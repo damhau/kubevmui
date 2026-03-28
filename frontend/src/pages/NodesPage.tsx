@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
 import { useNodes, useNode } from '@/hooks/useNodes'
 import { useNodeMetrics } from '@/hooks/useMetrics'
@@ -181,10 +181,6 @@ function NodeDetail({ name }: { name: string }) {
         </div>
       </div>
 
-      {/* VM list */}
-      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-        Running VMs ({vms.length})
-      </div>
       {/* Node Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         <NodeMetricChart
@@ -340,7 +336,6 @@ export function NodesPage() {
                         fontSize: 11,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
-                        width: col === '' ? 36 : undefined,
                       }}
                     >
                       {col}
@@ -352,62 +347,63 @@ export function NodesPage() {
                 {filtered.map((node) => {
                   const isExpanded = expanded === node.name
                   return (
-                    <tr key={node.name} style={{ verticalAlign: 'top' }}>
-                      <td colSpan={7} style={{ padding: 0 }}>
-                        <div
-                          onClick={() => setExpanded(isExpanded ? null : node.name)}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '36px 1fr auto auto auto auto auto',
-                            alignItems: 'center',
-                            cursor: 'pointer',
-                            borderBottom: isExpanded ? 'none' : `1px solid ${theme.main.tableRowBorder}`,
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <div style={{ padding: '10px 8px 10px 16px', color: theme.text.dim }}>
-                            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                          </div>
-                          <div style={{ padding: '10px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <Server size={14} style={{ color: theme.accent, flexShrink: 0 }} />
-                              <span style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>
-                                {node.name}
-                              </span>
-                            </div>
-                          </div>
-                          <div style={{ padding: '10px 16px' }}>
-                            <StatusBadge status={node.status} />
-                          </div>
-                          <div style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13, minWidth: 120 }}>
-                            {node.roles?.join(', ') || '—'}
-                          </div>
-                          <div style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13, minWidth: 80 }}>
-                            {node.cpu_capacity ?? '—'} vCPU
-                          </div>
-                          <div style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13, minWidth: 80 }}>
-                            {formatMemory(node.memory_capacity ?? '')}
-                          </div>
-                          <div style={{ padding: '10px 16px', minWidth: 60 }}>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                fontSize: 13,
-                                color: node.vm_count > 0 ? theme.accent : theme.text.dim,
-                                fontWeight: node.vm_count > 0 ? 500 : 400,
-                              }}
-                            >
-                              <Monitor size={13} />
-                              {node.vm_count}
+                    <React.Fragment key={node.name}>
+                      <tr
+                        onClick={() => setExpanded(isExpanded ? null : node.name)}
+                        style={{
+                          cursor: 'pointer',
+                          borderBottom: isExpanded ? 'none' : `1px solid ${theme.main.tableRowBorder}`,
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <td style={{ padding: '10px 8px 10px 16px', color: theme.text.dim, width: 36 }}>
+                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </td>
+                        <td style={{ padding: '10px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Server size={14} style={{ color: theme.accent, flexShrink: 0 }} />
+                            <span style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>
+                              {node.name}
                             </span>
                           </div>
-                        </div>
-                        {isExpanded && <NodeDetail name={node.name} />}
-                      </td>
-                    </tr>
+                        </td>
+                        <td style={{ padding: '10px 16px' }}>
+                          <StatusBadge status={node.status} />
+                        </td>
+                        <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                          {node.roles?.join(', ') || '—'}
+                        </td>
+                        <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                          {node.cpu_capacity ?? '—'} vCPU
+                        </td>
+                        <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                          {formatMemory(node.memory_capacity ?? '')}
+                        </td>
+                        <td style={{ padding: '10px 16px' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: 13,
+                              color: node.vm_count > 0 ? theme.accent : theme.text.dim,
+                              fontWeight: node.vm_count > 0 ? 500 : 400,
+                            }}
+                          >
+                            <Monitor size={13} />
+                            {node.vm_count}
+                          </span>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: 0 }}>
+                            <NodeDetail name={node.name} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   )
                 })}
               </tbody>
