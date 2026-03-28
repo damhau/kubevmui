@@ -14,7 +14,7 @@ export const theme = {
 
   // Main content area (light)
   main: {
-    bg: '#f0f0f3',
+    bg: '#f0f1f5',
     card: '#ffffff',
     cardBorder: '#e0e0e5',
     inputBg: '#ffffff',

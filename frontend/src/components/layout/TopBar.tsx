@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { theme } from '@/lib/theme'
 
@@ -9,6 +11,20 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...' }: TopBarProps) {
+  const navigate = useNavigate()
+  const searchRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        navigate('/vms')
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [navigate])
+
   return (
     <header
       style={{
@@ -19,6 +35,7 @@ export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...
         padding: '0 24px',
         background: theme.topBar.bg,
         borderBottom: `1px solid ${theme.topBar.border}`,
+        borderTop: `2px solid ${theme.accent}`,
         flexShrink: 0,
         gap: 16,
       }}
@@ -49,6 +66,8 @@ export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         {/* Search */}
         <div
+          ref={searchRef}
+          onClick={() => navigate('/vms')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -57,7 +76,7 @@ export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...
             border: `1px solid ${theme.topBar.searchBorder}`,
             borderRadius: theme.radius.md,
             padding: '6px 12px',
-            cursor: 'text',
+            cursor: 'pointer',
           }}
         >
           <Search size={14} style={{ color: theme.text.dim, flexShrink: 0 }} />

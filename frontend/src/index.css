@@ -28,3 +28,26 @@ body {
   color: var(--text);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
+
+/* Micro-interactions */
+tr {
+  transition: background 0.12s ease;
+}
+
+button {
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+/* Fade in for loaded content */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}

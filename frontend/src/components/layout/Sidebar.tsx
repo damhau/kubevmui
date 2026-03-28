@@ -222,8 +222,8 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-        {navGroups.map((group) => (
-          <div key={group.section} style={{ marginBottom: 8 }}>
+        {navGroups.map((group, groupIndex) => (
+          <div key={group.section} style={{ marginBottom: 8, ...(groupIndex > 0 ? { marginTop: 20, borderTop: `1px solid ${theme.sidebar.border}`, paddingTop: 12 } : {}) }}>
             <div
               style={{
                 padding: '6px 16px 4px',
@@ -231,7 +231,7 @@ export function Sidebar() {
                 color: theme.sidebar.sectionLabel,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
-                fontWeight: 600,
+                fontWeight: 700,
               }}
             >
               {group.section}
@@ -244,14 +244,15 @@ export function Sidebar() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: '7px 16px',
-                  marginBottom: 1,
+                  padding: '7px 12px',
+                  margin: '1px 8px',
                   textDecoration: 'none',
                   fontSize: 13,
+                  borderRadius: theme.radius.md,
                   fontWeight: isActive ? 500 : 400,
                   color: isActive ? theme.sidebar.text : theme.sidebar.textMuted,
-                  background: isActive ? theme.sidebar.activeBg : 'transparent',
-                  borderLeft: isActive ? `2px solid ${theme.sidebar.activeBorder}` : '2px solid transparent',
+                  background: isActive ? 'rgba(99,102,241,0.12)' : 'transparent',
+                  borderLeft: isActive ? `3px solid ${theme.sidebar.activeBorder}` : '3px solid transparent',
                   transition: 'background 0.12s, color 0.12s',
                 })}
               >

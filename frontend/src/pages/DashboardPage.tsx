@@ -47,7 +47,10 @@ function StatCard({ label, value, accent, borderColor }: { label: string; value:
         padding: 16,
         flex: 1,
         minWidth: 0,
+        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
       }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none' }}
     >
       <div
         style={{
