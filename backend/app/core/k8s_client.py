@@ -10,11 +10,14 @@ class KubeVirtClient:
     SNAPSHOT_API_VERSION = "v1beta1"
     CLONE_API_GROUP = "clone.kubevirt.io"
     CLONE_API_VERSION = "v1beta1"
+    CDI_API_GROUP = "cdi.kubevirt.io"
+    CDI_API_VERSION = "v1beta1"
 
     def __init__(self, api_client: client.ApiClient):
         self.api_client = api_client
         self.custom_api = client.CustomObjectsApi(api_client)
         self.core_api = client.CoreV1Api(api_client)
+        self.storage_api = client.StorageV1Api(api_client)
 
     def list_vms(self, namespace: str) -> list[dict]:
         result = self.custom_api.list_namespaced_custom_object(
@@ -163,6 +166,53 @@ class KubeVirtClient:
                 "memory_allocatable": node.status.allocatable.get("memory", "0"),
             })
         return nodes
+
+    # --- DataVolumes (CDI) ---
+
+    def list_datavolumes(self, namespace: str) -> list[dict]:
+        result = self.custom_api.list_namespaced_custom_object(
+            group=self.CDI_API_GROUP, version=self.CDI_API_VERSION,
+            namespace=namespace, plural="datavolumes",
+        )
+        return result.get("items", [])
+
+    def get_datavolume(self, namespace: str, name: str) -> dict | None:
+        try:
+            return self.custom_api.get_namespaced_custom_object(
+                group=self.CDI_API_GROUP, version=self.CDI_API_VERSION,
+                namespace=namespace, plural="datavolumes", name=name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def create_datavolume(self, namespace: str, body: dict) -> dict:
+        return self.custom_api.create_namespaced_custom_object(
+            group=self.CDI_API_GROUP, version=self.CDI_API_VERSION,
+            namespace=namespace, plural="datavolumes", body=body,
+        )
+
+    def delete_datavolume(self, namespace: str, name: str) -> None:
+        self.custom_api.delete_namespaced_custom_object(
+            group=self.CDI_API_GROUP, version=self.CDI_API_VERSION,
+            namespace=namespace, plural="datavolumes", name=name,
+        )
+
+    # --- Storage Classes ---
+
+    def list_storage_classes(self) -> list[dict]:
+        result = self.storage_api.list_storage_class()
+        classes = []
+        for sc in result.items:
+            annotations = sc.metadata.annotations or {}
+            is_default = annotations.get("storageclass.kubernetes.io/is-default-class", "false") == "true"
+            classes.append({
+                "name": sc.metadata.name,
+                "provisioner": sc.provisioner,
+                "is_default": is_default,
+            })
+        return classes
 
     # --- Clone ---
 
