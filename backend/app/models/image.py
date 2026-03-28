@@ -11,6 +11,10 @@ class Image(BaseModel):
     os_type: str = ""  # linux, windows
     source_type: str = ""  # container_disk, http, pvc, registry
     source_url: str = ""  # container image URL or HTTP URL
+    size_gb: int = 20
+    storage_class: str = ""
+    dv_phase: str = ""  # Pending, ImportScheduled, ImportInProgress, Succeeded, Failed
+    dv_progress: str = ""  # e.g. "45.5%"
     created_at: datetime | None = None
 
 
@@ -21,6 +25,8 @@ class ImageCreate(BaseModel):
     os_type: str = "linux"
     source_type: str = "container_disk"
     source_url: str = ""
+    size_gb: int = 20
+    storage_class: str = ""
 
 
 class ImageList(BaseModel):

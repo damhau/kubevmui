@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
+from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.disk import Disk, DiskCreate, DiskList
 from app.services.storage_service import StorageService
@@ -10,6 +11,8 @@ router = APIRouter(
     prefix="/api/v1/clusters/{cluster}",
     tags=["storage"],
 )
+
+cluster_router = APIRouter(tags=["storage"])
 
 
 def _get_service(cluster: str, cm: ClusterManager) -> StorageService:
@@ -53,3 +56,16 @@ def delete_disk(
 ):
     svc = _get_service(cluster, cm)
     svc.delete_disk(ns, name)
+
+
+@cluster_router.get("/api/v1/clusters/{cluster}/storage-classes")
+def list_storage_classes(
+    cluster: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    api_client = cm.get_api_client(cluster)
+    if api_client is None:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
+    kv = KubeVirtClient(api_client)
+    return {"items": kv.list_storage_classes()}

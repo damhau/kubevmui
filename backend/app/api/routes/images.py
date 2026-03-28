@@ -32,6 +32,21 @@ def list_images(
     return ImageList(items=items, total=len(items))
 
 
+@router.get("/images/{name}", response_model=Image)
+def get_image(
+    cluster: str,
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    img = svc.get_image(ns, name)
+    if img is None:
+        raise HTTPException(status_code=404, detail=f"Image '{name}' not found")
+    return img
+
+
 @router.post("/images", response_model=Image, status_code=201)
 def create_image(
     cluster: str,
