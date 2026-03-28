@@ -339,16 +339,16 @@ export function NetworksPage() {
                       animationDelay: `${0.05 + i * 0.04}s`,
                     } : undefined}
                   >
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{nad.display_name}</div>
                       {nad.display_name !== nad.name && (
                         <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2, fontFamily: theme.typography.mono.fontFamily }}>{nad.name}</div>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       <Badge label={nad.namespace} color={theme.accent} />
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily, fontSize: 13 }}>
                       {nad.full_name}
                     </td>
                   </tr>
