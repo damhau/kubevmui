@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
+import { useAllNetworks } from '@/hooks/useNetworks'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -138,6 +139,7 @@ interface TemplateDisk {
 
 interface TemplateNIC {
   name: string
+  type: 'pod' | 'multus'
   network_profile: string
 }
 
@@ -168,7 +170,8 @@ const emptyDisk = (): TemplateDisk => ({
 
 const emptyNIC = (): TemplateNIC => ({
   name: '',
-  network_profile: 'pod',
+  type: 'multus',
+  network_profile: '',
 })
 
 const defaultForm = (): TemplateForm => ({
@@ -255,6 +258,9 @@ const textareaStyle: React.CSSProperties = {
 export function TemplatesPage() {
   const navigate = useNavigate()
   const { data, isLoading } = useTemplates()
+  const { data: allNADsData } = useAllNetworks()
+  const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
+    Array.isArray(allNADsData?.items) ? allNADsData.items : []
   const createTemplate = useCreateTemplate()
   const deleteTemplate = useDeleteTemplate()
   const templates: Template[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
@@ -288,6 +294,7 @@ export function TemplatesPage() {
         })),
         nics: (tpl.networks || []).map((n: any) => ({
           name: n.name || '',
+          type: (n.network_profile === 'pod' ? 'pod' : 'multus') as 'pod' | 'multus',
           network_profile: n.network_profile || '',
         })),
         cloud_init_user_data: tpl.cloud_init_user_data || '',
@@ -794,41 +801,71 @@ export function TemplatesPage() {
             <div
               key={idx}
               style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr auto',
-                gap: 10,
-                alignItems: 'end',
+                background: theme.main.inputBg,
+                border: `1px solid ${theme.main.inputBorder}`,
+                borderRadius: theme.radius.md,
+                padding: 12,
                 marginBottom: 10,
               }}
             >
-              <div>
-                <label style={labelStyle}>Name</label>
-                <input
-                  type="text"
-                  value={nic.name}
-                  onChange={(e) => updateNIC(idx, { name: e.target.value })}
-                  placeholder="nic-0"
-                  style={inputStyle}
-                />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['pod', 'multus'] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => updateNIC(idx, {
+                        type: t,
+                        network_profile: t === 'pod' ? 'pod' : '',
+                        name: t === 'pod' ? 'default' : nic.name,
+                      })}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: 11,
+                        fontFamily: 'inherit',
+                        borderRadius: theme.radius.sm,
+                        cursor: 'pointer',
+                        background: nic.type === t ? theme.accentLight : theme.main.card,
+                        border: nic.type === t ? `2px solid ${theme.accent}` : `1px solid ${theme.main.cardBorder}`,
+                        color: nic.type === t ? theme.accent : theme.text.primary,
+                        fontWeight: nic.type === t ? 600 : 400,
+                      }}
+                    >
+                      {t === 'pod' ? 'Pod Network' : 'Multus'}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => removeNIC(idx)} style={removeBtnStyle} title="Remove NIC">x</button>
               </div>
-              <div>
-                <label style={labelStyle}>Network Profile</label>
-                <input
-                  type="text"
-                  value={nic.network_profile}
-                  onChange={(e) => updateNIC(idx, { network_profile: e.target.value })}
-                  placeholder="pod"
-                  style={inputStyle}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: nic.type === 'multus' ? '1fr 1fr' : '1fr', gap: 10 }}>
+                <div>
+                  <label style={labelStyle}>Name</label>
+                  <input
+                    type="text"
+                    value={nic.name}
+                    onChange={(e) => updateNIC(idx, { name: e.target.value })}
+                    placeholder={nic.type === 'pod' ? 'default' : 'nic-0'}
+                    style={inputStyle}
+                  />
+                </div>
+                {nic.type === 'multus' && (
+                  <div>
+                    <label style={labelStyle}>Network (NAD)</label>
+                    <select
+                      value={nic.network_profile}
+                      onChange={(e) => updateNIC(idx, { network_profile: e.target.value })}
+                      style={inputStyle}
+                    >
+                      <option value="">Select network...</option>
+                      {availableNADs.map((nad) => (
+                        <option key={nad.full_name} value={nad.full_name}>
+                          {nad.display_name} ({nad.namespace})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => removeNIC(idx)}
-                style={removeBtnStyle}
-                title="Remove NIC"
-              >
-                x
-              </button>
             </div>
           ))}
 
