@@ -4,21 +4,31 @@ A modern, enterprise-ready web UI for managing KubeVirt virtual machines across 
 
 ## 1. Overview
 
-kubevmui is a web-based management interface for KubeVirt that provides full VM lifecycle management, console access (VNC, serial, RDP), monitoring, and multi-cluster support. It targets both small single-cluster deployments and large enterprise environments with OIDC SSO.
+kubevmui is a **virtualization control plane** for KubeVirt — not just a UI, but an abstraction layer that sits above KubeVirt and presents operator-friendly workflows. It hides Kubernetes complexity (PVCs, NADs, CRDs) behind its own resource model (VMs, Disks, Network Profiles, Templates) while providing full VM lifecycle management, console access (VNC, serial, RDP), monitoring, and multi-cluster support. It targets both small single-cluster deployments and large enterprise environments with OIDC SSO.
+
+### Design Philosophy
+
+- **Control plane, not just a UI**: The API defines its own resource model. The UI consumes this API — never K8s directly. This allows automation (CLI, Terraform) later without coupling to K8s internals.
+- **Operator-first**: Abstractions are designed for infra operators, not Kubernetes experts. Networking uses "network profiles," storage uses "disks," not raw NADs and PVCs.
+- **Kubernetes is the data store**: All VM state lives in Kubernetes (no separate database). The API layer translates between our model and K8s CRDs. This avoids dual source-of-truth problems.
+- **Progressive disclosure**: Simple by default, powerful when needed. A VM can be created in 3 clicks from a template, or fully customized via a 9-step wizard. YAML editor is always available as an escape hatch.
 
 ### Goals
 
 - Replace manual YAML/kubectl workflows with an intuitive UI
+- Abstract Kubernetes complexity behind operator-friendly concepts
 - Provide enterprise-grade auth (OIDC + K8s RBAC impersonation)
 - Support multi-cluster management from a single pane of glass
 - Deliver a polished, dark modern UI inspired by Vercel/Linear aesthetics
 - Zero-config deployment that works immediately against the local cluster
+- Full audit trail of every action
 
 ### Non-Goals
 
 - Replacing general-purpose Kubernetes management (Lens, Rancher, etc.)
 - Managing non-KubeVirt workloads (pods, deployments, etc.)
 - Providing a KubeVirt operator or installer
+- Maintaining a separate database for VM state (Kubernetes is the source of truth)
 
 ## 2. Tech Stack
 
@@ -84,8 +94,8 @@ backend/
 │   │   │   ├── snapshots.py    # Snapshot/restore operations
 │   │   │   ├── backups.py      # Backup/restore + scheduled backups
 │   │   │   ├── migrations.py   # Live migration controls
-│   │   │   ├── networks.py     # Multus network attachment definitions
-│   │   │   ├── storage.py      # StorageClasses, PVCs, DataVolumes
+│   │   │   ├── networks.py     # Network profiles (abstracts Multus/NADs)
+│   │   │   ├── storage.py      # Disks (abstracts PVCs/DataVolumes/StorageClasses)
 │   │   │   ├── images.py       # OS image/boot source registry
 │   │   │   ├── ssh_keys.py     # SSH key secret management
 │   │   │   ├── nodes.py        # Node info and scheduling
@@ -121,10 +131,15 @@ backend/
 │   │   ├── k8s_token.py        # Direct K8s token validation
 │   │   ├── session.py          # JWT session management
 │   │   └── impersonation.py    # K8s user impersonation helper
-│   └── models/
-│       ├── vm.py               # Pydantic models for VMs
-│       ├── cluster.py          # Cluster registry models
-│       └── auth.py             # Auth request/response models
+│   ├── models/
+│   │   ├── vm.py               # Pydantic models for VMs (our own schema, not K8s CRDs)
+│   │   ├── disk.py             # Disk model (abstracts PVC/DataVolume)
+│   │   ├── network_profile.py  # Network profile model (abstracts NAD/Multus)
+│   │   ├── template.py         # Template model
+│   │   ├── cluster.py          # Cluster registry models
+│   │   └── auth.py             # Auth request/response models
+│   └── audit/
+│       └── logger.py           # Audit trail: who did what, when, on which cluster
 ├── pyproject.toml
 └── Dockerfile
 ```
@@ -203,6 +218,7 @@ frontend/
 │       ├── NodesPage.tsx
 │       ├── AdminClustersPage.tsx
 │       ├── AdminRBACPage.tsx
+│       ├── AdminAuditLogPage.tsx
 │       ├── SettingsPage.tsx
 │       └── LoginPage.tsx
 ├── package.json
@@ -410,22 +426,36 @@ When a user makes a request:
 - Migration progress bar with bandwidth and completion estimate
 - Migration policy management (bandwidth limits, auto-converge settings)
 
-### 5.11 Network Management
+### 5.11 Network Management (Network Profiles)
 
-- List Multus NetworkAttachmentDefinitions
-- View network details: type (bridge, SR-IOV, macvtap), VLAN, subnet
-- Create/edit/delete network definitions (form-based, not raw YAML)
-- Show which VMs are connected to each network
-- Network topology diagram (stretch goal)
+Network Profiles abstract Multus/NADs into operator-friendly concepts. Users define networks in terms they understand, not K8s primitives.
 
-### 5.12 Storage Management
+- **Network Profile list**: Name, VLAN ID, type (L2 bridge / L3 routed / SR-IOV), DHCP/static, subnet, connected VM count
+- **Create Network Profile**: Form-based wizard:
+  - Display name and description
+  - Type: Bridge, SR-IOV, Masquerade
+  - VLAN ID (optional)
+  - L2/L3 mode
+  - DHCP enabled or static IP range
+  - Subnet / gateway (if static)
+  - Under the hood: creates/updates the appropriate NetworkAttachmentDefinition
+- **Edit / delete** network profiles
+- **VM NIC attachment**: When attaching a NIC to a VM, users pick a "network profile" — not a raw NAD
+- **Show connected VMs**: Which VMs are using each profile
+- **Network topology diagram** (stretch goal)
 
-- List StorageClasses with capabilities (access modes, volume expansion)
-- List PersistentVolumeClaims with status, size, bound PV
-- List DataVolumes with import progress
-- Create DataVolume (import from URL, registry, upload, clone)
-- Upload disk image directly from browser (with progress bar)
-- Delete PVCs/DataVolumes (with warnings about attached VMs)
+### 5.12 Storage Management (Disks)
+
+Storage is presented as "Disks" — operators think in terms of disk size and performance, not PVCs and StorageClasses.
+
+- **Disk list**: Name, size, performance tier (mapped from StorageClass), backend info (Ceph, TopoLVM, Longhorn, etc.), attached VM, real usage vs provisioned size, status
+- **Create Disk**: Name, size, performance tier (dropdown mapped from available StorageClasses with human labels), access mode and volume mode hidden behind sensible defaults (overridable in advanced section)
+- **Import Disk**: From URL, container registry, clone existing disk — presented as a disk import, not "create DataVolume"
+- **Upload Disk**: Upload qcow2/raw/ISO from browser with progress bar
+- **Resize Disk**: Expand size (if StorageClass supports it)
+- **Snapshot Disk**: Volume-level snapshot
+- **Delete Disk**: With warnings if attached to a VM
+- **Storage overview**: Total capacity, used, available across all tiers. Per-tier breakdown showing backend storage system info
 
 ### 5.13 Node Overview
 
@@ -434,13 +464,33 @@ When a user makes a request:
 - Node labels and taints (relevant for VM scheduling)
 - Node detail: running VMs on this node, resource utilization charts
 
-### 5.14 Monitoring Dashboard
+### 5.14 Monitoring & Observability
 
+Not just Prometheus graphs — operator-first observability that answers "why is this VM slow?" and "what changed yesterday?"
+
+**VM Timeline View** (on VM Detail page):
+- Correlated timeline of events + metrics + config changes for a single VM
+- Shows: creation, start/stop, migrations, snapshot/backup, config changes (CPU resize, disk attach), error events
+- Each entry shows who triggered it (from audit log) and what happened
+- Metric overlays: CPU/memory spikes correlated with events on the same timeline
+- "What changed?" — diff view for any config change event
+
+**Derived Health Status** (on VM list + detail):
+- Each VM shows a computed health: Healthy / Degraded / Critical / Unknown
+- Based on: K8s conditions + guest agent status + resource pressure + error events
+- Cluster dashboard shows health distribution (e.g. "42 healthy, 3 degraded, 2 critical")
+
+**Metrics Dashboard**:
 - **Metrics source**: Prometheus (via metrics endpoint proxy)
 - **VM-level**: CPU usage, memory usage, disk I/O (read/write), network throughput (in/out)
-- **Cluster-level**: Total VM count over time, resource utilization trends, migration frequency
+- **Cluster-level**: Total VM count over time, resource utilization trends, migration frequency, top consumers
 - **Time range selector**: Last 1h, 6h, 24h, 7d, 30d, custom
 - **Charts**: Line charts for time series, bar charts for comparisons (Recharts)
+
+**Event Correlation**:
+- Cross-source event view: KubeVirt events + node events + storage events for a VM
+- Filterable by severity, source, time range
+- "Why did migration fail?" — shows migration event + node conditions + resource pressure in one view
 
 ### 5.15 Admin Panel
 
@@ -457,6 +507,13 @@ When a user makes a request:
 - Pre-built role templates: VM Viewer (read-only), VM Operator (lifecycle actions), VM Admin (full CRUD), Cluster Admin (all + cluster management)
 - Create/apply role bindings from the UI
 
+**Audit Log:**
+- Searchable log of every action: who, what, when, which cluster, which resource
+- Filter by: user, action type, cluster, resource, time range
+- Actions logged: VM lifecycle (start/stop/create/delete), config changes, console access, cluster registration, RBAC changes, login/logout
+- Stored in Redis stream (lightweight, no SQL dependency) with configurable retention (default 90 days)
+- Export to external systems (syslog, webhook) for compliance
+
 **Settings:**
 - OIDC provider configuration (issuer URL, client ID, client secret, scopes)
 - Default namespace
@@ -465,6 +522,7 @@ When a user makes a request:
 - Guacamole service URL (for RDP)
 - Backup target configuration (NFS endpoint or S3 bucket/credentials)
 - Snapshot quota defaults (per-namespace limits)
+- Audit log retention and export configuration
 
 ## 6. Console Architecture — Data Flow
 
@@ -522,6 +580,32 @@ Browser
 ```
 
 ## 7. API Design
+
+### 7.0 Resource Model
+
+The API exposes our own resource model — not raw K8s CRDs. The service layer translates between our model and Kubernetes objects. This decouples the UI/API consumers from K8s internals and allows future automation (CLI, Terraform provider) without K8s coupling.
+
+**Core resources and their K8s mappings:**
+
+| kubevmui Resource | K8s Backend | Abstraction |
+|---|---|---|
+| `VM` | VirtualMachine + VMI | Unified view: status from VMI, config from VM. Adds derived health, timeline. |
+| `Disk` | PVC + DataVolume | Presents as: name, size, performance tier, backend. Hides PVC/DV/SC plumbing. |
+| `NetworkProfile` | NetworkAttachmentDefinition | Operator-facing: name, VLAN ID, type (L2/L3), DHCP/static. Hides Multus config. |
+| `Template` | VM config + cloud-init + preferences | Versioned. Includes compute, storage, network, init script as a single unit. |
+| `Image` | DataVolume source / container disk | OS image with name, version, source (HTTP/S3/registry/upload). |
+| `Snapshot` | VirtualMachineSnapshot | Direct mapping with added metadata. |
+| `Backup` | VirtualMachineBackup (or Velero) | Backup with target (NFS/S3), schedule, retention. |
+| `Cluster` | K8s Secret (kubeconfig) | Registered cluster with health, version, VM count. |
+| `AuditEntry` | In-memory / Redis stream | Who did what, when, on which cluster/VM. Queryable log. |
+
+**Key principle:** A VM returned by our API is a single JSON object with everything an operator needs: status, health, IPs, disks (as Disk objects), networks (as NetworkProfile references), metrics summary, and recent events. The operator never needs to know about VirtualMachineInstance, PodStatus, or PersistentVolumeClaim.
+
+**Derived health status:** Each VM gets a computed health field:
+- **Healthy** — Running, guest agent connected, no error conditions
+- **Degraded** — Running but with warnings (high CPU, guest agent disconnected, disk pressure)
+- **Critical** — Error state, crash loop, migration failed
+- **Unknown** — No guest agent, cannot determine health
 
 ### 7.1 REST Endpoints
 
@@ -632,6 +716,13 @@ All endpoints are prefixed with `/api/v1` and scoped to a cluster via header or 
 - `WS /ws/console/{cluster}/{namespace}/{vm}` — serial console
 - `WS /ws/rdp/{cluster}/{namespace}/{vm}` — RDP console
 - `WS /ws/events/{cluster}` — real-time K8s events
+
+**Audit:**
+- `GET /api/v1/audit` — query audit log (filters: user, action, cluster, resource, time range)
+- `GET /api/v1/audit/export` — export audit log (CSV/JSON)
+
+**VM Timeline:**
+- `GET /api/v1/clusters/{cluster}/namespaces/{ns}/vms/{name}/timeline` — correlated timeline (events + config changes + metrics)
 
 ### 7.2 Request Scoping
 
