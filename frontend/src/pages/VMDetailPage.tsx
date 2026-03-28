@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
+import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
+import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
 import { theme } from '@/lib/theme'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
@@ -35,7 +37,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-type Tab = 'overview' | 'events' | 'yaml'
+type Tab = 'overview' | 'snapshots' | 'events' | 'yaml'
 
 function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
@@ -81,6 +83,23 @@ export function VMDetailPage() {
     enabled: !!(namespace && name),
   })
 
+  const { data: snapshotData } = useSnapshots(namespace!, name!)
+  const createSnapshot = useCreateSnapshot()
+  const deleteSnapshot = useDeleteSnapshot()
+  const restoreSnapshot = useRestoreSnapshot()
+  const [snapshotName, setSnapshotName] = useState('')
+  const [snapshotError, setSnapshotError] = useState<string | null>(null)
+
+  const snapshots = Array.isArray(snapshotData?.items) ? snapshotData.items : []
+
+  const { data: migrationData } = useMigrations(namespace!, name!)
+  const createMigration = useCreateMigration()
+  const cancelMigration = useCancelMigration()
+  const migrations = Array.isArray(migrationData?.items) ? migrationData.items : []
+  const activeMigration = migrations.find((m: any) =>
+    m.vm_name === name && !['Succeeded', 'Failed'].includes(m.phase)
+  )
+
   const handleAction = (action: string) => {
     if (!namespace || !name) return
     if (action === 'delete') {
@@ -100,6 +119,7 @@ export function VMDetailPage() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'snapshots', label: 'Snapshots' },
     { id: 'events', label: 'Events' },
     { id: 'yaml', label: 'YAML' },
   ]
@@ -178,6 +198,30 @@ export function VMDetailPage() {
               {btn.label}
             </button>
           ))}
+          {vm?.status === 'Running' && (
+            <button
+              onClick={() => {
+                if (namespace && name) {
+                  createMigration.mutate({ namespace, vmName: name })
+                }
+              }}
+              disabled={!!activeMigration || createMigration.isPending}
+              style={{
+                background: theme.status.migratingBg,
+                color: theme.status.migrating,
+                border: `1px solid rgba(245,158,11,0.3)`,
+                borderRadius: theme.radius.md,
+                padding: '6px 12px',
+                fontSize: 12,
+                cursor: activeMigration || createMigration.isPending ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 500,
+                opacity: activeMigration || createMigration.isPending ? 0.6 : 1,
+              }}
+            >
+              {activeMigration || createMigration.isPending ? 'Migrating...' : 'Migrate'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -227,14 +271,78 @@ export function VMDetailPage() {
           <>
             {/* Overview */}
             {activeTab === 'overview' && (
-              <div
-                style={{
-                  background: theme.main.card,
-                  border: `1px solid ${theme.main.cardBorder}`,
-                  borderRadius: theme.radius.lg,
-                  padding: '4px 20px',
-                }}
-              >
+              <>
+                {/* Active migration banner */}
+                {activeMigration && (
+                  <div
+                    style={{
+                      background: theme.status.migratingBg,
+                      borderLeft: `4px solid ${theme.status.migrating}`,
+                      borderRadius: theme.radius.md,
+                      padding: '12px 16px',
+                      marginBottom: 16,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
+                        Migration in progress
+                      </span>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: 10,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          background: 'rgba(245,158,11,0.15)',
+                          color: theme.status.migrating,
+                        }}
+                      >
+                        {activeMigration.phase}
+                      </span>
+                      {(activeMigration.source_node || activeMigration.target_node) && (
+                        <span style={{ fontSize: 12, color: theme.text.secondary }}>
+                          {activeMigration.source_node ?? '?'} → {activeMigration.target_node ?? '?'}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (namespace) {
+                          cancelMigration.mutate({ namespace, name: activeMigration.name })
+                        }
+                      }}
+                      disabled={cancelMigration.isPending}
+                      style={{
+                        background: theme.main.card,
+                        color: theme.status.error,
+                        border: `1px solid rgba(239,68,68,0.3)`,
+                        borderRadius: theme.radius.md,
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        cursor: cancelMigration.isPending ? 'not-allowed' : 'pointer',
+                        fontFamily: 'inherit',
+                        fontWeight: 500,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {cancelMigration.isPending ? 'Cancelling...' : 'Cancel'}
+                    </button>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    background: theme.main.card,
+                    border: `1px solid ${theme.main.cardBorder}`,
+                    borderRadius: theme.radius.lg,
+                    padding: '4px 20px',
+                  }}
+                >
                 <InfoRow label="Namespace" value={namespace} />
                 <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
                 <InfoRow label="CPU Cores" value={`${vm.cpu ?? '—'} vCPU`} />
@@ -272,6 +380,215 @@ export function VMDetailPage() {
                       </div>
                     }
                   />
+                )}
+              </div>
+              </>
+            )}
+
+            {/* Snapshots */}
+            {activeTab === 'snapshots' && (
+              <div
+                style={{
+                  background: theme.main.card,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  borderRadius: theme.radius.lg,
+                }}
+              >
+                {/* Create snapshot form */}
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <input
+                    type="text"
+                    placeholder="Snapshot name"
+                    value={snapshotName}
+                    onChange={(e) => {
+                      setSnapshotName(e.target.value)
+                      setSnapshotError(null)
+                    }}
+                    style={{
+                      background: theme.main.inputBg,
+                      border: `1px solid ${theme.main.inputBorder}`,
+                      borderRadius: theme.radius.md,
+                      padding: '6px 12px',
+                      fontSize: 13,
+                      color: theme.text.primary,
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      minWidth: 200,
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (!snapshotName.trim()) {
+                        setSnapshotError('Snapshot name is required')
+                        return
+                      }
+                      if (!namespace || !name) return
+                      setSnapshotError(null)
+                      createSnapshot.mutate(
+                        { namespace, vmName: name, snapshotName: snapshotName.trim() },
+                        {
+                          onSuccess: () => setSnapshotName(''),
+                          onError: (err: any) => setSnapshotError(err?.message ?? 'Failed to create snapshot'),
+                        }
+                      )
+                    }}
+                    disabled={createSnapshot.isPending}
+                    style={{
+                      background: theme.accent,
+                      color: theme.button.primaryText,
+                      border: 'none',
+                      borderRadius: theme.radius.md,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      cursor: createSnapshot.isPending ? 'not-allowed' : 'pointer',
+                      fontFamily: 'inherit',
+                      fontWeight: 500,
+                      opacity: createSnapshot.isPending ? 0.7 : 1,
+                    }}
+                  >
+                    {createSnapshot.isPending ? 'Creating...' : 'Take Snapshot'}
+                  </button>
+                  {snapshotError && (
+                    <span style={{ fontSize: 12, color: theme.status.error }}>{snapshotError}</span>
+                  )}
+                </div>
+
+                {/* Snapshots table */}
+                {snapshots.length > 0 ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                        {['Name', 'Phase', 'Ready', 'Created', 'Actions'].map((col) => (
+                          <th
+                            key={col}
+                            style={{
+                              padding: '10px 16px',
+                              textAlign: 'left',
+                              color: theme.text.secondary,
+                              fontWeight: 500,
+                              fontSize: 11,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                            }}
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {snapshots.map((snap: any) => {
+                        const phaseColors: Record<string, { bg: string; color: string }> = {
+                          Succeeded: { bg: '#ecfdf5', color: '#16a34a' },
+                          InProgress: { bg: '#eff6ff', color: '#2563eb' },
+                          Pending: { bg: '#eff6ff', color: '#2563eb' },
+                          Failed: { bg: '#fef2f2', color: '#dc2626' },
+                          Unknown: { bg: '#f4f4f5', color: '#71717a' },
+                        }
+                        const pc = phaseColors[snap.phase] ?? phaseColors.Unknown
+                        return (
+                          <tr key={snap.name} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                            <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>
+                              {snap.name}
+                            </td>
+                            <td style={{ padding: '10px 16px' }}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '2px 8px',
+                                  borderRadius: 10,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  background: pc.bg,
+                                  color: pc.color,
+                                }}
+                              >
+                                {snap.phase}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 16px' }}>
+                              {snap.ready_to_use ? (
+                                <span style={{ color: theme.status.running, fontSize: 14 }}>&#10003;</span>
+                              ) : (
+                                <span style={{ color: theme.text.dim, fontSize: 14 }}>&#10005;</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                              {snap.creation_time
+                                ? new Date(snap.creation_time).toLocaleString()
+                                : snap.created_at
+                                  ? new Date(snap.created_at).toLocaleString()
+                                  : '—'}
+                            </td>
+                            <td style={{ padding: '10px 16px' }}>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {snap.ready_to_use && (
+                                  <button
+                                    onClick={() => {
+                                      if (!namespace || !name) return
+                                      if (!window.confirm(`Restore VM "${name}" from snapshot "${snap.name}"?`)) return
+                                      restoreSnapshot.mutate(
+                                        { namespace, vmName: name, snapshotName: snap.name },
+                                        { onError: (err: unknown) => { setSnapshotError((err as { message?: string }).message ?? 'Restore failed') } },
+                                      )
+                                    }}
+                                    disabled={restoreSnapshot.isPending}
+                                    style={{
+                                      background: theme.main.card,
+                                      color: theme.accent,
+                                      border: `1px solid ${theme.main.inputBorder}`,
+                                      borderRadius: theme.radius.md,
+                                      padding: '3px 8px',
+                                      fontSize: 11,
+                                      cursor: restoreSnapshot.isPending ? 'not-allowed' : 'pointer',
+                                      fontFamily: 'inherit',
+                                      fontWeight: 500,
+                                    }}
+                                  >
+                                    Restore
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    if (!namespace) return
+                                    if (!window.confirm(`Delete snapshot "${snap.name}"?`)) return
+                                    deleteSnapshot.mutate({ namespace, name: snap.name })
+                                  }}
+                                  disabled={deleteSnapshot.isPending}
+                                  style={{
+                                    background: 'rgba(239,68,68,0.08)',
+                                    color: theme.status.error,
+                                    border: `1px solid rgba(239,68,68,0.3)`,
+                                    borderRadius: theme.radius.md,
+                                    padding: '3px 8px',
+                                    fontSize: 11,
+                                    cursor: deleteSnapshot.isPending ? 'not-allowed' : 'pointer',
+                                    fontFamily: 'inherit',
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                    No snapshots found for this VM.
+                  </div>
                 )}
               </div>
             )}
