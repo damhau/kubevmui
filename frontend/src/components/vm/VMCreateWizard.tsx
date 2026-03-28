@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useCreateVM } from '@/hooks/useVMs'
 import { useNamespaces } from '@/hooks/useNamespaces'
+import { useImages } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
 
 const STEPS = [
@@ -185,6 +186,9 @@ function DiskIcon() {
 export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
   const createVM = useCreateVM()
   const { data: namespacesData } = useNamespaces()
+  const { data: imagesData } = useImages()
+  const registeredImages: Array<{ name: string; display_name: string; source_url: string; os_type: string }> =
+    Array.isArray(imagesData?.items) ? imagesData.items : []
   const [step, setStep] = useState(1)
   const [error, setError] = useState('')
 
@@ -802,14 +806,47 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                               style={inputStyle()}
                             />
                           </FieldGroup>
-                          <FieldGroup label="Image URL">
-                            <input
-                              type="text"
-                              value={disk.image}
-                              onChange={(e) => updateDisk(i, { image: e.target.value })}
-                              placeholder="registry.io/image:tag"
-                              style={inputStyle()}
-                            />
+                          <FieldGroup label="Boot Image">
+                            {registeredImages.length > 0 ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <select
+                                  value={registeredImages.some((img) => img.source_url === disk.image) ? disk.image : '__custom__'}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__custom__') {
+                                      updateDisk(i, { image: '' })
+                                    } else {
+                                      const img = registeredImages.find((im) => im.source_url === e.target.value)
+                                      updateDisk(i, { image: e.target.value, name: img?.name || disk.name })
+                                    }
+                                  }}
+                                  style={inputStyle()}
+                                >
+                                  {registeredImages.map((img) => (
+                                    <option key={img.name} value={img.source_url}>
+                                      {img.display_name} ({img.os_type})
+                                    </option>
+                                  ))}
+                                  <option value="__custom__">Custom image URL...</option>
+                                </select>
+                                {!registeredImages.some((img) => img.source_url === disk.image) && (
+                                  <input
+                                    type="text"
+                                    value={disk.image}
+                                    onChange={(e) => updateDisk(i, { image: e.target.value })}
+                                    placeholder="registry.io/image:tag"
+                                    style={inputStyle()}
+                                  />
+                                )}
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={disk.image}
+                                onChange={(e) => updateDisk(i, { image: e.target.value })}
+                                placeholder="registry.io/image:tag"
+                                style={inputStyle()}
+                              />
+                            )}
                           </FieldGroup>
                           <FieldGroup label="Bus">
                             <select
