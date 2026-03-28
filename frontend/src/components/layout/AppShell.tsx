@@ -16,7 +16,8 @@ export function AppShell() {
         style={{
           flex: 1,
           overflowY: 'auto',
-          background: '#1c1c1e',
+          background: '#f0f0f3',
+          color: '#1c1c1e',
         }}
       >
         <Outlet />
