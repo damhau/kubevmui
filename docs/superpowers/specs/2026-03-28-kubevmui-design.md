@@ -879,24 +879,100 @@ kubevmui/
 └── README.md
 ```
 
-## 11. Phase 2 — Future Enhancements
+## 11. Implementation Phases
 
-Features identified from competitive analysis that are valuable but not required for initial release:
+### Phase 1 — MVP (Functional single-cluster)
 
-- **Cluster API (CAPK)**: Provision tenant Kubernetes clusters on KubeVirt VMs (kubevirt-manager feature)
-- **VM Import from external platforms**: Migration toolkit for VMware vSphere, RHV, OpenStack (OpenShift MTV)
-- **HPA Auto-scaling for VM Pools**: Horizontal Pod Autoscaler integration for VM pool scaling
-- **Liveness/Readiness probes for VM Pools**: Health probes for pool instances
-- **K8s Service / Load Balancer management**: Create ClusterIP/NodePort/LoadBalancer services for VMs
-- **Network health checkups**: Latency testing, DPDK validation, storage verification (OpenShift checkups)
-- **Topology view**: Visual graph of VMs, services, and their connections
-- **VM Folders / grouping**: Organize VMs into folders within a namespace (OpenShift 4.19+)
-- **vTPM (persistent)**: Persistent virtual Trusted Platform Module with Bitlocker support
-- **PXE/iPXE boot support**: Automated bare-metal style provisioning
-- **Storage migration**: Move VM storage between storage backends independently of compute migration
-- **Overlay/SDN networking**: Kube-OVN integration for VPC, microsegmentation (Harvester/Kubermatic)
-- **Cross-cluster live migration**: Move running VMs between clusters (OpenShift Tech Preview)
-- **AI assistant integration**: Natural language troubleshooting and management (OpenShift Lightspeed)
+The minimum that makes kubevmui usable and better than kubectl. Parallel backend + frontend development.
+
+**Backend:**
+- FastAPI project scaffolding with uv
+- K8s client wrapper with cluster manager (single local cluster)
+- Auth middleware (K8s token validation — no OIDC yet)
+- API resource model: VM, Disk, NetworkProfile, Template (our own Pydantic schemas)
+- VM service: list, get, create, start, stop, restart, pause, delete
+- Template service: list, create from VM config, create VM from template
+- Network profile service: list, create, map to/from NADs
+- Disk service: list, create, map to/from PVCs/DataVolumes
+- WebSocket handlers: VNC proxy, serial console proxy
+- Docker Compose for dev environment
+
+**Frontend:**
+- React + Vite + TypeScript + shadcn/ui scaffolding
+- Dark theme setup (Tailwind config, color tokens)
+- App shell: sidebar navigation, top bar, project (namespace) selector
+- Login page (K8s token form)
+- Dashboard: stats cards, recent VMs, cluster health
+- VM list page: table with status, search, project filter, bulk actions
+- VM detail page: overview, events, YAML editor tabs
+- VM create wizard (simplified: basics + compute + storage + networking + cloud-init + review)
+- VNC console (noVNC component)
+- Serial console (xterm.js component)
+- Template list + create VM from template
+- Network profile list + create form
+- Disk list + create form
+- Auto-generated API client from OpenAPI spec
+
+### Phase 2 — Enterprise Features
+
+What makes it credible for production deployments.
+
+**Auth & Multi-cluster:**
+- OIDC authentication + adaptive auth model (SSO login + token fallback)
+- Multi-cluster: cluster registry, sidebar cluster selector, user impersonation
+- JWT session management with refresh tokens
+
+**VM Management:**
+- Full 9-step VM create wizard (firmware/UEFI/Secure Boot, scheduling, GPU, Sysprep)
+- Disk hotplug/unplug on running VMs
+- NIC hotplug/unplug on running VMs
+- Snapshots: create, restore, restore as new VM, delete
+- Live migration: trigger, cancel, progress bar, migration policies
+- Image / boot source registry with browser upload
+- SSH key management (stored as K8s Secrets)
+- Run strategy, priority class management
+
+**Observability & Admin:**
+- Monitoring: Prometheus metrics proxy, VM-level and cluster-level charts
+- VM health status (derived Healthy/Degraded/Critical)
+- Node overview with KubeVirt info
+- Audit log (Redis-backed, searchable, exportable)
+- RDP console (Guacamole integration)
+
+### Phase 3 — Scale & Operations
+
+What differentiates kubevmui from competition.
+
+- VM Pools with replica scaling
+- Backups to NFS/S3 + scheduled backups with cron and retention policies
+- VM timeline view + event correlation ("why did this fail?")
+- Project quotas (CPU, memory, storage, VM count)
+- Services for VMs (expose ports via LoadBalancer/NodePort)
+- RBAC admin panel (roles, bindings, pre-built role templates)
+- Diagnostics tab (conditions, guest agent info, health probes)
+- Helm chart for production Kubernetes deployment
+- Settings page (OIDC config, backup targets, metrics endpoints, Guacamole URL)
+- Cross-cluster backup restore
+
+### Phase 4 — Future Roadmap
+
+Features identified from competitive analysis for long-term differentiation:
+
+- **Cluster API (CAPK)**: Provision tenant Kubernetes clusters on KubeVirt VMs
+- **VM Import**: Migration toolkit for VMware vSphere, RHV, OpenStack
+- **HPA Auto-scaling**: Horizontal Pod Autoscaler for VM Pools
+- **Liveness/Readiness probes**: Health probes for VM Pool instances
+- **Network health checkups**: Latency testing, DPDK validation
+- **Topology view**: Visual graph of VMs, services, and connections
+- **VM Folders / grouping**: Organize VMs into folders within a project
+- **vTPM (persistent)**: Persistent Trusted Platform Module with Bitlocker support
+- **PXE/iPXE boot**: Automated bare-metal style provisioning
+- **Storage migration**: Move VM storage between backends independently
+- **Overlay/SDN networking**: Kube-OVN for VPC, microsegmentation
+- **Cross-cluster live migration**: Move running VMs between clusters
+- **Policy engine**: Prevent risky configs, enforce standards, approval workflows
+- **CLI tool**: Command-line client consuming the same API
+- **Terraform provider**: Infrastructure-as-code for kubevmui resources
 
 ## 12. Competitive Feature Coverage
 
