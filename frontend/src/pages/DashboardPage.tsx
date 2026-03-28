@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { theme } from '@/lib/theme'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton'
-import { Monitor, AlertTriangle, Loader2 } from 'lucide-react'
+import { Monitor, AlertTriangle, Loader2, Play, Square, Server } from 'lucide-react'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: theme.status.runningBg, color: theme.status.running, border: `1px solid ${theme.status.running}40` },
@@ -36,33 +36,53 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function StatCard({ label, value, accent, borderColor }: { label: string; value: number | string; accent?: string; borderColor?: string }) {
+function StatCard({ label, value, accent, borderColor, icon, animationDelay }: { label: string; value: number | string; accent?: string; borderColor?: string; icon?: React.ReactNode; animationDelay?: string }) {
   return (
     <div
       style={{
         background: theme.main.card,
-        border: `1px solid ${theme.main.cardBorder}`,
+        border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card,
         borderRadius: theme.radius.lg,
-        borderLeft: `3px solid ${borderColor ?? theme.main.cardBorder}`,
-        padding: 16,
+        borderBottom: `3px solid ${borderColor ?? theme.main.cardBorder}`,
+        padding: 20,
         flex: 1,
         minWidth: 0,
         transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+        animation: 'fadeInUp 0.35s ease-out both',
+        animationDelay: animationDelay ?? '0s',
       }}
       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)' }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none' }}
     >
-      <div
-        style={{
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          color: theme.text.secondary,
-          fontWeight: 500,
-          marginBottom: 8,
-        }}
-      >
-        {label}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div
+          style={{
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: theme.text.secondary,
+            fontWeight: 500,
+          }}
+        >
+          {label}
+        </div>
+        {icon && (
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: `${borderColor ?? theme.main.cardBorder}1F`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: borderColor ?? theme.text.secondary,
+              flexShrink: 0,
+            }}
+          >
+            {icon}
+          </div>
+        )}
       </div>
       <div
         style={{
@@ -70,6 +90,8 @@ function StatCard({ label, value, accent, borderColor }: { label: string; value:
           fontWeight: 700,
           color: accent ?? theme.text.heading,
           lineHeight: 1,
+          fontFamily: theme.typography.heading.fontFamily,
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
         {value ?? 0}
@@ -78,36 +100,38 @@ function StatCard({ label, value, accent, borderColor }: { label: string; value:
   )
 }
 
-function ResourceGauge({ label, used, total, unit, color }: { label: string; used: number; total: number; unit: string; color: string }) {
+function ResourceGauge({ label, used, total, unit, color, animationDelay }: { label: string; used: number; total: number; unit: string; color: string; animationDelay?: string }) {
   const pct = total > 0 ? (used / total) * 100 : 0
   return (
     <div style={{
       background: theme.main.card,
-      border: `1px solid ${theme.main.cardBorder}`,
+      border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card,
       borderRadius: theme.radius.lg,
       padding: 16,
+      animation: 'fadeInUp 0.35s ease-out both',
+      animationDelay: animationDelay ?? '0s',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
         <span style={{ fontSize: 12, fontWeight: 500, color: theme.text.secondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
-        <span style={{ fontSize: 12, color: theme.text.primary, fontWeight: 500 }}>
+        <span style={{ fontSize: 12, color: theme.text.primary, fontWeight: 500, fontFamily: theme.typography.mono.fontFamily }}>
           {used.toFixed(1)} / {total.toFixed(1)} {unit}
         </span>
       </div>
       <div style={{
-        height: 8,
+        height: theme.gauge.height,
         background: theme.main.inputBg,
-        borderRadius: 4,
+        borderRadius: theme.gauge.borderRadius,
         overflow: 'hidden',
       }}>
         <div style={{
           height: '100%',
           width: `${Math.min(pct, 100)}%`,
           background: pct > 80 ? theme.status.error : pct > 60 ? theme.status.migrating : color,
-          borderRadius: 4,
+          borderRadius: theme.gauge.borderRadius,
           transition: 'width 0.5s ease',
         }} />
       </div>
-      <div style={{ fontSize: 11, color: theme.text.dim, marginTop: 4, textAlign: 'right' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.dim, marginTop: 4, textAlign: 'right' }}>
         {pct.toFixed(0)}% used
       </div>
     </div>
@@ -163,7 +187,8 @@ export function DashboardPage() {
         subtitle="Overview of your virtual infrastructure"
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div className="page-content">
+        <div style={{ maxWidth: theme.layout.contentMaxWidth, margin: '0 auto', width: '100%' }}>
         {isLoading ? (
           <>
             <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
@@ -178,13 +203,13 @@ export function DashboardPage() {
           <>
             {/* Stat cards */}
             <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-              <StatCard label="Total VMs" value={stats.total} borderColor={theme.accent} />
-              <StatCard label="Running VMs" value={stats.running} accent={theme.status.running} borderColor={theme.status.running} />
-              <StatCard label="Stopped VMs" value={stats.stopped} accent={theme.text.secondary} borderColor={theme.status.stopped} />
+              <StatCard label="Total VMs" value={stats.total} borderColor={theme.accent} icon={<Monitor size={16} />} animationDelay="0s" />
+              <StatCard label="Running VMs" value={stats.running} accent={theme.status.running} borderColor={theme.status.running} icon={<Play size={16} />} animationDelay="0.06s" />
+              <StatCard label="Stopped VMs" value={stats.stopped} accent={theme.text.secondary} borderColor={theme.status.stopped} icon={<Square size={16} />} animationDelay="0.12s" />
               {stats.error > 0 && (
-                <StatCard label="Error VMs" value={stats.error} accent={theme.status.error} borderColor={theme.status.error} />
+                <StatCard label="Error VMs" value={stats.error} accent={theme.status.error} borderColor={theme.status.error} icon={<AlertTriangle size={16} />} animationDelay="0.18s" />
               )}
-              <StatCard label="Nodes" value={stats.nodes} accent={theme.accent} borderColor={theme.status.provisioning} />
+              <StatCard label="Nodes" value={stats.nodes} accent={theme.accent} borderColor={theme.status.provisioning} icon={<Server size={16} />} animationDelay={stats.error > 0 ? '0.24s' : '0.18s'} />
             </div>
 
             {/* Resource Utilization */}
@@ -201,6 +226,7 @@ export function DashboardPage() {
                   total={totalCpuCapacity}
                   unit="cores"
                   color={theme.accent}
+                  animationDelay="0.24s"
                 />
                 <ResourceGauge
                   label="Cluster Memory"
@@ -208,6 +234,7 @@ export function DashboardPage() {
                   total={totalMemCapacity}
                   unit="Gi"
                   color={theme.status.running}
+                  animationDelay="0.30s"
                 />
               </div>
             )}
@@ -251,13 +278,7 @@ export function DashboardPage() {
             )}
 
             {/* Recent VMs */}
-            <div
-              style={{
-                background: theme.main.card,
-                border: `1px solid ${theme.main.cardBorder}`,
-                borderRadius: theme.radius.lg,
-              }}
-            >
+            <div className="card">
               <div
                 style={{
                   padding: '14px 16px',
@@ -265,6 +286,7 @@ export function DashboardPage() {
                   fontSize: 16,
                   fontWeight: 600,
                   color: theme.text.heading,
+                  fontFamily: theme.typography.heading.fontFamily,
                 }}
               >
                 Recent Virtual Machines
@@ -278,53 +300,33 @@ export function DashboardPage() {
                   action={{ label: 'Create VM', onClick: () => navigate('/vms/create') }}
                 />
               ) : (
-                <table
-                  style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    fontSize: 13,
-                  }}
-                >
+                <table className="table">
                   <thead>
-                    <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                    <tr className="table-header">
                       {['Name', 'Namespace', 'Status', 'CPU', 'Memory', 'Node'].map((col) => (
-                        <th
-                          key={col}
-                          style={{
-                            padding: '10px 16px',
-                            textAlign: 'left',
-                            color: theme.text.secondary,
-                            fontWeight: 600,
-                            fontSize: 11,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.06em',
-                          }}
-                        >
-                          {col}
-                        </th>
+                        <th key={col} className="table-header-cell">{col}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {recentVMs.map((vm) => (
+                    {recentVMs.map((vm, i) => (
                       <tr
                         key={`${vm.namespace}/${vm.name}`}
+                        className="table-row-clickable"
                         onClick={() => navigate(`/vms/${vm.namespace}/${vm.name}`)}
                         style={{
-                          borderBottom: `1px solid ${theme.main.tableRowBorder}`,
-                          cursor: 'pointer',
+                          animation: i < 8 ? 'fadeInRow 0.3s ease-out both' : undefined,
+                          animationDelay: i < 8 ? `${0.1 + i * 0.04}s` : undefined,
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{vm.name}</td>
-                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.namespace}</td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{vm.name}</td>
+                        <td className="table-cell" style={{ color: theme.text.secondary }}>{vm.namespace}</td>
+                        <td className="table-cell">
                           <StatusBadge status={vm.status} />
                         </td>
-                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.cpu}</td>
-                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.memory}</td>
-                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.node ?? '—'}</td>
+                        <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily }}>{vm.cpu}</td>
+                        <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily }}>{vm.memory}</td>
+                        <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily }}>{vm.node ?? '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -333,14 +335,7 @@ export function DashboardPage() {
             </div>
 
             {/* Nodes */}
-            <div
-              style={{
-                background: theme.main.card,
-                border: `1px solid ${theme.main.cardBorder}`,
-                borderRadius: theme.radius.lg,
-                marginTop: 20,
-              }}
-            >
+            <div className="card" style={{ marginTop: 20 }}>
               <div
                 style={{
                   padding: '14px 16px',
@@ -348,6 +343,7 @@ export function DashboardPage() {
                   fontSize: 16,
                   fontWeight: 600,
                   color: theme.text.heading,
+                  fontFamily: theme.typography.heading.fontFamily,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -380,7 +376,7 @@ export function DashboardPage() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 16 }}>
-                  {nodes.map((node) => (
+                  {nodes.map((node, i) => (
                     <div
                       key={node.name}
                       onClick={() => navigate('/nodes')}
@@ -388,10 +384,12 @@ export function DashboardPage() {
                         flex: '1 1 220px',
                         maxWidth: 320,
                         background: theme.main.bg,
-                        border: `1px solid ${theme.main.cardBorder}`,
+                        border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card,
                         borderRadius: theme.radius.md,
                         padding: 14,
                         cursor: 'pointer',
+                        animation: 'fadeInUp 0.35s ease-out both',
+                        animationDelay: `${0.1 + i * 0.06}s`,
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.borderColor = theme.accent)}
                       onMouseLeave={(e) => (e.currentTarget.style.borderColor = theme.main.cardBorder)}
@@ -425,6 +423,7 @@ export function DashboardPage() {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   )

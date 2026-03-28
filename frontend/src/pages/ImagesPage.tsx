@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useImages, useCreateImage, useDeleteImage, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
+import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -9,6 +11,7 @@ import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Disc } from 'lucide-react'
+import { DropdownMenu } from '@/components/ui/DropdownMenu'
 
 const osColor: Record<string, string> = {
   linux: theme.status.running,
@@ -92,81 +95,9 @@ const SUGGESTIONS = [
   },
 ]
 
-function ActionsMenu({ actions, onAction }: { actions: { label: string; action: string; danger?: boolean }[]; onAction: (action: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          background: theme.main.card,
-          border: `1px solid ${theme.main.inputBorder}`,
-          borderRadius: 5,
-          color: theme.text.secondary,
-          cursor: 'pointer',
-          padding: '3px 8px',
-          fontSize: 16,
-          lineHeight: 1,
-          fontFamily: 'inherit',
-        }}
-      >
-        ⋯
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: '100%',
-            marginTop: 4,
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: 7,
-            minWidth: 140,
-            zIndex: 100,
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          }}
-        >
-          {actions.map((a) => (
-            <button
-              key={a.action}
-              onClick={() => { setOpen(false); onAction(a.action) }}
-              style={{
-                width: '100%',
-                display: 'block',
-                padding: '8px 14px',
-                background: 'transparent',
-                border: 'none',
-                textAlign: 'left',
-                fontSize: 13,
-                color: a.danger ? theme.status.error : theme.text.primary,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function ImagesPage() {
+  const navigate = useNavigate()
+  const { activeNamespace } = useUIStore()
   const { data, isLoading } = useImages()
   const createImage = useCreateImage()
   const deleteImage = useDeleteImage()
@@ -402,14 +333,9 @@ export function ImagesPage() {
         }
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.lg,
-          }}
-        >
+      <div className="page-content" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+        <div className="page-container">
+        <div className="card">
           {isLoading ? (
             <TableSkeleton rows={3} cols={8} />
           ) : images.length === 0 ? (
@@ -420,14 +346,9 @@ export function ImagesPage() {
               action={{ label: 'Add Image', onClick: () => { setForm(defaultForm); setEditingName(null); setError(null); setShowCreate(true) } }}
             />
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table">
               <thead>
-                <tr
-                  style={{
-                    background: theme.main.tableHeaderBg,
-                    borderBottom: `1px solid ${theme.main.tableRowBorder}`,
-                  }}
-                >
+                <tr className="table-header">
                   {[
                     'Name',
                     'Display Name',
@@ -440,15 +361,7 @@ export function ImagesPage() {
                   ].map((col) => (
                     <th
                       key={col}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        color: theme.text.secondary,
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                      }}
+                      className="table-header-cell"
                     >
                       {col}
                     </th>
@@ -456,22 +369,19 @@ export function ImagesPage() {
                 </tr>
               </thead>
               <tbody>
-                {images.map((img) => (
+                {images.map((img, i) => (
                   <tr
                     key={img.name}
-                    style={{
-                      borderBottom: `1px solid ${theme.main.tableRowBorder}`,
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = theme.main.hoverBg)
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = 'transparent')
-                    }
+                    className="table-row-clickable"
+                    onClick={() => navigate(`/images/${activeNamespace}/${img.name}`)}
+                    style={i < 8 ? {
+                      animation: `fadeInRow 0.3s ease-out both`,
+                      animationDelay: `${0.05 + i * 0.04}s`,
+                    } : undefined}
                   >
                     <td
+                      className="table-cell"
                       style={{
-                        padding: '10px 16px',
                         color: theme.text.primary,
                         fontWeight: 500,
                         fontSize: 13,
@@ -481,15 +391,15 @@ export function ImagesPage() {
                       {img.name}
                     </td>
                     <td
+                      className="table-cell"
                       style={{
-                        padding: '10px 16px',
                         color: theme.text.primary,
                         fontSize: 13,
                       }}
                     >
                       {img.display_name || '\u2014'}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       {img.os_type ? (
                         <Badge
                           label={img.os_type}
@@ -499,7 +409,7 @@ export function ImagesPage() {
                         <span style={{ color: theme.text.dim }}>{'\u2014'}</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       {img.source_type ? (
                         <Badge
                           label={img.source_type.replace('_', ' ')}
@@ -512,8 +422,8 @@ export function ImagesPage() {
                       )}
                     </td>
                     <td
+                      className="table-cell"
                       style={{
-                        padding: '10px 16px',
                         color: theme.text.secondary,
                         fontSize: 12,
                         maxWidth: 260,
@@ -526,7 +436,7 @@ export function ImagesPage() {
                     >
                       {img.source_url || '\u2014'}
                     </td>
-                    <td style={{ padding: '10px 16px', minWidth: 160 }}>
+                    <td className="table-cell" style={{ minWidth: 160 }}>
                       {(() => {
                         const phase = img.dv_phase || 'Pending'
                         const progress = img.dv_progress && img.dv_progress !== 'N/A' ? img.dv_progress : null
@@ -551,9 +461,9 @@ export function ImagesPage() {
                               )}
                             </div>
                             <div style={{
-                              height: 6,
+                              height: 10,
                               background: theme.main.inputBg,
-                              borderRadius: 3,
+                              borderRadius: 5,
                               overflow: 'hidden',
                               border: `1px solid ${theme.main.inputBorder}`,
                             }}>
@@ -561,7 +471,7 @@ export function ImagesPage() {
                                 height: '100%',
                                 width: isActive && progress ? `${Math.min(pct, 100)}%` : '0%',
                                 background: theme.status.provisioning,
-                                borderRadius: 3,
+                                borderRadius: 5,
                                 transition: 'width 0.5s ease',
                                 ...(isActive && !progress ? {
                                   width: '100%',
@@ -574,16 +484,16 @@ export function ImagesPage() {
                       })()}
                     </td>
                     <td
+                      className="table-cell"
                       style={{
-                        padding: '10px 16px',
                         color: theme.text.secondary,
                         fontSize: 13,
                       }}
                     >
                       {formatDate(img.created_at)}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <ActionsMenu
+                    <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
+                      <DropdownMenu
                         actions={[
                           { label: 'Edit', action: 'edit' },
                           { label: 'Duplicate', action: 'duplicate' },
@@ -598,6 +508,7 @@ export function ImagesPage() {
               </tbody>
             </table>
           )}
+        </div>
         </div>
       </div>
 

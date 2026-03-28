@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { TopBar } from '@/components/layout/TopBar'
@@ -15,6 +15,7 @@ import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Monitor } from 'lucide-react'
+import { DropdownMenu } from '@/components/ui/DropdownMenu'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -54,96 +55,17 @@ interface VM {
   created_at?: string
 }
 
-function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const actions = [
-    { label: 'Start', action: 'start' },
-    { label: 'Stop', action: 'stop' },
-    { label: 'Force Stop', action: 'force-stop', danger: true },
-    { label: 'Restart', action: 'restart' },
-    { label: 'Snapshot', action: 'snapshot' },
-    { label: 'Migrate', action: 'migrate' },
-    { label: 'Clone', action: 'clone' },
-    { label: 'Console', action: 'console' },
-    { label: 'Delete', action: 'delete', danger: true },
-  ]
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          background: theme.main.card,
-          border: `1px solid ${theme.main.inputBorder}`,
-          borderRadius: 5,
-          color: theme.text.secondary,
-          cursor: 'pointer',
-          padding: '3px 8px',
-          fontSize: 16,
-          lineHeight: 1,
-          fontFamily: 'inherit',
-        }}
-      >
-        ⋯
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: '100%',
-            marginTop: 4,
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: 7,
-            minWidth: 130,
-            zIndex: 100,
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          }}
-        >
-          {actions.map((a) => (
-            <button
-              key={a.action}
-              onClick={() => {
-                setOpen(false)
-                onAction(a.action)
-              }}
-              style={{
-                width: '100%',
-                display: 'block',
-                padding: '8px 14px',
-                background: 'transparent',
-                border: 'none',
-                textAlign: 'left',
-                fontSize: 13,
-                color: a.danger ? theme.status.error : theme.text.primary,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+const vmActions = [
+  { label: 'Start', action: 'start' },
+  { label: 'Stop', action: 'stop' },
+  { label: 'Force Stop', action: 'force-stop', danger: true },
+  { label: 'Restart', action: 'restart' },
+  { label: 'Snapshot', action: 'snapshot' },
+  { label: 'Migrate', action: 'migrate' },
+  { label: 'Clone', action: 'clone' },
+  { label: 'Console', action: 'console' },
+  { label: 'Delete', action: 'delete', danger: true },
+]
 
 export function VMListPage() {
   const [search, setSearch] = useState('')
@@ -301,7 +223,8 @@ export function VMListPage() {
         }
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div className="page-content" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+        <div className="page-container">
         {/* Search */}
         <div style={{ marginBottom: 16 }}>
           <input
@@ -309,28 +232,13 @@ export function VMListPage() {
             placeholder="Search virtual machines..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              width: 280,
-              background: theme.main.inputBg,
-              border: `1px solid ${theme.main.inputBorder}`,
-              borderRadius: theme.radius.md,
-              color: theme.text.primary,
-              fontSize: 13,
-              padding: '8px 12px',
-              outline: 'none',
-              fontFamily: 'inherit',
-            }}
+            className="input"
+            style={{ width: 280 }}
           />
         </div>
 
         {/* Table */}
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.lg,
-          }}
-        >
+        <div className="card">
           {isLoading ? (
             <TableSkeleton rows={5} cols={7} />
           ) : filtered.length === 0 ? (
@@ -347,22 +255,14 @@ export function VMListPage() {
               />
             )
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table">
               <thead>
-                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                <tr className="table-header">
                   {['Name', 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
                     <th
                       key={i}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        color: theme.text.secondary,
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        width: col === '' ? 48 : undefined,
-                      }}
+                      className="table-header-cell"
+                      style={col === '' ? { width: 48 } : undefined}
                     >
                       {col}
                     </th>
@@ -370,16 +270,18 @@ export function VMListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((vm) => (
+                {filtered.map((vm, i) => (
                   <tr
                     key={`${vm.namespace}/${vm.name}`}
+                    className="table-row-clickable"
                     onClick={() => navigate(`/vms/${vm.namespace}/${vm.name}`)}
-                    style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}`, cursor: 'pointer', transition: 'background 0.12s ease' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    style={i < 8 ? {
+                      animation: `fadeInRow 0.3s ease-out both`,
+                      animationDelay: `${0.05 + i * 0.04}s`,
+                    } : undefined}
                   >
-                    <td style={{ padding: '10px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: theme.text.primary, fontWeight: 600, fontSize: 14 }}>
+                    <td className="table-cell">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: theme.text.primary, fontWeight: 600, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>
                         <span style={{
                           width: 7,
                           height: 7,
@@ -393,23 +295,24 @@ export function VMListPage() {
                         }} />
                         {vm.name}
                       </div>
-                      <div style={{ color: theme.text.secondary, fontSize: 11, marginTop: 2, paddingLeft: 14 }}>{vm.namespace}</div>
+                      <div style={{ color: theme.text.secondary, fontSize: 11, marginTop: 2, paddingLeft: 14, fontFamily: theme.typography.mono.fontFamily }}>{vm.namespace}</div>
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       <StatusBadge status={vm.status} />
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.compute?.cpu_cores ?? '—'} vCPU</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{formatMemoryMb(vm.compute?.memory_mb)}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{vm.node ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{formatTimeAgo(vm.created_at)}</td>
-                    <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
-                      <ActionsMenu vm={vm} onAction={(action) => handleAction(vm, action)} />
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{vm.compute?.cpu_cores ?? '—'} vCPU</td>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{formatMemoryMb(vm.compute?.memory_mb)}</td>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{vm.node ?? '—'}</td>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>{formatTimeAgo(vm.created_at)}</td>
+                    <td className="table-cell" style={{ position: 'relative', zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu actions={vmActions} onAction={(action) => handleAction(vm, action)} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+        </div>
         </div>
       </div>
 

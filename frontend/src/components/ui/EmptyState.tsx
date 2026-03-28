@@ -16,6 +16,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
       flexDirection: 'column',
       alignItems: 'center',
       gap: 12,
+      animation: 'fadeInUp 0.35s ease-out',
     }}>
       <div style={{
         width: 48,
@@ -30,7 +31,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
       }}>
         {icon}
       </div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: theme.text.heading }}>{title}</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: theme.text.heading, fontFamily: theme.typography.heading.fontFamily }}>{title}</div>
       <div style={{ fontSize: 13, color: theme.text.secondary, maxWidth: 320, lineHeight: 1.5 }}>{description}</div>
       {action && (
         <button

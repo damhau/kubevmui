@@ -15,6 +15,8 @@ import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { CardSkeleton } from '@/components/ui/Skeleton'
+import { InfoRow } from '@/components/ui/InfoRow'
+import { Cpu, Network, HardDrive, Tag } from 'lucide-react'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -47,40 +49,9 @@ function StatusBadge({ status }: { status: string }) {
 
 type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
 
-function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        padding: '10px 0',
-        borderBottom: `1px solid ${theme.main.tableRowBorder}`,
-        gap: 16,
-      }}
-    >
-      <span style={{ minWidth: 160, fontSize: 12, color: theme.text.secondary, fontWeight: 500, flexShrink: 0 }}>{label}</span>
-      <span
-        style={{
-          fontSize: 14,
-          fontWeight: 500,
-          color: theme.text.primary,
-          fontFamily: mono ? "'JetBrains Mono', 'Fira Code', 'Consolas', monospace" : 'inherit',
-        }}
-      >
-        {value ?? '—'}
-      </span>
-    </div>
-  )
-}
-
 function MetricChart({ title, data, color, formatValue }: { title: string; data: any[]; color: string; formatValue: (v: number) => string }) {
   return (
-    <div style={{
-      background: theme.main.card,
-      border: `1px solid ${theme.main.cardBorder}`,
-      borderRadius: theme.radius.lg,
-      padding: 16,
-    }}>
+    <div className="card" style={{ padding: 16 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>{title}</div>
       {data.length === 0 ? (
         <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.secondary, fontSize: 13 }}>
@@ -103,7 +74,7 @@ function MetricChart({ title, data, color, formatValue }: { title: string; data:
               width={50}
             />
             <Tooltip
-              contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: 6, fontSize: 12 }}
+              contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card, boxShadow: theme.shadow.card, borderRadius: 6, fontSize: 12 }}
               labelFormatter={(ts) => new Date(Number(ts) * 1000).toLocaleString()}
               formatter={(value: number) => [formatValue(value), '']}
             />
@@ -295,6 +266,7 @@ export function VMDetailPage() {
               margin: 0,
               fontSize: 20,
               fontWeight: 700,
+              fontFamily: theme.typography.heading.fontFamily,
               color: theme.text.heading,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -309,20 +281,51 @@ export function VMDetailPage() {
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          {[
-            { label: vm?.status === 'Running' ? 'Stop' : 'Start', action: vm?.status === 'Running' ? 'stop' : 'start' },
-            { label: 'Restart', action: 'restart' },
-            { label: 'Console', action: 'console' },
-            { label: 'Delete', action: 'delete', danger: true },
-          ].map((btn) => (
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+          {/* Primary action */}
+          {vm?.status === 'Running' ? (
             <button
-              key={btn.action}
-              onClick={() => handleAction(btn.action)}
+              onClick={() => handleAction('console')}
               style={{
-                background: btn.danger ? 'rgba(239,68,68,0.08)' : theme.main.card,
-                color: btn.danger ? theme.status.error : theme.text.primary,
-                border: `1px solid ${btn.danger ? 'rgba(239,68,68,0.3)' : theme.main.inputBorder}`,
+                background: theme.button.primary,
+                color: theme.button.primaryText,
+                border: 'none',
+                borderRadius: theme.radius.md,
+                padding: '6px 14px',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 600,
+              }}
+            >
+              Console
+            </button>
+          ) : (
+            <button
+              onClick={() => handleAction('start')}
+              style={{
+                background: theme.button.primary,
+                color: theme.button.primaryText,
+                border: 'none',
+                borderRadius: theme.radius.md,
+                padding: '6px 14px',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 600,
+              }}
+            >
+              Start
+            </button>
+          )}
+          {/* Secondary actions */}
+          {vm?.status === 'Running' && (
+            <button
+              onClick={() => handleAction('stop')}
+              style={{
+                background: theme.main.card,
+                color: theme.text.primary,
+                border: `1px solid ${theme.main.inputBorder}`,
                 borderRadius: theme.radius.md,
                 padding: '6px 12px',
                 fontSize: 12,
@@ -331,9 +334,25 @@ export function VMDetailPage() {
                 fontWeight: 500,
               }}
             >
-              {btn.label}
+              Stop
             </button>
-          ))}
+          )}
+          <button
+            onClick={() => handleAction('restart')}
+            style={{
+              background: theme.main.card,
+              color: theme.text.primary,
+              border: `1px solid ${theme.main.inputBorder}`,
+              borderRadius: theme.radius.md,
+              padding: '6px 12px',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+            }}
+          >
+            Restart
+          </button>
           <button
             onClick={() => {
               setPromptAction({
@@ -442,16 +461,33 @@ export function VMDetailPage() {
               {activeMigration || createMigration.isPending ? 'Migrating...' : 'Migrate'}
             </button>
           )}
+          {/* Separator + Delete */}
+          <div style={{ width: 1, height: 20, background: theme.main.cardBorder, margin: '0 4px' }} />
+          <button
+            onClick={() => handleAction('delete')}
+            style={{
+              background: 'transparent',
+              color: theme.status.error,
+              border: 'none',
+              borderRadius: theme.radius.md,
+              padding: '6px 12px',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+              opacity: 0.8,
+            }}
+          >
+            Delete
+          </button>
         </div>
       </div>
 
       {/* Tabs */}
       <div
+        className="tab-bar"
         style={{
-          display: 'flex',
-          gap: 0,
           background: theme.main.card,
-          borderBottom: `1px solid ${theme.main.cardBorder}`,
           padding: '0 24px',
           flexShrink: 0,
         }}
@@ -460,18 +496,11 @@ export function VMDetailPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
+            className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
             style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeTab === tab.id ? `2px solid ${theme.accent}` : '2px solid transparent',
-              color: activeTab === tab.id ? theme.text.primary : theme.text.secondary,
-              cursor: 'pointer',
-              padding: '10px 16px',
-              fontSize: 13,
-              fontWeight: activeTab === tab.id ? 600 : 400,
-              fontFamily: 'inherit',
               marginBottom: -1,
-              transition: 'color 0.12s',
+              fontWeight: activeTab === tab.id ? 600 : 400,
+              transition: 'color 0.15s, border-color 0.2s, font-weight 0.15s',
               textTransform: activeTab === tab.id ? 'uppercase' : 'none',
               letterSpacing: activeTab === tab.id ? '0.05em' : 'normal',
             }}
@@ -482,7 +511,8 @@ export function VMDetailPage() {
       </div>
 
       {/* Tab content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div className="page-content">
+      <div style={{ maxWidth: theme.layout.contentMaxWidth, margin: '0 auto', width: '100%' }}>
         {isLoading ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <CardSkeleton height={100} />
@@ -562,8 +592,9 @@ export function VMDetailPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   {/* Compute card */}
-                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                  <div className="card-padded animate-fade-in-up">
+                    <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Cpu size={13} style={{ opacity: 0.6 }} />
                       Compute
                     </div>
                     <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
@@ -629,8 +660,9 @@ export function VMDetailPage() {
                   </div>
 
                   {/* Network card */}
-                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                  <div className="card-padded animate-fade-in-up stagger-1">
+                    <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Network size={13} style={{ opacity: 0.6 }} />
                       Network
                     </div>
                     <InfoRow label="Node" value={vm.node ?? '—'} mono />
@@ -643,8 +675,9 @@ export function VMDetailPage() {
                   </div>
 
                   {/* Storage card */}
-                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                  <div className="card-padded animate-fade-in-up stagger-2">
+                    <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <HardDrive size={13} style={{ opacity: 0.6 }} />
                       Storage
                     </div>
                     <InfoRow label="Disks" value={`${vm.disks?.length ?? 0}`} />
@@ -667,8 +700,9 @@ export function VMDetailPage() {
                   </div>
 
                   {/* Identity card */}
-                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                  <div className="card-padded animate-fade-in-up stagger-3">
+                    <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Tag size={13} style={{ opacity: 0.6 }} />
                       Identity
                     </div>
                     <InfoRow label="Namespace" value={namespace} mono />
@@ -767,13 +801,7 @@ export function VMDetailPage() {
 
             {/* Disks */}
             {activeTab === 'disks' && (
-              <div
-                style={{
-                  background: theme.main.card,
-                  border: `1px solid ${theme.main.cardBorder}`,
-                  borderRadius: theme.radius.lg,
-                }}
-              >
+              <div className="card">
                 {/* Add disk toolbar */}
                 <div
                   style={{
@@ -910,22 +938,11 @@ export function VMDetailPage() {
 
                 {/* Disks table */}
                 {vm.disks?.length ? (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <table className="table">
                     <thead>
-                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                      <tr className="table-header">
                         {['Name', 'Size', 'Bus', 'Actions'].map((col) => (
-                          <th
-                            key={col}
-                            style={{
-                              padding: '10px 16px',
-                              textAlign: 'left',
-                              color: theme.text.secondary,
-                              fontWeight: 500,
-                              fontSize: 11,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.06em',
-                            }}
-                          >
+                          <th key={col} className="table-header-cell">
                             {col}
                           </th>
                         ))}
@@ -933,17 +950,17 @@ export function VMDetailPage() {
                     </thead>
                     <tbody>
                       {vm.disks.map((disk: any) => (
-                        <tr key={disk.name} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                          <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>
+                        <tr key={disk.name} className="table-row">
+                          <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500 }}>
                             {disk.name}
                           </td>
-                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>
+                          <td className="table-cell" style={{ color: theme.text.secondary }}>
                             {disk.size_gb ? `${disk.size_gb} GB` : '—'}
                           </td>
-                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>
+                          <td className="table-cell" style={{ color: theme.text.secondary }}>
                             {disk.bus ?? '—'}
                           </td>
-                          <td style={{ padding: '10px 16px' }}>
+                          <td className="table-cell">
                             {vm.status === 'Running' && (
                               <button
                                 onClick={() => {
@@ -987,7 +1004,7 @@ export function VMDetailPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                  <div className="empty-text">
                     No disks found for this VM.
                   </div>
                 )}
@@ -996,13 +1013,7 @@ export function VMDetailPage() {
 
             {/* Network */}
             {activeTab === 'network' && (
-              <div
-                style={{
-                  background: theme.main.card,
-                  border: `1px solid ${theme.main.cardBorder}`,
-                  borderRadius: theme.radius.lg,
-                }}
-              >
+              <div className="card">
                 {/* Add interface toolbar */}
                 <div
                   style={{
@@ -1121,22 +1132,11 @@ export function VMDetailPage() {
 
                 {/* Network table */}
                 {vm.networks?.length ? (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <table className="table">
                     <thead>
-                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                      <tr className="table-header">
                         {['Name', 'Network', 'IP', 'MAC', 'Actions'].map((col) => (
-                          <th
-                            key={col}
-                            style={{
-                              padding: '10px 16px',
-                              textAlign: 'left',
-                              color: theme.text.secondary,
-                              fontWeight: 500,
-                              fontSize: 11,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.06em',
-                            }}
-                          >
+                          <th key={col} className="table-header-cell">
                             {col}
                           </th>
                         ))}
@@ -1144,20 +1144,20 @@ export function VMDetailPage() {
                     </thead>
                     <tbody>
                       {vm.networks.map((net: any) => (
-                        <tr key={net.name} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                          <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>
+                        <tr key={net.name} className="table-row">
+                          <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500 }}>
                             {net.name}
                           </td>
-                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>
+                          <td className="table-cell" style={{ color: theme.text.secondary }}>
                             {net.network_profile ?? '—'}
                           </td>
-                          <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                          <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {net.ip_address ?? '—'}
                           </td>
-                          <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                          <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {net.mac_address ?? '—'}
                           </td>
-                          <td style={{ padding: '10px 16px' }}>
+                          <td className="table-cell">
                             {vm.status === 'Running' && (
                               <button
                                 onClick={() => {
@@ -1201,7 +1201,7 @@ export function VMDetailPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                  <div className="empty-text">
                     No network interfaces found for this VM.
                   </div>
                 )}
@@ -1210,13 +1210,7 @@ export function VMDetailPage() {
 
             {/* Snapshots */}
             {activeTab === 'snapshots' && (
-              <div
-                style={{
-                  background: theme.main.card,
-                  border: `1px solid ${theme.main.cardBorder}`,
-                  borderRadius: theme.radius.lg,
-                }}
-              >
+              <div className="card">
                 {/* Create snapshot form */}
                 <div
                   style={{
@@ -1287,22 +1281,11 @@ export function VMDetailPage() {
 
                 {/* Snapshots table */}
                 {snapshots.length > 0 ? (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <table className="table">
                     <thead>
-                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                      <tr className="table-header">
                         {['Name', 'Phase', 'Ready', 'Created', 'Actions'].map((col) => (
-                          <th
-                            key={col}
-                            style={{
-                              padding: '10px 16px',
-                              textAlign: 'left',
-                              color: theme.text.secondary,
-                              fontWeight: 500,
-                              fontSize: 11,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.06em',
-                            }}
-                          >
+                          <th key={col} className="table-header-cell">
                             {col}
                           </th>
                         ))}
@@ -1319,11 +1302,11 @@ export function VMDetailPage() {
                         }
                         const pc = phaseColors[snap.phase] ?? phaseColors.Unknown
                         return (
-                          <tr key={snap.name} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                            <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>
+                          <tr key={snap.name} className="table-row">
+                            <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500 }}>
                               {snap.name}
                             </td>
-                            <td style={{ padding: '10px 16px' }}>
+                            <td className="table-cell">
                               <span
                                 style={{
                                   display: 'inline-block',
@@ -1338,21 +1321,21 @@ export function VMDetailPage() {
                                 {snap.phase}
                               </span>
                             </td>
-                            <td style={{ padding: '10px 16px' }}>
+                            <td className="table-cell">
                               {snap.ready_to_use ? (
                                 <span style={{ color: theme.status.running, fontSize: 14 }}>&#10003;</span>
                               ) : (
                                 <span style={{ color: theme.text.dim, fontSize: 14 }}>&#10005;</span>
                               )}
                             </td>
-                            <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
                               {snap.creation_time
                                 ? new Date(snap.creation_time).toLocaleString()
                                 : snap.created_at
                                   ? new Date(snap.created_at).toLocaleString()
                                   : '—'}
                             </td>
-                            <td style={{ padding: '10px 16px' }}>
+                            <td className="table-cell">
                               <div style={{ display: 'flex', gap: 6 }}>
                                 {snap.ready_to_use && (
                                   <button
@@ -1437,7 +1420,7 @@ export function VMDetailPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                  <div className="empty-text">
                     No snapshots found for this VM.
                   </div>
                 )}
@@ -1446,42 +1429,25 @@ export function VMDetailPage() {
 
             {/* Events */}
             {activeTab === 'events' && (
-              <div
-                style={{
-                  background: theme.main.card,
-                  border: `1px solid ${theme.main.cardBorder}`,
-                  borderRadius: theme.radius.lg,
-                }}
-              >
+              <div className="card">
                 {vm.events?.length ? (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <table className="table">
                     <thead>
-                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                        {['Time', 'Type', 'Reason', 'Message'].map((col) => (
-                          <th
-                            key={col}
-                            style={{
-                              padding: '10px 16px',
-                              textAlign: 'left',
-                              color: theme.text.secondary,
-                              fontWeight: 500,
-                              fontSize: 11,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.06em',
-                            }}
-                          >
+                      <tr className="table-header">
+                        {['Time', 'Type', 'Source', 'Reason', 'Message'].map((col) => (
+                          <th key={col} className="table-header-cell">
                             {col}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {vm.events.map((evt: { timestamp: string; type: string; reason: string; message: string }, i: number) => (
-                        <tr key={i} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                          <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                      {vm.events.map((evt: { timestamp: string; type: string; reason: string; message: string; source?: string; object_name?: string }, i: number) => (
+                        <tr key={i} className="table-row">
+                          <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
                             {evt.timestamp}
                           </td>
-                          <td style={{ padding: '10px 16px' }}>
+                          <td className="table-cell">
                             <span
                               style={{
                                 color: evt.type === 'Warning' ? theme.status.migrating : theme.status.running,
@@ -1492,14 +1458,30 @@ export function VMDetailPage() {
                               {evt.type}
                             </span>
                           </td>
-                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{evt.reason}</td>
-                          <td style={{ padding: '10px 16px', color: theme.text.primary }}>{evt.message}</td>
+                          <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                            {evt.source && (
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                fontSize: 11,
+                                fontWeight: 500,
+                                background: evt.source === 'DataVolume' ? `${theme.status.provisioning}1a` : `${theme.accent}1a`,
+                                color: evt.source === 'DataVolume' ? theme.status.provisioning : theme.accent,
+                                border: `1px solid ${evt.source === 'DataVolume' ? theme.status.provisioning : theme.accent}40`,
+                              }}>
+                                {evt.source}
+                              </span>
+                            )}
+                          </td>
+                          <td className="table-cell" style={{ color: theme.text.secondary }}>{evt.reason}</td>
+                          <td className="table-cell" style={{ color: theme.text.primary }}>{evt.message}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                  <div className="empty-text">
                     No events found for this VM.
                   </div>
                 )}
@@ -1508,25 +1490,13 @@ export function VMDetailPage() {
 
             {/* YAML */}
             {activeTab === 'yaml' && (
-              <pre
-                style={{
-                  background: theme.main.card,
-                  border: `1px solid ${theme.main.cardBorder}`,
-                  borderRadius: theme.radius.lg,
-                  padding: 20,
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  color: theme.text.primary,
-                  overflow: 'auto',
-                  margin: 0,
-                  lineHeight: 1.6,
-                }}
-              >
+              <pre className="code-block" style={{ lineHeight: 1.6 }}>
                 {JSON.stringify(vm, null, 2)}
               </pre>
             )}
           </>
         )}
+      </div>
       </div>
 
       <ConfirmModal

@@ -73,6 +73,15 @@ class TemplateService:
     def __init__(self, api_client: client.ApiClient):
         self.core_api = client.CoreV1Api(api_client)
 
+    def get_template(self, namespace: str, name: str) -> Template | None:
+        try:
+            cm = self.core_api.read_namespaced_config_map(f"{CM_PREFIX}{name}", namespace)
+            return _cm_to_template(cm)
+        except client.ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
     def list_templates(self, namespace: str) -> list[Template]:
         label_selector = f"{TEMPLATE_LABEL}={TEMPLATE_LABEL_VALUE}"
         result = self.core_api.list_namespaced_config_map(

@@ -135,6 +135,7 @@ class KubeVirtClient:
         )
         events = []
         for e in result.items:
+            involved = e.involved_object
             events.append({
                 "timestamp": (e.last_timestamp or e.event_time or e.metadata.creation_timestamp or "").isoformat()
                     if hasattr(e.last_timestamp or e.event_time or e.metadata.creation_timestamp, 'isoformat')
@@ -142,6 +143,8 @@ class KubeVirtClient:
                 "type": e.type or "",
                 "reason": e.reason or "",
                 "message": e.message or "",
+                "involved_object_name": involved.name if involved else "",
+                "involved_object_kind": involved.kind if involved else "",
             })
         return sorted(events, key=lambda x: x["timestamp"], reverse=True)
 

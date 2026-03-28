@@ -1,12 +1,11 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
-import { useNodes, useNode } from '@/hooks/useNodes'
-import { useNodeMetrics } from '@/hooks/useMetrics'
+import { useNodes } from '@/hooks/useNodes'
 import { theme } from '@/lib/theme'
-import { ChevronDown, ChevronRight, Server, Cpu, MemoryStick, Monitor } from 'lucide-react'
+import { Server, Monitor } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface NodeItem {
   name: string
@@ -19,13 +18,6 @@ interface NodeItem {
   vm_count: number
 }
 
-interface NodeVM {
-  name: string
-  namespace: string
-  status: string
-  cpu_cores: number
-  memory_mb: number
-}
 
 function formatMemory(mem: string): string {
   if (!mem) return '—'
@@ -71,204 +63,9 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function VMStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, { bg: string; color: string; border: string }> = {
-    Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
-    Stopped:      { bg: '#f4f4f5', color: '#52525b', border: '1px solid #d4d4d8' },
-    Error:        { bg: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' },
-    Migrating:    { bg: '#fffbeb', color: '#d97706', border: '1px solid #fde68a' },
-    Provisioning: { bg: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' },
-  }
-  const s = styles[status]
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '2px 8px',
-        borderRadius: 10,
-        fontSize: 11,
-        fontWeight: 500,
-        background: s?.bg ?? theme.main.bg,
-        color: s?.color ?? theme.text.secondary,
-        border: s?.border ?? `1px solid ${theme.main.cardBorder}`,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {status}
-    </span>
-  )
-}
-
-function NodeMetricChart({ title, data: chartData, color }: { title: string; data: Array<{ timestamp: number; value: number }>; color: string }) {
-  if (chartData.length === 0) {
-    return (
-      <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.md, padding: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.heading, marginBottom: 8 }}>{title}</div>
-        <div style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.dim, fontSize: 12 }}>No data</div>
-      </div>
-    )
-  }
-  return (
-    <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.md, padding: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.heading, marginBottom: 8 }}>{title}</div>
-      <ResponsiveContainer width="100%" height={140}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke={theme.main.cardBorder} />
-          <XAxis
-            dataKey="timestamp"
-            tickFormatter={(ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            tick={{ fontSize: 9, fill: theme.text.dim }}
-            stroke={theme.main.cardBorder}
-          />
-          <YAxis
-            tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
-            domain={[0, 1]}
-            tick={{ fontSize: 9, fill: theme.text.dim }}
-            stroke={theme.main.cardBorder}
-            width={40}
-          />
-          <Tooltip
-            contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: 6, fontSize: 11 }}
-            labelFormatter={(ts: number) => new Date(Number(ts) * 1000).toLocaleTimeString()}
-            formatter={(value: number) => [`${(value * 100).toFixed(1)}%`, '']}
-          />
-          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
-function NodeDetail({ name }: { name: string }) {
-  const { data, isLoading } = useNode(name)
-  const { data: metricsData } = useNodeMetrics(name, '1h')
-
-  if (isLoading) {
-    return (
-      <div style={{ padding: '16px 48px', color: theme.text.secondary, fontSize: 13 }}>
-        Loading node details...
-      </div>
-    )
-  }
-
-  if (!data) return null
-
-  const vms: NodeVM[] = data.vms ?? []
-
-  return (
-    <div
-      style={{
-        padding: '16px 48px 20px',
-        background: theme.main.tableHeaderBg,
-        borderBottom: `1px solid ${theme.main.tableRowBorder}`,
-      }}
-    >
-      {/* Resource summary */}
-      <div style={{ display: 'flex', gap: 32, marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Cpu size={14} style={{ color: theme.accent }} />
-          <span style={{ fontSize: 12, color: theme.text.secondary, fontWeight: 500 }}>CPU:</span>
-          <span style={{ fontSize: 13, color: theme.text.primary, fontWeight: 500 }}>
-            {data.cpu_allocatable ?? '—'} / {data.cpu_capacity ?? '—'}
-          </span>
-          <span style={{ fontSize: 11, color: theme.text.dim }}>(allocatable / capacity)</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <MemoryStick size={14} style={{ color: theme.accent }} />
-          <span style={{ fontSize: 12, color: theme.text.secondary, fontWeight: 500 }}>Memory:</span>
-          <span style={{ fontSize: 13, color: theme.text.primary, fontWeight: 500 }}>
-            {formatMemory(data.memory_allocatable ?? '')} / {formatMemory(data.memory_capacity ?? '')}
-          </span>
-          <span style={{ fontSize: 11, color: theme.text.dim }}>(allocatable / capacity)</span>
-        </div>
-      </div>
-
-      {/* Node Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <NodeMetricChart
-          title="CPU Usage (%)"
-          data={metricsData?.cpu_usage_pct ?? []}
-          color={theme.accent}
-        />
-        <NodeMetricChart
-          title="Memory Usage (%)"
-          data={metricsData?.memory_usage_pct ?? []}
-          color={theme.status.running}
-        />
-      </div>
-
-      {/* VM list */}
-      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-        Running VMs ({vms.length})
-      </div>
-      {vms.length === 0 ? (
-        <div style={{ fontSize: 13, color: theme.text.dim, padding: '8px 0' }}>
-          No VMs running on this node.
-        </div>
-      ) : (
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.md,
-            overflow: 'hidden',
-          }}
-        >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                {['Name', 'Namespace', 'Status', 'CPU', 'Memory'].map((col) => (
-                  <th
-                    key={col}
-                    style={{
-                      padding: '8px 14px',
-                      textAlign: 'left',
-                      color: theme.text.secondary,
-                      fontWeight: 600,
-                      fontSize: 10,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                    }}
-                  >
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {vms.map((vm) => (
-                <tr
-                  key={`${vm.namespace}/${vm.name}`}
-                  style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}
-                >
-                  <td style={{ padding: '8px 14px', fontSize: 13, fontWeight: 500, color: theme.text.primary }}>
-                    {vm.name}
-                  </td>
-                  <td style={{ padding: '8px 14px', fontSize: 12, color: theme.text.secondary }}>
-                    {vm.namespace}
-                  </td>
-                  <td style={{ padding: '8px 14px' }}>
-                    <VMStatusBadge status={vm.status} />
-                  </td>
-                  <td style={{ padding: '8px 14px', fontSize: 13, color: theme.text.secondary }}>
-                    {vm.cpu_cores} vCPU
-                  </td>
-                  <td style={{ padding: '8px 14px', fontSize: 13, color: theme.text.secondary }}>
-                    {vm.memory_mb} Mi
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function NodesPage() {
   const [search, setSearch] = useState('')
-  const [expanded, setExpanded] = useState<string | null>(null)
+  const navigate = useNavigate()
   const { data, isLoading } = useNodes()
 
   const nodes: NodeItem[] = Array.isArray(data?.items) ? data.items : []
@@ -285,7 +82,8 @@ export function NodesPage() {
         subtitle={nodes.length > 0 ? `${nodes.length} node${nodes.length !== 1 ? 's' : ''}` : undefined}
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div className="page-content" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+        <div className="page-container">
         {/* Search */}
         <div style={{ marginBottom: 16 }}>
           <input
@@ -293,28 +91,13 @@ export function NodesPage() {
             placeholder="Search nodes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              width: 280,
-              background: theme.main.inputBg,
-              border: `1px solid ${theme.main.inputBorder}`,
-              borderRadius: theme.radius.md,
-              color: theme.text.primary,
-              fontSize: 13,
-              padding: '8px 12px',
-              outline: 'none',
-              fontFamily: 'inherit',
-            }}
+            className="input"
+            style={{ width: 280 }}
           />
         </div>
 
         {/* Table */}
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.lg,
-          }}
-        >
+        <div className="card">
           {isLoading ? (
             <TableSkeleton rows={2} cols={7} />
           ) : filtered.length === 0 ? (
@@ -330,21 +113,13 @@ export function NodesPage() {
               />
             )
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table">
               <thead>
-                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                  {['', 'Name', 'Status', 'Roles', 'CPU', 'Memory', 'VMs'].map((col, i) => (
+                <tr className="table-header">
+                  {['Name', 'Status', 'Roles', 'CPU', 'Memory', 'VMs'].map((col, i) => (
                     <th
                       key={i}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        color: theme.text.secondary,
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                      }}
+                      className="table-header-cell"
                     >
                       {col}
                     </th>
@@ -352,43 +127,37 @@ export function NodesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((node) => {
-                  const isExpanded = expanded === node.name
-                  return (
-                    <React.Fragment key={node.name}>
+                {filtered.map((node, i) => (
                       <tr
-                        onClick={() => setExpanded(isExpanded ? null : node.name)}
-                        style={{
-                          cursor: 'pointer',
-                          borderBottom: isExpanded ? 'none' : `1px solid ${theme.main.tableRowBorder}`,
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        key={node.name}
+                        className="table-row-clickable"
+                        onClick={() => navigate(`/nodes/${node.name}`)}
+                        style={i < 8 ? {
+                          animation: `fadeInRow 0.3s ease-out both`,
+                          animationDelay: `${0.05 + i * 0.04}s`,
+                        } : undefined}
                       >
-                        <td style={{ padding: '10px 8px 10px 16px', color: theme.text.dim, width: 36 }}>
-                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className="table-cell">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Server size={14} style={{ color: theme.accent, flexShrink: 0 }} />
-                            <span style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>
+                            <span style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>
                               {node.name}
                             </span>
                           </div>
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className="table-cell">
                           <StatusBadge status={node.status} />
                         </td>
-                        <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                        <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                           {node.roles?.join(', ') || '—'}
                         </td>
-                        <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                        <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>
                           {node.cpu_capacity ?? '—'} vCPU
                         </td>
-                        <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                        <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>
                           {formatMemory(node.memory_capacity ?? '')}
                         </td>
-                        <td style={{ padding: '10px 16px' }}>
+                        <td className="table-cell">
                           <span
                             style={{
                               display: 'inline-flex',
@@ -404,19 +173,11 @@ export function NodesPage() {
                           </span>
                         </td>
                       </tr>
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={7} style={{ padding: 0 }}>
-                            <NodeDetail name={node.name} />
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  )
-                })}
+                ))}
               </tbody>
             </table>
           )}
+        </div>
         </div>
       </div>
     </div>

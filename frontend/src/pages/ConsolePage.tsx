@@ -80,7 +80,7 @@ export function ConsolePage() {
         >
           ← {name}
         </Link>
-        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: theme.text.heading }}>
+        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: theme.text.heading, fontFamily: theme.typography.heading.fontFamily }}>
           Console — {name}
         </h1>
         <span
@@ -92,6 +92,7 @@ export function ConsolePage() {
             border: `1px solid ${theme.main.inputBorder}`,
             borderRadius: theme.radius.sm,
             padding: '3px 8px',
+            fontFamily: theme.typography.mono.fontFamily,
           }}
         >
           {namespace}
@@ -185,6 +186,7 @@ export function ConsolePage() {
                 height: 6,
                 borderRadius: '50%',
                 background: connected ? theme.status.running : theme.status.error,
+                animation: connectionStatus === 'connected' ? 'pulseDot 2s ease-in-out infinite' : undefined,
               }}
             />
             {connected ? 'Connected' : 'Disconnected'}

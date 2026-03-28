@@ -34,6 +34,21 @@ def list_disks(
     return DiskList(items=items, total=len(items))
 
 
+@router.get("/namespaces/{ns}/disks/{name}", response_model=Disk)
+def get_disk(
+    cluster: str,
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    disk = svc.get_disk(ns, name)
+    if disk is None:
+        raise HTTPException(status_code=404, detail=f"Disk '{name}' not found")
+    return disk
+
+
 @router.post("/namespaces/{ns}/disks", response_model=Disk, status_code=201)
 def create_disk(
     cluster: str,

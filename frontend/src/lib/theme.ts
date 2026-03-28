@@ -102,6 +102,8 @@ export const theme = {
 
   // Typography
   typography: {
+    heading: { fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" },
+    headingLarge: { fontSize: 24, fontWeight: 700 },
     pageTitle: { fontSize: 20, fontWeight: 700 },
     sectionTitle: { fontSize: 16, fontWeight: 600 },
     cardTitle: { fontSize: 14, fontWeight: 600 },
@@ -112,12 +114,36 @@ export const theme = {
     mono: { fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace" },
   },
 
+  // Animation
+  animation: {
+    entrance: '0.35s',
+    stagger: '0.06s',
+    fast: '0.15s',
+    medium: '0.25s',
+  },
+
+  // Layout
+  layout: {
+    contentMaxWidth: 99999,
+    contentPadding: 24,
+  },
+
+  // Gauge
+  gauge: {
+    height: 14,
+    borderRadius: 7,
+  },
+
   // Misc
   radius: {
-    sm: 4,
-    md: 6,
-    lg: 8,
-    xl: 12,
+    sm: 1,
+    md: 2,
+    lg: 2,
+    xl: 3,
+  },
+
+  shadow: {
+    card: '0 1px 4px rgba(0,0,0,0.08)',
   },
 } as const
 

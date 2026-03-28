@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
 import { useNetworks, useCreateNetwork, useDeleteNetwork, useAllNetworks } from '@/hooks/useNetworks'
 import { useUIStore } from '@/stores/ui-store'
@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Network } from 'lucide-react'
+import { DropdownMenu } from '@/components/ui/DropdownMenu'
 
 const typeColor: Record<string, string> = {
   Bridge: theme.status.running,
@@ -51,80 +52,6 @@ interface NetworkForm {
   dhcp: boolean
   subnet: string
   gateway: string
-}
-
-function ActionsMenu({ actions, onAction }: { actions: { label: string; action: string; danger?: boolean }[]; onAction: (action: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          background: theme.main.card,
-          border: `1px solid ${theme.main.inputBorder}`,
-          borderRadius: 5,
-          color: theme.text.secondary,
-          cursor: 'pointer',
-          padding: '3px 8px',
-          fontSize: 16,
-          lineHeight: 1,
-          fontFamily: 'inherit',
-        }}
-      >
-        ⋯
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: '100%',
-            marginTop: 4,
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: 7,
-            minWidth: 140,
-            zIndex: 100,
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          }}
-        >
-          {actions.map((a) => (
-            <button
-              key={a.action}
-              onClick={() => { setOpen(false); onAction(a.action) }}
-              style={{
-                width: '100%',
-                display: 'block',
-                padding: '8px 14px',
-                background: 'transparent',
-                border: 'none',
-                textAlign: 'left',
-                fontSize: 13,
-                color: a.danger ? theme.status.error : theme.text.primary,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export function NetworksPage() {
@@ -223,16 +150,10 @@ export function NetworksPage() {
         }
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div className="page-content" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+        <div className="page-container">
         {/* Built-in Pod Network */}
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.lg,
-            marginBottom: 20,
-          }}
-        >
+        <div className="card" style={{ marginBottom: 20 }}>
           <div
             style={{
               padding: '12px 16px',
@@ -273,14 +194,7 @@ export function NetworksPage() {
         </div>
 
         {/* Current Namespace Profiles */}
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.lg,
-            marginBottom: 20,
-          }}
-        >
+        <div className="card" style={{ marginBottom: 20 }}>
           <div
             style={{
               padding: '12px 16px',
@@ -308,21 +222,13 @@ export function NetworksPage() {
               description="Create network profiles to configure VM networking."
             />
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table">
               <thead>
-                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                <tr className="table-header">
                   {['Display Name', 'Type', 'VLAN ID', 'DHCP', 'Subnet', 'Actions'].map((col) => (
                     <th
                       key={col}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        color: theme.text.secondary,
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                      }}
+                      className="table-header-cell"
                     >
                       {col}
                     </th>
@@ -330,30 +236,32 @@ export function NetworksPage() {
                 </tr>
               </thead>
               <tbody>
-                {networks.map((net) => (
+                {networks.map((net, i) => (
                   <tr
                     key={net.name}
-                    style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    className="table-row"
+                    style={i < 8 ? {
+                      animation: `fadeInRow 0.3s ease-out both`,
+                      animationDelay: `${0.05 + i * 0.04}s`,
+                    } : undefined}
                   >
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{net.display_name ?? net.name}</div>
                       {net.display_name && (
-                        <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2 }}>{net.name}</div>
+                        <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2, fontFamily: theme.typography.mono.fontFamily }}>{net.name}</div>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       {net.type ? (
                         <Badge label={net.type} color={typeColor[net.type] ?? theme.text.dim} />
                       ) : (
                         <span style={{ color: theme.text.dim }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>
                       {net.vlan_id ?? '—'}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       <span
                         style={{
                           color: net.dhcp ? theme.status.running : theme.text.secondary,
@@ -363,11 +271,11 @@ export function NetworksPage() {
                         {net.dhcp === undefined ? '—' : net.dhcp ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace", fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily, fontSize: 13 }}>
                       {net.subnet ?? '—'}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <ActionsMenu
+                    <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
+                      <DropdownMenu
                         actions={[{ label: 'Delete', action: 'delete', danger: true }]}
                         onAction={(action) => {
                           if (action === 'delete') handleDelete(net.name)
@@ -382,13 +290,7 @@ export function NetworksPage() {
         </div>
 
         {/* Cluster NADs (other namespaces) */}
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.lg,
-          }}
-        >
+        <div className="card">
           <div
             style={{
               padding: '12px 16px',
@@ -414,21 +316,13 @@ export function NetworksPage() {
               No NADs found in other namespaces.
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table">
               <thead>
-                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                <tr className="table-header">
                   {['Name', 'Namespace', 'Full Reference'].map((col) => (
                     <th
                       key={col}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        color: theme.text.secondary,
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                      }}
+                      className="table-header-cell"
                     >
                       {col}
                     </th>
@@ -436,23 +330,25 @@ export function NetworksPage() {
                 </tr>
               </thead>
               <tbody>
-                {clusterNADs.map((nad) => (
+                {clusterNADs.map((nad, i) => (
                   <tr
                     key={nad.full_name}
-                    style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    className="table-row"
+                    style={i < 8 ? {
+                      animation: `fadeInRow 0.3s ease-out both`,
+                      animationDelay: `${0.05 + i * 0.04}s`,
+                    } : undefined}
                   >
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{nad.display_name}</div>
                       {nad.display_name !== nad.name && (
-                        <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2 }}>{nad.name}</div>
+                        <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2, fontFamily: theme.typography.mono.fontFamily }}>{nad.name}</div>
                       )}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <Badge label={nad.namespace} color={theme.accent} />
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace", fontSize: 13 }}>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily, fontSize: 13 }}>
                       {nad.full_name}
                     </td>
                   </tr>
@@ -460,6 +356,7 @@ export function NetworksPage() {
               </tbody>
             </table>
           )}
+        </div>
         </div>
       </div>
 

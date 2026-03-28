@@ -36,6 +36,8 @@ export function LoginPage() {
         justifyContent: 'center',
         minHeight: '100vh',
         background: theme.login.bg,
+        backgroundImage: 'radial-gradient(circle, rgba(255, 255, 255, 0.02) 1px, transparent 1px)',
+        backgroundSize: '20px 20px',
         padding: 24,
       }}
     >
@@ -47,6 +49,8 @@ export function LoginPage() {
           border: `1px solid ${theme.login.cardBorder}`,
           borderRadius: theme.radius.xl,
           padding: 40,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          animation: 'fadeInScale 0.3s ease-out',
         }}
       >
         {/* Logo */}
@@ -74,6 +78,7 @@ export function LoginPage() {
             style={{
               fontSize: 22,
               fontWeight: 700,
+              fontFamily: theme.typography.heading.fontFamily,
               color: theme.login.text,
               letterSpacing: '-0.02em',
             }}
@@ -87,6 +92,7 @@ export function LoginPage() {
             margin: '0 0 24px',
             fontSize: 16,
             fontWeight: 600,
+            fontFamily: theme.typography.heading.fontFamily,
             color: theme.login.text,
             textAlign: 'center',
           }}
@@ -120,7 +126,7 @@ export function LoginPage() {
                 color: theme.login.text,
                 fontSize: 13,
                 padding: '10px 12px',
-                fontFamily: 'monospace',
+                fontFamily: theme.typography.mono.fontFamily,
                 resize: 'vertical',
                 outline: 'none',
                 boxSizing: 'border-box',

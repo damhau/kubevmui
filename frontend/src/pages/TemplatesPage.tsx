@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
@@ -13,6 +13,7 @@ import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Copy } from 'lucide-react'
+import { DropdownMenu } from '@/components/ui/DropdownMenu'
 
 const categoryColor: Record<string, string> = {
   OS: theme.status.provisioning,
@@ -53,86 +54,12 @@ function Badge({ label, color }: { label: string; color: string }) {
   )
 }
 
-function TemplateActionsMenu({ onAction }: { onAction: (action: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const actions = [
-    { label: 'Create VM', action: 'create-vm' },
-    { label: 'Edit', action: 'edit' },
-    { label: 'Duplicate', action: 'duplicate' },
-    { label: 'Delete', action: 'delete', danger: true },
-  ]
-
-  return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          background: theme.main.card,
-          border: `1px solid ${theme.main.inputBorder}`,
-          borderRadius: 5,
-          color: theme.text.secondary,
-          cursor: 'pointer',
-          padding: '3px 8px',
-          fontSize: 16,
-          lineHeight: 1,
-          fontFamily: 'inherit',
-        }}
-      >
-        ⋯
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: '100%',
-            marginTop: 4,
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: 7,
-            minWidth: 140,
-            zIndex: 100,
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          }}
-        >
-          {actions.map((a) => (
-            <button
-              key={a.action}
-              onClick={() => { setOpen(false); onAction(a.action) }}
-              style={{
-                width: '100%',
-                display: 'block',
-                padding: '8px 14px',
-                background: 'transparent',
-                border: 'none',
-                textAlign: 'left',
-                fontSize: 13,
-                color: a.danger ? theme.status.error : theme.text.primary,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+const templateActions = [
+  { label: 'Create VM', action: 'create-vm' },
+  { label: 'Edit', action: 'edit' },
+  { label: 'Duplicate', action: 'duplicate' },
+  { label: 'Delete', action: 'delete', danger: true },
+]
 
 /* ── Form types ── */
 
@@ -495,14 +422,9 @@ export function TemplatesPage() {
         }
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: theme.radius.lg,
-          }}
-        >
+      <div className="page-content" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+        <div className="page-container">
+        <div className="card">
           {isLoading ? (
             <TableSkeleton rows={3} cols={8} />
           ) : templates.length === 0 ? (
@@ -513,27 +435,14 @@ export function TemplatesPage() {
               action={{ label: 'Create Template', onClick: () => { setForm(defaultForm()); setEditingName(null); setError(null); setShowCreate(true) } }}
             />
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table">
               <thead>
-                <tr
-                  style={{
-                    background: theme.main.tableHeaderBg,
-                    borderBottom: `1px solid ${theme.main.tableRowBorder}`,
-                  }}
-                >
+                <tr className="table-header">
                   {['Name', 'Category', 'OS Type', 'CPU', 'Memory', 'Disks', 'Networks', ''].map(
                     (col) => (
                       <th
                         key={col || '_actions'}
-                        style={{
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          color: theme.text.secondary,
-                          fontWeight: 600,
-                          fontSize: 11,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.06em',
-                        }}
+                        className="table-header-cell"
                       >
                         {col}
                       </th>
@@ -542,24 +451,28 @@ export function TemplatesPage() {
                 </tr>
               </thead>
               <tbody>
-                {templates.map((tpl) => (
+                {templates.map((tpl, i) => (
                   <tr
                     key={tpl.name}
-                    style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    className="table-row-clickable"
+                    onClick={() => navigate(`/templates/${tpl.name}`)}
+                    style={i < 8 ? {
+                      animation: `fadeInRow 0.3s ease-out both`,
+                      animationDelay: `${0.05 + i * 0.04}s`,
+                    } : undefined}
                   >
                     <td
+                      className="table-cell"
                       style={{
-                        padding: '10px 16px',
                         color: theme.text.primary,
                         fontWeight: 500,
                         fontSize: 14,
+                        fontFamily: theme.typography.mono.fontFamily,
                       }}
                     >
                       {tpl.display_name || tpl.name}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
+                    <td className="table-cell">
                       {tpl.category ? (
                         <Badge
                           label={tpl.category}
@@ -569,29 +482,30 @@ export function TemplatesPage() {
                         <span style={{ color: theme.text.dim }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {tpl.os_type ?? '—'}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {tpl.compute?.cpu_cores ? `${tpl.compute.cpu_cores} vCPU` : '—'}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {formatMemoryMb(tpl.compute?.memory_mb)}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {tpl.disks?.length ?? 0}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {tpl.networks?.length ?? 0}
                     </td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                      <TemplateActionsMenu onAction={(action) => handleTemplateAction(tpl, action)} />
+                    <td className="table-cell" style={{ textAlign: 'right', position: 'relative', zIndex: 10 }}>
+                      <DropdownMenu actions={templateActions} onAction={(action) => handleTemplateAction(tpl, action)} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+        </div>
         </div>
       </div>
 
@@ -693,7 +607,7 @@ export function TemplatesPage() {
               key={idx}
               style={{
                 background: theme.main.tableHeaderBg,
-                border: `1px solid ${theme.main.cardBorder}`,
+                border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card,
                 borderRadius: theme.radius.md,
                 padding: 12,
                 marginBottom: 10,

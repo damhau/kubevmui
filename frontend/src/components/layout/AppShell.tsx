@@ -18,6 +18,8 @@ export function AppShell() {
           flex: 1,
           overflowY: 'auto',
           background: theme.main.bg,
+          backgroundImage: 'radial-gradient(circle, rgba(0, 0, 0, 0.03) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
           color: theme.text.primary,
         }}
       >

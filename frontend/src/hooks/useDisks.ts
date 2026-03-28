@@ -15,6 +15,20 @@ export function useDisks() {
   })
 }
 
+export function useDisk(namespace: string, name: string) {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['disk', activeCluster, namespace, name],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/namespaces/${namespace}/disks/${name}`
+      )
+      return data
+    },
+    enabled: !!namespace && !!name,
+  })
+}
+
 export function useCreateDisk() {
   const queryClient = useQueryClient()
   const { activeCluster, activeNamespace } = useUIStore()

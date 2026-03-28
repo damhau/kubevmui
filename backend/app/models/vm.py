@@ -33,6 +33,8 @@ class VMEvent(BaseModel):
     type: str = ""  # Normal, Warning
     reason: str = ""
     message: str = ""
+    source: str = ""  # VirtualMachine, VirtualMachineInstance, DataVolume
+    object_name: str = ""
 
 class VM(ResourceMeta):
     status: VMStatus = VMStatus.unknown

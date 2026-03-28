@@ -16,6 +16,21 @@ export function useImages() {
   })
 }
 
+export function useImage(namespace: string, name: string) {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['image', activeCluster, namespace, name],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/namespaces/${namespace}/images/${name}`
+      )
+      return data
+    },
+    enabled: !!namespace && !!name,
+    refetchInterval: 5000,
+  })
+}
+
 export function useStorageClasses() {
   const { activeCluster } = useUIStore()
   return useQuery({

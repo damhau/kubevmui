@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
 import { useSSHKeys, useCreateSSHKey, useDeleteSSHKey } from '@/hooks/useSSHKeys'
 import { theme } from '@/lib/theme'
@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { KeyRound } from 'lucide-react'
+import { DropdownMenu } from '@/components/ui/DropdownMenu'
 
 interface SSHKey {
   name: string
@@ -31,80 +32,6 @@ function formatDate(iso: string | null): string {
   } catch {
     return '\u2014'
   }
-}
-
-function ActionsMenu({ actions, onAction }: { actions: { label: string; action: string; danger?: boolean }[]; onAction: (action: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          background: theme.main.card,
-          border: `1px solid ${theme.main.inputBorder}`,
-          borderRadius: 5,
-          color: theme.text.secondary,
-          cursor: 'pointer',
-          padding: '3px 8px',
-          fontSize: 16,
-          lineHeight: 1,
-          fontFamily: 'inherit',
-        }}
-      >
-        ⋯
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 0,
-            top: '100%',
-            marginTop: 4,
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
-            borderRadius: 7,
-            minWidth: 140,
-            zIndex: 100,
-            overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-          }}
-        >
-          {actions.map((a) => (
-            <button
-              key={a.action}
-              onClick={() => { setOpen(false); onAction(a.action) }}
-              style={{
-                width: '100%',
-                display: 'block',
-                padding: '8px 14px',
-                background: 'transparent',
-                border: 'none',
-                textAlign: 'left',
-                fontSize: 13,
-                color: a.danger ? theme.status.error : theme.text.primary,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export function SSHKeysPage() {
@@ -182,11 +109,12 @@ export function SSHKeysPage() {
         }
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 24, animation: 'fadeInUp 0.35s ease-out' }}>
+        <div style={{ maxWidth: theme.layout.contentMaxWidth, margin: '0 auto', width: '100%' }}>
         <div
           style={{
             background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`,
+            border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card,
             borderRadius: theme.radius.lg,
           }}
         >
@@ -221,10 +149,15 @@ export function SSHKeysPage() {
                 </tr>
               </thead>
               <tbody>
-                {keys.map((key) => (
+                {keys.map((key, i) => (
                   <tr
                     key={key.name}
-                    style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}
+                    style={{
+                      borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                      background: 'transparent',
+                      animation: i < 8 ? `fadeInRow 0.3s ease-out both` : undefined,
+                      animationDelay: i < 8 ? `${0.05 + i * 0.04}s` : undefined,
+                    }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
@@ -249,8 +182,8 @@ export function SSHKeysPage() {
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
                       {formatDate(key.created_at)}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <ActionsMenu
+                    <td style={{ padding: '10px 16px', position: 'relative', zIndex: 10 }}>
+                      <DropdownMenu
                         actions={[
                           { label: 'Copy Public Key', action: 'copy' },
                           { label: 'Delete', action: 'delete', danger: true },
@@ -266,6 +199,7 @@ export function SSHKeysPage() {
               </tbody>
             </table>
           )}
+        </div>
         </div>
       </div>
 

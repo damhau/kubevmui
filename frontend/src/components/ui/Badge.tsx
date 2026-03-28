@@ -4,6 +4,7 @@ interface BadgeProps {
   label: string
   variant?: 'success' | 'error' | 'warning' | 'info' | 'neutral' | 'accent'
   size?: 'sm' | 'md'
+  mono?: boolean
 }
 
 const variantStyles = {
@@ -15,12 +16,12 @@ const variantStyles = {
   accent: { bg: theme.accentLight, color: theme.accent, border: `1px solid ${theme.accent}40` },
 }
 
-export function Badge({ label, variant = 'neutral', size = 'sm' }: BadgeProps) {
+export function Badge({ label, variant = 'neutral', size = 'sm', mono }: BadgeProps) {
   const style = variantStyles[variant]
   return (
     <span style={{
       display: 'inline-block',
-      padding: size === 'sm' ? '2px 8px' : '3px 10px',
+      padding: size === 'sm' ? '2px 10px' : '3px 12px',
       borderRadius: 20,
       fontSize: size === 'sm' ? 11 : 12,
       fontWeight: 500,
@@ -28,6 +29,7 @@ export function Badge({ label, variant = 'neutral', size = 'sm' }: BadgeProps) {
       background: style.bg,
       border: style.border,
       lineHeight: 1.4,
+      ...(mono ? { fontFamily: theme.typography.mono.fontFamily } : {}),
     }}>
       {label}
     </span>

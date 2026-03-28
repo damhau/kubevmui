@@ -31,6 +31,21 @@ def list_templates(
     return TemplateList(items=items, total=len(items))
 
 
+@router.get("/templates/{name}", response_model=Template)
+def get_template(
+    cluster: str,
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    tpl = svc.get_template(ns, name)
+    if tpl is None:
+        raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
+    return tpl
+
+
 @router.post("/templates", response_model=Template, status_code=201)
 def create_template(
     cluster: str,

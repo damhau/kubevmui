@@ -29,6 +29,7 @@ export function SlideOver({ open, onClose, title, children, width = 480 }: Slide
           position: 'absolute',
           inset: 0,
           background: theme.modal.overlay,
+          backdropFilter: 'blur(4px)',
           transition: 'opacity 150ms',
         }}
       />
@@ -44,6 +45,7 @@ export function SlideOver({ open, onClose, title, children, width = 480 }: Slide
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+          animation: 'slideInRight 0.25s ease-out',
         }}
       >
         {/* Header */}

@@ -352,21 +352,20 @@ class VMService:
         vmi_raw = self.kv.get_vmi(namespace, name)
         vm = _vm_from_raw(vm_raw, vmi_raw)
         try:
-            raw_events = self.kv.list_events(
-                namespace,
-                field_selector=f"involvedObject.name={name},involvedObject.kind=VirtualMachine",
-            )
-            # Also get VMI events
-            raw_events += self.kv.list_events(
-                namespace,
-                field_selector=f"involvedObject.name={name},involvedObject.kind=VirtualMachineInstance",
-            )
+            all_events = self.kv.list_events(namespace)
+            raw_events = [
+                e for e in all_events
+                if e.get("involved_object_name", "") == name
+                or e.get("involved_object_name", "").startswith(f"{name}-")
+            ]
             vm.events = [
                 VMEvent(
                     timestamp=e.get("timestamp", ""),
                     type=e.get("type", ""),
                     reason=e.get("reason", ""),
                     message=e.get("message", ""),
+                    source=e.get("involved_object_kind", ""),
+                    object_name=e.get("involved_object_name", ""),
                 )
                 for e in sorted(raw_events, key=lambda x: x.get("timestamp", ""), reverse=True)
             ]

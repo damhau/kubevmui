@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -9,11 +8,7 @@ import {
   Disc,
   KeyRound,
   Server,
-  ChevronDown,
-  Check,
 } from 'lucide-react'
-import { useUIStore } from '@/stores/ui-store'
-import { useNamespaces } from '@/hooks/useNamespaces'
 import { theme } from '@/lib/theme'
 
 const VERSION = 'v0.1.0'
@@ -51,21 +46,6 @@ const navGroups: NavGroup[] = [
 ]
 
 export function Sidebar() {
-  const { activeNamespace, setActiveNamespace } = useUIStore()
-  const { data: namespacesData } = useNamespaces()
-  const [nsOpen, setNsOpen] = useState(false)
-
-  const rawNamespaces = Array.isArray(namespacesData?.items)
-    ? namespacesData.items
-    : Array.isArray(namespacesData)
-      ? namespacesData
-      : []
-  const namespaces: string[] = rawNamespaces.length > 0
-    ? rawNamespaces.map((n: { name?: string } | string) =>
-        typeof n === 'string' ? n : n.name ?? String(n)
-      )
-    : ['default']
-
   return (
     <aside
       style={{
@@ -102,7 +82,7 @@ export function Sidebar() {
               <rect x="9" y="9" width="5" height="4" rx="1" fill="white" fillOpacity="0.9" />
             </svg>
           </div>
-          <span style={{ color: theme.sidebar.text, fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
+          <span style={{ color: theme.sidebar.text, fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em', fontFamily: theme.typography.heading.fontFamily }}>
             kubevmui
           </span>
           <span
@@ -132,92 +112,6 @@ export function Sidebar() {
             }}
           />
         </div>
-      </div>
-
-      {/* Namespace selector */}
-      <div style={{ padding: '12px 12px 0', position: 'relative' }}>
-        <div
-          style={{ marginBottom: 4, fontSize: 10, color: theme.sidebar.sectionLabel, textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}
-        >
-          Namespace
-        </div>
-        <button
-          onClick={() => setNsOpen((v) => !v)}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '7px 10px',
-            background: theme.sidebar.bgHover,
-            border: `1px solid ${theme.sidebar.border}`,
-            borderRadius: theme.radius.md,
-            color: theme.sidebar.text,
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {activeNamespace}
-          </span>
-          <ChevronDown
-            size={14}
-            style={{
-              color: theme.sidebar.textDim,
-              flexShrink: 0,
-              transition: 'transform 0.15s',
-              transform: nsOpen ? 'rotate(180deg)' : 'none',
-            }}
-          />
-        </button>
-
-        {nsOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              left: 12,
-              right: 12,
-              top: '100%',
-              marginTop: 4,
-              background: theme.sidebar.bgHover,
-              border: `1px solid ${theme.sidebar.border}`,
-              borderRadius: theme.radius.md,
-              overflow: 'hidden',
-              zIndex: 200,
-              maxHeight: 250,
-              overflowY: 'auto',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-            }}
-          >
-            {namespaces.map((ns) => (
-              <button
-                key={ns}
-                onClick={() => {
-                  setActiveNamespace(ns)
-                  setNsOpen(false)
-                }}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '7px 10px',
-                  background: ns === activeNamespace ? theme.accentLight : 'transparent',
-                  border: 'none',
-                  color: ns === activeNamespace ? '#818cf8' : theme.sidebar.textMuted,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontFamily: 'inherit',
-                }}
-              >
-                {ns}
-                {ns === activeNamespace && <Check size={13} style={{ color: theme.accent }} />}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Navigation */}
@@ -251,8 +145,7 @@ export function Sidebar() {
                   borderRadius: theme.radius.md,
                   fontWeight: isActive ? 500 : 400,
                   color: isActive ? theme.sidebar.text : theme.sidebar.textMuted,
-                  background: isActive ? 'rgba(99,102,241,0.12)' : 'transparent',
-                  borderLeft: isActive ? `3px solid ${theme.sidebar.activeBorder}` : '3px solid transparent',
+                  background: isActive ? theme.sidebar.bgHover : 'transparent',
                   transition: 'background 0.12s, color 0.12s',
                 })}
               >

@@ -15,6 +15,20 @@ export function useTemplates() {
   })
 }
 
+export function useTemplate(name: string) {
+  const { activeCluster, activeNamespace } = useUIStore()
+  return useQuery({
+    queryKey: ['template', activeCluster, activeNamespace, name],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/namespaces/${activeNamespace}/templates/${name}`
+      )
+      return data
+    },
+    enabled: !!name,
+  })
+}
+
 export function useCreateTemplate() {
   const queryClient = useQueryClient()
   const { activeCluster, activeNamespace } = useUIStore()

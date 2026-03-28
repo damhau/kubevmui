@@ -375,7 +375,9 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
       borderLeft: isActive ? `3px solid ${theme.accent}` : '3px solid transparent',
       background: isActive ? theme.accentLight : 'transparent',
       cursor: isCompleted ? 'pointer' : isActive ? 'default' : 'default',
-      opacity: !isActive && !isCompleted ? 0.5 : 1,
+      opacity: !isActive && !isCompleted ? 0.35 : 1,
+      filter: !isActive && !isCompleted ? 'grayscale(100%)' : 'none',
+      transition: 'opacity 0.2s, background 0.15s, filter 0.2s',
     }
   }
 
@@ -422,7 +424,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
             borderBottom: `1px solid ${theme.main.cardBorder}`,
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.heading, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: theme.typography.heading.fontFamily, color: theme.text.heading, lineHeight: 1.3 }}>
             Create Virtual Machine
           </div>
         </div>
@@ -495,8 +497,8 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
         }}
       >
         {/* Step header */}
-        <div style={{ padding: '32px 32px 0' }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: theme.text.heading, marginBottom: 4 }}>
+        <div style={{ padding: '32px 32px 0' }} key={step}>
+          <div style={{ fontSize: 18, fontWeight: 600, fontFamily: theme.typography.heading.fontFamily, color: theme.text.heading, marginBottom: 4, animation: 'fadeInUp 0.25s ease-out' }}>
             {currentStep.label}
           </div>
           <div style={{ fontSize: 13, color: theme.text.secondary, marginBottom: 24 }}>
@@ -1794,7 +1796,9 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                 fontWeight: 500,
                 cursor: canNext() ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit',
-                opacity: canNext() ? 1 : 0.5,
+                opacity: canNext() ? 1 : 0.4,
+                filter: canNext() ? 'none' : 'grayscale(50%)',
+                transition: 'opacity 0.15s, filter 0.15s',
               }}
             >
               Next Step →

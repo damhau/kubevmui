@@ -32,6 +32,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 480, height }
           position: 'absolute',
           inset: 0,
           background: theme.modal.overlay,
+          backdropFilter: 'blur(4px)',
         }}
       />
       {/* Dialog */}
@@ -47,6 +48,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 480, height }
           display: 'flex',
           flexDirection: 'column',
           maxHeight: '85vh',
+          animation: 'fadeInScale 0.2s ease-out',
           ...(height ? { height } : {}),
         }}
       >

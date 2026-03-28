@@ -90,6 +90,18 @@ class StorageService:
         except Exception:
             return sc_name
 
+    def get_disk(self, namespace: str, name: str) -> Disk | None:
+        try:
+            pvc = self.core_api.read_namespaced_persistent_volume_claim(name, namespace)
+            disk = _pvc_to_disk(pvc)
+            if disk.storage_class and disk.performance_tier == disk.storage_class:
+                disk.performance_tier = self._get_storage_class_tier(disk.storage_class)
+            return disk
+        except client.ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
     def list_disks(self, namespace: str) -> list[Disk]:
         result = self.core_api.list_namespaced_persistent_volume_claim(namespace)
         disks = []

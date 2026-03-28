@@ -14,7 +14,7 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = 4, style 
         width,
         height,
         borderRadius,
-        background: `linear-gradient(90deg, ${theme.main.inputBg} 25%, ${theme.main.hoverBg} 50%, ${theme.main.inputBg} 75%)`,
+        background: `linear-gradient(90deg, ${theme.main.inputBg} 20%, ${theme.main.hoverBg} 40%, ${theme.main.inputBg} 60%)`,
         backgroundSize: '200% 100%',
         animation: 'shimmer 1.5s infinite',
         ...style,
@@ -53,7 +53,7 @@ export function CardSkeleton({ height = 80 }: { height?: number }) {
     <div
       style={{
         background: theme.main.card,
-        border: `1px solid ${theme.main.cardBorder}`,
+        border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card,
         borderRadius: theme.radius.lg,
         padding: 16,
         height,
