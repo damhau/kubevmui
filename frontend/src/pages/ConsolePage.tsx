@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { theme } from '@/lib/theme'
+import { useUIStore } from '@/stores/ui-store'
+import { VNCConsole } from '@/components/console/VNCConsole'
+import { SerialConsole } from '@/components/console/SerialConsole'
 
 type ConsoleTab = 'vnc' | 'serial'
 
 export function ConsolePage() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>()
+  const { activeCluster } = useUIStore()
   const [activeTab, setActiveTab] = useState<ConsoleTab>('vnc')
 
   return (
@@ -80,101 +84,30 @@ export function ConsolePage() {
         ))}
       </div>
 
-      {/* Console area — kept dark (terminal) */}
-      <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column' }}>
+      {/* Console area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div
           style={{
             flex: 1,
             background: theme.console.bg,
-            border: `1px solid ${theme.sidebar.border}`,
-            borderRadius: theme.radius.lg,
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
             minHeight: 400,
+            overflow: 'hidden',
           }}
         >
           {activeTab === 'vnc' ? (
-            <div style={{ textAlign: 'center' }}>
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  background: theme.login.bg,
-                  border: `1px solid ${theme.sidebar.border}`,
-                  borderRadius: theme.radius.xl,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 16px',
-                  fontSize: 28,
-                }}
-              >
-                🖥
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: theme.sidebar.text, marginBottom: 8 }}>
-                VNC Console
-              </div>
-              <div style={{ fontSize: 13, color: theme.sidebar.sectionLabel }}>
-                VNC Console — requires noVNC integration
-              </div>
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: '6px 14px',
-                  background: theme.login.bg,
-                  border: `1px solid ${theme.sidebar.border}`,
-                  borderRadius: theme.radius.md,
-                  fontSize: 11,
-                  color: theme.sidebar.textDim,
-                  display: 'inline-block',
-                  fontFamily: 'monospace',
-                }}
-              >
-                ws://{window.location.hostname}/api/v1/namespaces/{namespace}/vms/{name}/vnc
-              </div>
-            </div>
+            <VNCConsole
+              cluster={activeCluster}
+              namespace={namespace ?? ''}
+              vmName={name ?? ''}
+            />
           ) : (
-            <div style={{ textAlign: 'center' }}>
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  background: theme.login.bg,
-                  border: `1px solid ${theme.sidebar.border}`,
-                  borderRadius: theme.radius.xl,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 16px',
-                  fontSize: 28,
-                }}
-              >
-                ⌨
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: theme.sidebar.text, marginBottom: 8 }}>
-                Serial Console
-              </div>
-              <div style={{ fontSize: 13, color: theme.sidebar.sectionLabel }}>
-                Serial Console — requires xterm.js integration
-              </div>
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: '6px 14px',
-                  background: theme.login.bg,
-                  border: `1px solid ${theme.sidebar.border}`,
-                  borderRadius: theme.radius.md,
-                  fontSize: 11,
-                  color: theme.sidebar.textDim,
-                  display: 'inline-block',
-                  fontFamily: 'monospace',
-                }}
-              >
-                ws://{window.location.hostname}/api/v1/namespaces/{namespace}/vms/{name}/serial
-              </div>
-            </div>
+            <SerialConsole
+              cluster={activeCluster}
+              namespace={namespace ?? ''}
+              vmName={name ?? ''}
+            />
           )}
         </div>
       </div>
