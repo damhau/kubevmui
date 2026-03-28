@@ -61,6 +61,7 @@ export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       const wsUrl = `${protocol}//${window.location.host}/ws/console/${cluster}/${namespace}/${vmName}`
       const ws = new WebSocket(wsUrl)
+      ws.binaryType = 'arraybuffer'
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -69,7 +70,11 @@ export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps
       }
 
       ws.onmessage = (event: MessageEvent) => {
-        termRef.current?.write(event.data as string)
+        if (event.data instanceof ArrayBuffer) {
+          termRef.current?.write(new Uint8Array(event.data))
+        } else {
+          termRef.current?.write(event.data as string)
+        }
       }
 
       ws.onclose = () => {
@@ -84,7 +89,7 @@ export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps
 
       term.onData((data: string) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(data)
+          wsRef.current.send(new TextEncoder().encode(data))
         }
       })
 
