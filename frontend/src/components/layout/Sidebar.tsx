@@ -6,6 +6,7 @@ import {
   Copy,
   Network,
   HardDrive,
+  Disc,
   KeyRound,
   ChevronDown,
   Check,
@@ -39,6 +40,7 @@ const navGroups: NavGroup[] = [
   {
     section: 'Infrastructure',
     items: [
+      { label: 'Images', to: '/images', icon: <Disc size={16} /> },
       { label: 'Networks', to: '/networks', icon: <Network size={16} /> },
       { label: 'Storage', to: '/storage', icon: <HardDrive size={16} /> },
       { label: 'SSH Keys', to: '/ssh-keys', icon: <KeyRound size={16} /> },

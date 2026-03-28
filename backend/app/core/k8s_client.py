@@ -214,6 +214,48 @@ class KubeVirtClient:
     def delete_ssh_key(self, namespace: str, name: str) -> None:
         self.core_api.delete_namespaced_secret(name=name, namespace=namespace)
 
+    # --- Images (ConfigMap-backed registry) ---
+
+    def list_images(self, namespace: str) -> list[dict]:
+        result = self.core_api.list_namespaced_config_map(
+            namespace=namespace, label_selector="kubevmui.io/type=image",
+        )
+        return [self._configmap_to_dict(cm) for cm in result.items]
+
+    def get_image(self, namespace: str, name: str) -> dict | None:
+        try:
+            cm = self.core_api.read_namespaced_config_map(name=name, namespace=namespace)
+            return self._configmap_to_dict(cm)
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def create_image(self, namespace: str, name: str, data: dict) -> dict:
+        cm = client.V1ConfigMap(
+            metadata=client.V1ObjectMeta(
+                name=name, namespace=namespace,
+                labels={"kubevmui.io/type": "image"},
+            ),
+            data=data,
+        )
+        result = self.core_api.create_namespaced_config_map(namespace=namespace, body=cm)
+        return self._configmap_to_dict(result)
+
+    def delete_image(self, namespace: str, name: str) -> None:
+        self.core_api.delete_namespaced_config_map(name=name, namespace=namespace)
+
+    @staticmethod
+    def _configmap_to_dict(cm) -> dict:
+        return {
+            "metadata": {
+                "name": cm.metadata.name,
+                "namespace": cm.metadata.namespace,
+                "creationTimestamp": cm.metadata.creation_timestamp.isoformat() if cm.metadata.creation_timestamp else None,
+            },
+            "data": cm.data or {},
+        }
+
     @staticmethod
     def _secret_to_dict(secret) -> dict:
         import base64

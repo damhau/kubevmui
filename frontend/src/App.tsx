@@ -11,6 +11,7 @@ import { TemplatesPage } from '@/pages/TemplatesPage'
 import { NetworksPage } from '@/pages/NetworksPage'
 import { StoragePage } from '@/pages/StoragePage'
 import { SSHKeysPage } from '@/pages/SSHKeysPage'
+import { ImagesPage } from '@/pages/ImagesPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +35,7 @@ function App() {
             <Route path="/vms/create" element={<VMCreatePage />} />
             <Route path="/vms/:namespace/:name/console" element={<ConsolePage />} />
             <Route path="/vms/:namespace/:name" element={<VMDetailPage />} />
+            <Route path="/images" element={<ImagesPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/networks" element={<NetworksPage />} />
             <Route path="/storage" element={<StoragePage />} />

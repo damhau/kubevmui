@@ -1,0 +1,572 @@
+import { useState } from 'react'
+import { TopBar } from '@/components/layout/TopBar'
+import { useImages, useCreateImage, useDeleteImage } from '@/hooks/useImages'
+import { theme } from '@/lib/theme'
+import { Modal } from '@/components/ui/Modal'
+
+const osColor: Record<string, string> = {
+  linux: theme.status.running,
+  windows: theme.status.provisioning,
+}
+
+const sourceColor: Record<string, string> = {
+  container_disk: theme.accent,
+  http: theme.status.migrating,
+  pvc: theme.status.running,
+  registry: theme.status.provisioning,
+}
+
+interface ImageItem {
+  name: string
+  display_name?: string
+  description?: string
+  os_type?: string
+  source_type?: string
+  source_url?: string
+  created_at?: string
+}
+
+function Badge({ label, color }: { label: string; color: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: theme.radius.sm,
+        fontSize: 11,
+        fontWeight: 600,
+        color,
+        background: `${color}1a`,
+        border: `1px solid ${color}40`,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+interface ImageForm {
+  display_name: string
+  name: string
+  description: string
+  os_type: string
+  source_type: string
+  source_url: string
+}
+
+const SUGGESTIONS = [
+  {
+    label: 'CirrOS (Container Disk)',
+    name: 'cirros-container-disk',
+    display_name: 'CirrOS',
+    os_type: 'linux',
+    source_type: 'container_disk',
+    source_url: 'quay.io/kubevirt/cirros-container-disk-demo',
+  },
+  {
+    label: 'Fedora Cloud (Container Disk)',
+    name: 'fedora-container-disk',
+    display_name: 'Fedora Cloud',
+    os_type: 'linux',
+    source_type: 'container_disk',
+    source_url: 'quay.io/kubevirt/fedora-cloud-container-disk-demo',
+  },
+  {
+    label: 'Alpine (HTTP)',
+    name: 'alpine-http',
+    display_name: 'Alpine Linux',
+    os_type: 'linux',
+    source_type: 'http',
+    source_url: 'https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-virt-3.19.1-x86_64.iso',
+  },
+]
+
+export function ImagesPage() {
+  const { data, isLoading } = useImages()
+  const createImage = useCreateImage()
+  const deleteImage = useDeleteImage()
+  const images: ImageItem[] = Array.isArray(data?.items) ? data.items : []
+  const [showCreate, setShowCreate] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState<ImageForm>({
+    display_name: '',
+    name: '',
+    description: '',
+    os_type: 'linux',
+    source_type: 'container_disk',
+    source_url: '',
+  })
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: theme.main.inputBg,
+    border: `1px solid ${theme.main.inputBorder}`,
+    borderRadius: theme.radius.md,
+    color: theme.text.primary,
+    fontSize: 13,
+    padding: '8px 12px',
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 12,
+    color: theme.text.secondary,
+    marginBottom: 6,
+    fontWeight: 500,
+  }
+
+  const handleDisplayNameChange = (val: string) => {
+    setForm((f) => ({
+      ...f,
+      display_name: val,
+      name: val
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, ''),
+    }))
+  }
+
+  const applySuggestion = (s: (typeof SUGGESTIONS)[number]) => {
+    setForm({
+      display_name: s.display_name,
+      name: s.name,
+      description: '',
+      os_type: s.os_type,
+      source_type: s.source_type,
+      source_url: s.source_url,
+    })
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    createImage.mutate(form, {
+      onSuccess: () => {
+        setShowCreate(false)
+        setForm({
+          display_name: '',
+          name: '',
+          description: '',
+          os_type: 'linux',
+          source_type: 'container_disk',
+          source_url: '',
+        })
+      },
+      onError: (err: unknown) => {
+        const e = err as { message?: string }
+        setError(e.message ?? 'Failed to create image')
+      },
+    })
+  }
+
+  const handleDelete = (name: string) => {
+    if (!confirm(`Delete image "${name}"?`)) return
+    deleteImage.mutate(name)
+  }
+
+  const formatDate = (d?: string) => {
+    if (!d) return '\u2014'
+    try {
+      return new Date(d).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    } catch {
+      return '\u2014'
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <TopBar
+        title="Boot Source Images"
+        action={
+          <button
+            onClick={() => {
+              setShowCreate(true)
+              setError(null)
+            }}
+            style={{
+              background: theme.button.primary,
+              color: theme.button.primaryText,
+              border: 'none',
+              borderRadius: theme.radius.md,
+              padding: '7px 14px',
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            + Add Image
+          </button>
+        }
+      />
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        <div
+          style={{
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: theme.radius.lg,
+          }}
+        >
+          {isLoading ? (
+            <div
+              style={{
+                padding: 40,
+                textAlign: 'center',
+                color: theme.text.dim,
+                fontSize: 13,
+              }}
+            >
+              Loading images...
+            </div>
+          ) : images.length === 0 ? (
+            <div
+              style={{
+                padding: 40,
+                textAlign: 'center',
+                color: theme.text.dim,
+                fontSize: 13,
+              }}
+            >
+              No boot source images found. Click &quot;+ Add Image&quot; to register one.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr
+                  style={{
+                    background: theme.main.tableHeaderBg,
+                    borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                  }}
+                >
+                  {[
+                    'Name',
+                    'Display Name',
+                    'OS Type',
+                    'Source Type',
+                    'Source URL',
+                    'Created',
+                    'Actions',
+                  ].map((col) => (
+                    <th
+                      key={col}
+                      style={{
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        color: theme.text.secondary,
+                        fontWeight: 600,
+                        fontSize: 11,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                      }}
+                    >
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {images.map((img) => (
+                  <tr
+                    key={img.name}
+                    style={{
+                      borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = theme.main.hoverBg)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = 'transparent')
+                    }
+                  >
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        color: theme.text.primary,
+                        fontWeight: 500,
+                        fontSize: 13,
+                        ...theme.typography.mono,
+                      }}
+                    >
+                      {img.name}
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        color: theme.text.primary,
+                        fontSize: 13,
+                      }}
+                    >
+                      {img.display_name || '\u2014'}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      {img.os_type ? (
+                        <Badge
+                          label={img.os_type}
+                          color={osColor[img.os_type] ?? theme.text.dim}
+                        />
+                      ) : (
+                        <span style={{ color: theme.text.dim }}>{'\u2014'}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      {img.source_type ? (
+                        <Badge
+                          label={img.source_type.replace('_', ' ')}
+                          color={
+                            sourceColor[img.source_type] ?? theme.text.dim
+                          }
+                        />
+                      ) : (
+                        <span style={{ color: theme.text.dim }}>{'\u2014'}</span>
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        color: theme.text.secondary,
+                        fontSize: 12,
+                        maxWidth: 260,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        ...theme.typography.mono,
+                      }}
+                      title={img.source_url}
+                    >
+                      {img.source_url || '\u2014'}
+                    </td>
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        color: theme.text.secondary,
+                        fontSize: 13,
+                      }}
+                    >
+                      {formatDate(img.created_at)}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <button
+                        onClick={() => handleDelete(img.name)}
+                        disabled={deleteImage.isPending}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${theme.button.secondaryBorder}`,
+                          color: theme.status.error,
+                          borderRadius: theme.radius.sm,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                          cursor: deleteImage.isPending
+                            ? 'not-allowed'
+                            : 'pointer',
+                          fontFamily: 'inherit',
+                          opacity: deleteImage.isPending ? 0.5 : 1,
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="Add Boot Source Image"
+        maxWidth={540}
+      >
+        <form onSubmit={handleSubmit}>
+          {/* Suggestions */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ ...labelStyle, marginBottom: 8 }}>
+              Quick presets
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => applySuggestion(s)}
+                  style={{
+                    background:
+                      form.name === s.name ? theme.accentLight : 'transparent',
+                    border: `1px solid ${form.name === s.name ? theme.accent : theme.main.inputBorder}`,
+                    color:
+                      form.name === s.name
+                        ? theme.accent
+                        : theme.text.secondary,
+                    borderRadius: theme.radius.md,
+                    padding: '5px 10px',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Display Name</label>
+            <input
+              type="text"
+              value={form.display_name}
+              onChange={(e) => handleDisplayNameChange(e.target.value)}
+              placeholder="e.g. Ubuntu 22.04"
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Name (auto-generated)</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="ubuntu-2204"
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Description</label>
+            <input
+              type="text"
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+              placeholder="Optional description"
+              style={inputStyle}
+            />
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 12,
+              marginBottom: 14,
+            }}
+          >
+            <div>
+              <label style={labelStyle}>OS Type</label>
+              <select
+                value={form.os_type}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, os_type: e.target.value }))
+                }
+                style={inputStyle}
+              >
+                <option value="linux">Linux</option>
+                <option value="windows">Windows</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Source Type</label>
+              <select
+                value={form.source_type}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, source_type: e.target.value }))
+                }
+                style={inputStyle}
+              >
+                <option value="container_disk">Container Disk</option>
+                <option value="http">HTTP</option>
+                <option value="pvc">PVC</option>
+                <option value="registry">Registry</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Source URL</label>
+            <input
+              type="text"
+              value={form.source_url}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, source_url: e.target.value }))
+              }
+              placeholder={
+                form.source_type === 'container_disk'
+                  ? 'quay.io/kubevirt/cirros-container-disk-demo'
+                  : 'https://...'
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          {error && (
+            <div
+              style={{
+                color: theme.status.error,
+                fontSize: 13,
+                marginBottom: 8,
+              }}
+            >
+              {error}
+            </div>
+          )}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 8,
+              marginTop: 8,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowCreate(false)}
+              style={{
+                background: theme.button.secondary,
+                border: `1px solid ${theme.button.secondaryBorder}`,
+                color: theme.button.secondaryText,
+                borderRadius: theme.radius.md,
+                padding: '7px 16px',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createImage.isPending || !form.name}
+              style={{
+                background: theme.button.primary,
+                border: 'none',
+                color: theme.button.primaryText,
+                borderRadius: theme.radius.md,
+                padding: '7px 16px',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor:
+                  createImage.isPending || !form.name
+                    ? 'not-allowed'
+                    : 'pointer',
+                fontFamily: 'inherit',
+                opacity: createImage.isPending || !form.name ? 0.7 : 1,
+              }}
+            >
+              {createImage.isPending ? 'Creating...' : 'Add Image'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  )
+}
