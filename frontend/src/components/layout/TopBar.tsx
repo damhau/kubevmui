@@ -27,8 +27,8 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
         <h1
           style={{
             margin: 0,
-            fontSize: 18,
-            fontWeight: 600,
+            fontSize: 20,
+            fontWeight: 700,
             color: theme.text.heading,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -38,7 +38,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
           {title}
         </h1>
         {subtitle && (
-          <span style={{ fontSize: 12, color: theme.text.dim, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 13, color: theme.text.secondary, whiteSpace: 'nowrap' }}>
             {subtitle}
           </span>
         )}

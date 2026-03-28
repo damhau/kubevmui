@@ -138,7 +138,7 @@ export function TemplatesPage() {
               No templates found. Create one to get started.
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
                   {['Name', 'Category', 'OS Type', 'CPU', 'Memory'].map((col) => (
@@ -147,8 +147,8 @@ export function TemplatesPage() {
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: theme.text.dim,
-                        fontWeight: 500,
+                        color: theme.text.secondary,
+                        fontWeight: 600,
                         fontSize: 11,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
@@ -167,7 +167,7 @@ export function TemplatesPage() {
                     onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>{tpl.name}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{tpl.name}</td>
                     <td style={{ padding: '10px 16px' }}>
                       {tpl.category ? (
                         <Badge
@@ -178,9 +178,9 @@ export function TemplatesPage() {
                         <span style={{ color: theme.text.dim }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.dim }}>{tpl.os_type ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.dim }}>{tpl.cpu ? `${tpl.cpu} vCPU` : '—'}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.dim }}>{tpl.memory ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{tpl.os_type ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{tpl.cpu ? `${tpl.cpu} vCPU` : '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{tpl.memory ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

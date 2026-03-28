@@ -110,6 +110,17 @@ export function Sidebar() {
           >
             {VERSION}
           </span>
+          <span
+            title="Cluster connected"
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: theme.status.running,
+              flexShrink: 0,
+              display: 'inline-block',
+            }}
+          />
         </div>
       </div>
 

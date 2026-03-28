@@ -6,17 +6,38 @@ import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { theme } from '@/lib/theme'
 
-const statusColor: Record<string, string> = {
-  Running: theme.status.running,
-  Stopped: theme.status.stopped,
-  Error: theme.status.error,
-  Migrating: theme.status.migrating,
-  Provisioning: theme.status.provisioning,
+const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
+  Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
+  Stopped:      { bg: '#f4f4f5', color: '#52525b', border: '1px solid #d4d4d8' },
+  Error:        { bg: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' },
+  Migrating:    { bg: '#fffbeb', color: '#d97706', border: '1px solid #fde68a' },
+  Provisioning: { bg: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = statusBadge[status]
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '3px 10px',
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 500,
+        background: s?.bg ?? theme.main.bg,
+        color: s?.color ?? theme.text.secondary,
+        border: s?.border ?? `1px solid ${theme.main.cardBorder}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {status}
+    </span>
+  )
 }
 
 type Tab = 'overview' | 'events' | 'yaml'
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div
       style={{
@@ -28,7 +49,16 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
       }}
     >
       <span style={{ minWidth: 160, fontSize: 12, color: theme.text.secondary, fontWeight: 500, flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: 13, color: theme.text.primary }}>{value ?? '—'}</span>
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 500,
+          color: theme.text.primary,
+          fontFamily: mono ? "'JetBrains Mono', 'Fira Code', 'Consolas', monospace" : 'inherit',
+        }}
+      >
+        {value ?? '—'}
+      </span>
     </div>
   )
 }
@@ -107,8 +137,8 @@ export function VMDetailPage() {
           <h1
             style={{
               margin: 0,
-              fontSize: 18,
-              fontWeight: 600,
+              fontSize: 20,
+              fontWeight: 700,
               color: theme.text.heading,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -118,26 +148,7 @@ export function VMDetailPage() {
             {name}
           </h1>
           {vm?.status && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: 12,
-                color: statusColor[vm.status] ?? theme.text.secondary,
-                flexShrink: 0,
-              }}
-            >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: statusColor[vm.status] ?? theme.text.secondary,
-                }}
-              />
-              {vm.status}
-            </span>
+            <StatusBadge status={vm.status} />
           )}
         </div>
 
@@ -197,6 +208,8 @@ export function VMDetailPage() {
               fontFamily: 'inherit',
               marginBottom: -1,
               transition: 'color 0.12s',
+              textTransform: activeTab === tab.id ? 'uppercase' : 'none',
+              letterSpacing: activeTab === tab.id ? '0.05em' : 'normal',
             }}
           >
             {tab.label}
@@ -223,17 +236,15 @@ export function VMDetailPage() {
                 }}
               >
                 <InfoRow label="Namespace" value={namespace} />
-                <InfoRow label="Status" value={
-                  <span style={{ color: statusColor[vm.status] ?? theme.text.secondary }}>{vm.status}</span>
-                } />
+                <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
                 <InfoRow label="CPU Cores" value={`${vm.cpu ?? '—'} vCPU`} />
                 <InfoRow label="Memory" value={vm.memory} />
-                <InfoRow label="Node" value={vm.node} />
+                <InfoRow label="Node" value={vm.node} mono />
                 <InfoRow label="IP Addresses" value={
                   vm.ip_addresses?.length
                     ? vm.ip_addresses.join(', ')
                     : vm.ip ?? '—'
-                } />
+                } mono />
                 <InfoRow label="OS Type" value={vm.os_type ?? vm.os} />
                 <InfoRow label="Run Strategy" value={vm.run_strategy} />
                 <InfoRow label="Creation Time" value={vm.created_at ?? vm.creation_timestamp} />

@@ -4,12 +4,33 @@ import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
 import { theme } from '@/lib/theme'
 
-const statusColor: Record<string, string> = {
-  Running: theme.status.running,
-  Stopped: theme.status.stopped,
-  Error: theme.status.error,
-  Migrating: theme.status.migrating,
-  Provisioning: theme.status.provisioning,
+const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
+  Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
+  Stopped:      { bg: '#f4f4f5', color: '#52525b', border: '1px solid #d4d4d8' },
+  Error:        { bg: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' },
+  Migrating:    { bg: '#fffbeb', color: '#d97706', border: '1px solid #fde68a' },
+  Provisioning: { bg: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = statusBadge[status]
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '3px 10px',
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 500,
+        background: s?.bg ?? theme.main.bg,
+        color: s?.color ?? theme.text.secondary,
+        border: s?.border ?? `1px solid ${theme.main.cardBorder}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {status}
+    </span>
+  )
 }
 
 interface VM {
@@ -199,7 +220,7 @@ export function VMListPage() {
               {search ? 'No VMs match your search.' : 'No virtual machines found.'}
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
                   {['Name', 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
@@ -209,7 +230,7 @@ export function VMListPage() {
                         padding: '10px 16px',
                         textAlign: 'left',
                         color: theme.text.secondary,
-                        fontWeight: 500,
+                        fontWeight: 600,
                         fontSize: 11,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
@@ -231,35 +252,16 @@ export function VMListPage() {
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px' }}>
-                      <div style={{ color: theme.text.primary, fontWeight: 500 }}>{vm.name}</div>
+                      <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{vm.name}</div>
                       <div style={{ color: theme.text.secondary, fontSize: 11, marginTop: 2 }}>{vm.namespace}</div>
                     </td>
                     <td style={{ padding: '10px 16px' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          fontSize: 12,
-                          color: statusColor[vm.status] ?? theme.text.secondary,
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            background: statusColor[vm.status] ?? theme.text.secondary,
-                            flexShrink: 0,
-                          }}
-                        />
-                        {vm.status}
-                      </span>
+                      <StatusBadge status={vm.status} />
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.cpu} vCPU</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.memory}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.node ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.age ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.cpu} vCPU</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.memory}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.node ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.age ?? '—'}</td>
                     <td style={{ padding: '10px 16px' }}>
                       <ActionsMenu vm={vm} onAction={(action) => handleAction(vm, action)} />
                     </td>

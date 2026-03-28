@@ -131,7 +131,7 @@ export function StoragePage() {
               No disks found.
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
                   {['Name', 'Size (GB)', 'Performance Tier', 'Status', 'Attached VM'].map((col) => (
@@ -140,8 +140,8 @@ export function StoragePage() {
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: theme.text.dim,
-                        fontWeight: 500,
+                        color: theme.text.secondary,
+                        fontWeight: 600,
                         fontSize: 11,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
@@ -160,8 +160,8 @@ export function StoragePage() {
                     onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>{disk.name}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.dim }}>
+                    <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{disk.name}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
                       {disk.size_gb != null ? disk.size_gb : '—'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
@@ -181,8 +181,8 @@ export function StoragePage() {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 6,
-                            fontSize: 12,
-                            color: diskStatusColor[disk.status] ?? theme.text.dim,
+                            fontSize: 13,
+                            color: diskStatusColor[disk.status] ?? theme.text.secondary,
                           }}
                         >
                           <span
@@ -190,7 +190,7 @@ export function StoragePage() {
                               width: 7,
                               height: 7,
                               borderRadius: '50%',
-                              background: diskStatusColor[disk.status] ?? theme.text.dim,
+                              background: diskStatusColor[disk.status] ?? theme.text.secondary,
                               flexShrink: 0,
                             }}
                           />
@@ -200,7 +200,7 @@ export function StoragePage() {
                         <span style={{ color: theme.text.dim }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.dim }}>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
                       {disk.attached_vm ?? '—'}
                     </td>
                   </tr>

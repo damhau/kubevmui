@@ -100,6 +100,18 @@ export const theme = {
     headerBorder: '#e0e0e5',
   },
 
+  // Typography
+  typography: {
+    pageTitle: { fontSize: 20, fontWeight: 700 },
+    sectionTitle: { fontSize: 16, fontWeight: 600 },
+    cardTitle: { fontSize: 14, fontWeight: 600 },
+    label: { fontSize: 11, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '0.06em' },
+    value: { fontSize: 14, fontWeight: 500 },
+    body: { fontSize: 14, fontWeight: 400 },
+    small: { fontSize: 12, fontWeight: 400 },
+    mono: { fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace" },
+  },
+
   // Misc
   radius: {
     sm: 4,

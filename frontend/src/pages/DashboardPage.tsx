@@ -11,13 +11,14 @@ const statusColor: Record<string, string> = {
   Provisioning: theme.status.provisioning,
 }
 
-function StatCard({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
+function StatCard({ label, value, accent, borderColor }: { label: string; value: number | string; accent?: string; borderColor?: string }) {
   return (
     <div
       style={{
         background: theme.main.card,
         border: `1px solid ${theme.main.cardBorder}`,
         borderRadius: theme.radius.lg,
+        borderLeft: `3px solid ${borderColor ?? theme.main.cardBorder}`,
         padding: 16,
         flex: 1,
         minWidth: 0,
@@ -27,9 +28,9 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
         style={{
           fontSize: 11,
           textTransform: 'uppercase',
-          letterSpacing: '0.08em',
+          letterSpacing: '0.06em',
           color: theme.text.secondary,
-          fontWeight: 600,
+          fontWeight: 500,
           marginBottom: 8,
         }}
       >
@@ -37,7 +38,7 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
       </div>
       <div
         style={{
-          fontSize: 28,
+          fontSize: 32,
           fontWeight: 700,
           color: accent ?? theme.text.heading,
           lineHeight: 1,
@@ -77,10 +78,10 @@ export function DashboardPage() {
           <>
             {/* Stat cards */}
             <div style={{ display: 'flex', gap: 16, marginBottom: 28 }}>
-              <StatCard label="Total VMs" value={stats.total} />
-              <StatCard label="Running VMs" value={stats.running} accent={theme.status.running} />
-              <StatCard label="Stopped VMs" value={stats.stopped} accent={theme.text.secondary} />
-              <StatCard label="Nodes" value={stats.nodes} accent={theme.accent} />
+              <StatCard label="Total VMs" value={stats.total} borderColor={theme.accent} />
+              <StatCard label="Running VMs" value={stats.running} accent={theme.status.running} borderColor={theme.status.running} />
+              <StatCard label="Stopped VMs" value={stats.stopped} accent={theme.text.secondary} borderColor={theme.status.stopped} />
+              <StatCard label="Nodes" value={stats.nodes} accent={theme.accent} borderColor={theme.status.provisioning} />
             </div>
 
             {/* Recent VMs */}
@@ -95,7 +96,7 @@ export function DashboardPage() {
                 style={{
                   padding: '14px 16px',
                   borderBottom: `1px solid ${theme.main.cardBorder}`,
-                  fontSize: 13,
+                  fontSize: 16,
                   fontWeight: 600,
                   color: theme.text.heading,
                 }}
@@ -131,7 +132,7 @@ export function DashboardPage() {
                             padding: '10px 16px',
                             textAlign: 'left',
                             color: theme.text.secondary,
-                            fontWeight: 500,
+                            fontWeight: 600,
                             fontSize: 11,
                             textTransform: 'uppercase',
                             letterSpacing: '0.06em',
@@ -154,7 +155,7 @@ export function DashboardPage() {
                         onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>{vm.name}</td>
+                        <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{vm.name}</td>
                         <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.namespace}</td>
                         <td style={{ padding: '10px 16px' }}>
                           <span

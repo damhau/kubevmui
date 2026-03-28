@@ -141,7 +141,7 @@ export function NetworksPage() {
               No network profiles found.
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
                   {['Display Name', 'Type', 'VLAN ID', 'DHCP', 'Subnet'].map((col) => (
@@ -150,8 +150,8 @@ export function NetworksPage() {
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: theme.text.dim,
-                        fontWeight: 500,
+                        color: theme.text.secondary,
+                        fontWeight: 600,
                         fontSize: 11,
                         textTransform: 'uppercase',
                         letterSpacing: '0.06em',
@@ -171,7 +171,7 @@ export function NetworksPage() {
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px' }}>
-                      <div style={{ color: theme.text.primary, fontWeight: 500 }}>{net.display_name ?? net.name}</div>
+                      <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{net.display_name ?? net.name}</div>
                       {net.display_name && (
                         <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2 }}>{net.name}</div>
                       )}
@@ -183,20 +183,20 @@ export function NetworksPage() {
                         <span style={{ color: theme.text.dim }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.dim }}>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
                       {net.vlan_id ?? '—'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <span
                         style={{
-                          color: net.dhcp ? theme.status.running : theme.text.dim,
-                          fontSize: 12,
+                          color: net.dhcp ? theme.status.running : theme.text.secondary,
+                          fontSize: 13,
                         }}
                       >
                         {net.dhcp === undefined ? '—' : net.dhcp ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.dim, fontFamily: 'monospace', fontSize: 12 }}>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace", fontSize: 13 }}>
                       {net.subnet ?? '—'}
                     </td>
                   </tr>
