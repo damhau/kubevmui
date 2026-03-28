@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCreateVM } from '@/hooks/useVMs'
 import { useNamespaces } from '@/hooks/useNamespaces'
 import { useImages, useStorageClasses } from '@/hooks/useImages'
@@ -63,6 +63,7 @@ interface FormData {
 interface VMCreateWizardProps {
   onClose: () => void
   onSuccess: () => void
+  initialTemplate?: string
 }
 
 function inputStyle(extra?: React.CSSProperties): React.CSSProperties {
@@ -190,7 +191,7 @@ function DiskIcon() {
   )
 }
 
-export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
+export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreateWizardProps) {
   const createVM = useCreateVM()
   const { data: namespacesData } = useNamespaces()
   const { data: imagesData } = useImages()
@@ -262,6 +263,14 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
       autoattach_pod_interface: tpl.autoattach_pod_interface ?? true,
     }))
   }
+
+  // Apply initial template from URL param once templates are loaded
+  useEffect(() => {
+    if (initialTemplate && templates.length > 0 && !form.template_name) {
+      applyTemplate(initialTemplate)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTemplate, templates.length])
 
   const addDisk = () =>
     updateForm({

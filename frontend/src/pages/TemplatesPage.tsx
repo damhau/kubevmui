@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
 import { theme } from '@/lib/theme'
@@ -38,6 +39,86 @@ function Badge({ label, color }: { label: string; color: string }) {
     >
       {label}
     </span>
+  )
+}
+
+function TemplateActionsMenu({ onAction }: { onAction: (action: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const actions = [
+    { label: 'Create VM', action: 'create-vm' },
+    { label: 'Duplicate', action: 'duplicate' },
+    { label: 'Delete', action: 'delete', danger: true },
+  ]
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: theme.main.card,
+          border: `1px solid ${theme.main.inputBorder}`,
+          borderRadius: 5,
+          color: theme.text.secondary,
+          cursor: 'pointer',
+          padding: '3px 8px',
+          fontSize: 16,
+          lineHeight: 1,
+          fontFamily: 'inherit',
+        }}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '100%',
+            marginTop: 4,
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: 7,
+            minWidth: 140,
+            zIndex: 100,
+            overflow: 'hidden',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          }}
+        >
+          {actions.map((a) => (
+            <button
+              key={a.action}
+              onClick={() => { setOpen(false); onAction(a.action) }}
+              style={{
+                width: '100%',
+                display: 'block',
+                padding: '8px 14px',
+                background: 'transparent',
+                border: 'none',
+                textAlign: 'left',
+                fontSize: 13,
+                color: a.danger ? theme.status.error : theme.text.primary,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -171,6 +252,7 @@ const textareaStyle: React.CSSProperties = {
 /* ── Component ── */
 
 export function TemplatesPage() {
+  const navigate = useNavigate()
   const { data, isLoading } = useTemplates()
   const createTemplate = useCreateTemplate()
   const deleteTemplate = useDeleteTemplate()
@@ -178,6 +260,27 @@ export function TemplatesPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<TemplateForm>(defaultForm)
+
+  const handleTemplateAction = (tpl: Template, action: string) => {
+    if (action === 'create-vm') {
+      navigate(`/vms/create?template=${encodeURIComponent(tpl.name)}`)
+      return
+    }
+    if (action === 'duplicate') {
+      const newName = window.prompt('New template name:', `${tpl.name}-copy`)
+      if (!newName) return
+      createTemplate.mutate({
+        ...tpl,
+        name: newName,
+        display_name: `${tpl.display_name || tpl.name} (copy)`,
+      })
+      return
+    }
+    if (action === 'delete') {
+      if (!window.confirm(`Delete template "${tpl.display_name || tpl.name}"?`)) return
+      deleteTemplate.mutate(tpl.name)
+    }
+  }
 
   const handleDisplayNameChange = (val: string) => {
     setForm((f) => ({
@@ -255,11 +358,6 @@ export function TemplatesPage() {
         setError(e.message ?? 'Failed to create template')
       },
     })
-  }
-
-  const handleDelete = (name: string) => {
-    if (!window.confirm(`Delete template "${name}"?`)) return
-    deleteTemplate.mutate(name)
   }
 
   return (
@@ -379,23 +477,7 @@ export function TemplatesPage() {
                       {tpl.networks?.length ?? 0}
                     </td>
                     <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleDelete(tpl.name)}
-                        disabled={deleteTemplate.isPending}
-                        style={{
-                          background: 'transparent',
-                          border: `1px solid ${theme.status.error}40`,
-                          color: theme.status.error,
-                          borderRadius: theme.radius.sm,
-                          padding: '4px 10px',
-                          fontSize: 12,
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          opacity: deleteTemplate.isPending ? 0.5 : 1,
-                        }}
-                      >
-                        Delete
-                      </button>
+                      <TemplateActionsMenu onAction={(action) => handleTemplateAction(tpl, action)} />
                     </td>
                   </tr>
                 ))}
