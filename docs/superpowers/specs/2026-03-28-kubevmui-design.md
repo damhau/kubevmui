@@ -79,11 +79,15 @@ backend/
 │   ├── api/
 │   │   ├── routes/
 │   │   │   ├── vms.py          # VM CRUD + lifecycle actions
+│   │   │   ├── vm_pools.py     # VirtualMachinePool CRUD + scaling
 │   │   │   ├── templates.py    # VM template management
 │   │   │   ├── snapshots.py    # Snapshot/restore operations
+│   │   │   ├── backups.py      # Backup/restore + scheduled backups
 │   │   │   ├── migrations.py   # Live migration controls
 │   │   │   ├── networks.py     # Multus network attachment definitions
 │   │   │   ├── storage.py      # StorageClasses, PVCs, DataVolumes
+│   │   │   ├── images.py       # OS image/boot source registry
+│   │   │   ├── ssh_keys.py     # SSH key secret management
 │   │   │   ├── nodes.py        # Node info and scheduling
 │   │   │   ├── clusters.py     # Cluster registry CRUD
 │   │   │   ├── auth.py         # Login, OIDC callback, token refresh
@@ -96,11 +100,15 @@ backend/
 │   │   └── k8s_client.py       # Kubernetes client wrapper with impersonation
 │   ├── services/
 │   │   ├── vm_service.py       # VM business logic
+│   │   ├── vm_pool_service.py  # VM Pool scaling + management
 │   │   ├── template_service.py
 │   │   ├── snapshot_service.py
+│   │   ├── backup_service.py   # Backup/restore + scheduling
 │   │   ├── migration_service.py
 │   │   ├── network_service.py
 │   │   ├── storage_service.py
+│   │   ├── image_service.py    # OS image registry
+│   │   ├── ssh_key_service.py  # SSH key management
 │   │   ├── node_service.py
 │   │   └── metrics_service.py
 │   ├── ws/
@@ -138,10 +146,13 @@ frontend/
 │   │   │   └── AppShell.tsx        # Overall layout wrapper
 │   │   ├── vm/
 │   │   │   ├── VMTable.tsx         # VM list with filters/sorting
-│   │   │   ├── VMDetail.tsx        # VM detail view
-│   │   │   ├── VMCreateWizard.tsx  # Multi-step VM creation
+│   │   │   ├── VMDetail.tsx        # VM detail view (tabs: overview, metrics, disks, network, snapshots, scheduling, diagnostics, events, yaml, console)
+│   │   │   ├── VMCreateWizard.tsx  # Multi-step VM creation (9 steps)
 │   │   │   ├── VMActions.tsx       # Start/stop/delete action buttons
-│   │   │   └── VMMetrics.tsx       # CPU/memory/network charts
+│   │   │   ├── VMMetrics.tsx       # CPU/memory/network charts
+│   │   │   ├── VMPoolTable.tsx     # VM Pool list
+│   │   │   ├── VMPoolDetail.tsx    # Pool detail with instance list
+│   │   │   └── VMDiagnostics.tsx   # Conditions, guest agent, health
 │   │   ├── console/
 │   │   │   ├── VNCConsole.tsx      # noVNC wrapper
 │   │   │   ├── SerialConsole.tsx   # xterm.js wrapper
@@ -149,6 +160,14 @@ frontend/
 │   │   ├── cluster/
 │   │   │   ├── ClusterSelector.tsx # Sidebar cluster dropdown
 │   │   │   └── ClusterManager.tsx  # Admin cluster registration
+│   │   ├── images/
+│   │   │   ├── ImageList.tsx       # OS image registry
+│   │   │   └── ImageUpload.tsx     # Browser upload with progress
+│   │   ├── ssh-keys/
+│   │   │   └── SSHKeyList.tsx      # SSH key management
+│   │   ├── backups/
+│   │   │   ├── BackupList.tsx      # Backup list + restore
+│   │   │   └── ScheduleList.tsx    # Scheduled backup/snapshot management
 │   │   ├── dashboard/
 │   │   │   ├── StatsCards.tsx      # Overview stat cards
 │   │   │   └── RecentVMs.tsx       # Recent VM activity table
@@ -169,9 +188,15 @@ frontend/
 │       ├── DashboardPage.tsx
 │       ├── VMListPage.tsx
 │       ├── VMDetailPage.tsx
+│       ├── VMPoolListPage.tsx
+│       ├── VMPoolDetailPage.tsx
 │       ├── ConsolePage.tsx
 │       ├── TemplatesPage.tsx
+│       ├── ImagesPage.tsx
+│       ├── SSHKeysPage.tsx
 │       ├── SnapshotsPage.tsx
+│       ├── BackupsPage.tsx
+│       ├── BackupSchedulesPage.tsx
 │       ├── MigrationsPage.tsx
 │       ├── NetworksPage.tsx
 │       ├── StoragePage.tsx
@@ -261,29 +286,38 @@ When a user makes a request:
 - Status badges: Running (green), Stopped (gray), Migrating (amber), Error (red), Provisioning (blue)
 
 **VM Detail Page:**
-- **Overview tab**: Status, IP addresses, creation time, labels, annotations
+- **Overview tab**: Status, IP addresses, creation time, labels, annotations, run strategy (editable), OS type, guest agent info
 - **Metrics tab**: CPU, memory, disk I/O, network throughput charts (Recharts, time-range selectable)
-- **Disks tab**: List of attached volumes, DataVolumes, add/remove disks
-- **Network tab**: Network interfaces, IPs, Multus attachments
+- **Disks tab**: List of attached volumes, DataVolumes, add/remove disks, **hotplug/unplug disks on running VMs**, edit bus type, boot order (drag-and-drop reorder)
+- **Network tab**: Network interfaces, IPs, Multus attachments, **hotplug/unplug NICs on running VMs**
 - **Snapshots tab**: List snapshots, create new, restore
+- **Scheduling tab**: Node selector, tolerations, affinity/anti-affinity rules (node and workload level), eviction strategy (LiveMigrate/None), priority class
+- **Diagnostics tab**: VM conditions, QEMU guest agent status, health probes, guest OS info, troubleshooting data
 - **Events tab**: K8s events for this VM
-- **YAML tab**: Raw YAML editor with syntax highlighting and apply/revert
+- **YAML tab**: Raw YAML editor with syntax highlighting, apply/revert, download as file
 - **Console tab**: Inline console launcher (VNC / Serial / RDP selector)
 
 **VM Create Wizard (multi-step):**
-1. **Basics**: Name, namespace, description, labels, template selection (optional)
-2. **Compute**: CPU cores, memory, CPU model, topology (sockets/cores/threads)
-3. **Storage**: Boot disk (DataVolume from image, PVC, blank), additional disks
-4. **Networking**: Network interfaces, Multus networks, port forwarding
-5. **Cloud-Init**: User data script editor, SSH keys, hostname
-6. **Review**: Summary of all settings, estimated resources, create button
+1. **Basics**: Name, namespace, description, labels, OS type selector, template selection (optional), run strategy (Always/Halted/Manual/RerunOnFailure)
+2. **Compute**: CPU cores, memory, CPU model, topology (sockets/cores/threads), reserved memory override, priority class selection, dedicated resources (CPU pinning)
+3. **Firmware**: Boot mode (BIOS/UEFI), Secure Boot toggle, TPM 2.0 toggle (for Windows 11)
+4. **Storage**: Boot disk (DataVolume from image, PVC, blank, container disk), additional disks with detailed options: bus type (virtio/sata/scsi), cache mode (none/writethrough/writeback), volume mode (filesystem/block), access mode (RWO/ROX/RWX), boot order (drag-and-drop)
+5. **Networking**: Network interfaces with type selection (bridge/masquerade/SR-IOV), Multus network selection, port forwarding
+6. **Scheduling**: Node selector, tolerations, node affinity/anti-affinity rules, workload affinity rules, eviction strategy
+7. **Cloud-Init / Sysprep**: Cloud-init user data script editor, network data, SSH key selection (from stored K8s Secrets), hostname — OR Sysprep for Windows VMs (upload autounattend.xml / unattend.xml)
+8. **GPU/Devices**: GPU/vGPU passthrough selection, host device passthrough (optional, shown only if devices available on cluster)
+9. **Review**: Summary of all settings, estimated resources, create button
 
 **VM Lifecycle Actions:**
 - Start, Stop, Restart, Pause, Unpause
 - Force stop (with confirmation)
 - Delete (with confirmation, option to delete associated PVCs)
-- Clone VM
+- Clone VM (direct clone without requiring snapshot)
 - Edit VM (modify CPU/memory/disks while stopped)
+- Change Run Strategy
+- Change Priority Class
+- Resize CPU/Memory (for running VMs where supported)
+- Take Backup, Take Snapshot (quick actions from VM list)
 
 ### 5.3 Console Access
 
@@ -311,7 +345,34 @@ When a user makes a request:
 - Toolbar: full-screen toggle, send keys, screenshot, disconnect
 - Status bar: connection state, latency, resolution
 
-### 5.4 Templates
+### 5.4 VM Pools (VirtualMachinePool)
+
+- List all VM Pools with name, namespace, replicas (ready/desired), instance type, status
+- Create new VM Pool (same options as VM creation plus replica count)
+- Scale pool replicas up/down
+- Per-pool actions: start all, stop all, resize, delete
+- Per-instance actions: start, stop, restart, pause, migrate, remove from pool
+- Pool detail page with template configuration, instance list, and status overview
+
+### 5.5 SSH Key Management
+
+- List all SSH key secrets (labeled for kubevmui)
+- Create new SSH key: name, namespace, public key value
+- Delete SSH keys
+- Select SSH keys during VM creation (injected via cloud-init)
+- Keys stored as Kubernetes Secrets
+
+### 5.6 Image / Boot Source Management
+
+- Registry of OS images for VM provisioning
+- Image sources: HTTP URL, S3, container registry, PVC, local upload
+- Upload disk images (qcow2, raw, ISO) from browser with progress bar
+- Image metadata: display name, description, OS type, source URL
+- Image categories: Linux, Windows, Custom
+- Images stored as DataVolume sources or custom resource
+- Auto-import from container registries (configurable)
+
+### 5.7 Templates
 
 - List all VirtualMachineClusterInstanceTypes and VirtualMachineInstancetypes
 - Create custom templates (save a VM config as reusable template)
@@ -319,15 +380,29 @@ When a user makes a request:
 - Template categories: Linux, Windows, Custom
 - Template details: default CPU, memory, disks, cloud-init, networks
 
-### 5.5 Snapshots
+### 5.8 Snapshots
 
 - List all VirtualMachineSnapshots for current namespace/cluster
-- Create snapshot from a running or stopped VM
+- Create snapshot from a running or stopped VM (filesystem freeze via QEMU guest agent for consistency)
 - Restore VM from snapshot (with confirmation — current state will be replaced)
+- Restore as new VM from snapshot
 - Delete snapshots
 - Snapshot details: creation time, size, source VM, status
+- Snapshot quota management: per-namespace and per-VM storage limits
 
-### 5.6 Live Migration
+### 5.9 Backups
+
+- **Backup target configuration**: NFS server or S3-compatible storage (endpoint, bucket, credentials)
+- Create on-demand backup from VM list or detail page
+- **Scheduled backups**: Cron-based automatic backups with configurable retention count
+- **Scheduled snapshots**: Cron-based automatic snapshots with retention
+- Schedule management: create, edit, suspend, resume, delete schedules
+- Max failure threshold before auto-suspending a schedule
+- Restore VM from backup (as new VM or replace existing)
+- Backup list with status, size, creation time, source VM
+- Cross-cluster restore support (restore backup to a different registered cluster)
+
+### 5.10 Live Migration
 
 - List active and completed migrations
 - Trigger live migration for a running VM (select target node or let scheduler decide)
@@ -335,7 +410,7 @@ When a user makes a request:
 - Migration progress bar with bandwidth and completion estimate
 - Migration policy management (bandwidth limits, auto-converge settings)
 
-### 5.7 Network Management
+### 5.11 Network Management
 
 - List Multus NetworkAttachmentDefinitions
 - View network details: type (bridge, SR-IOV, macvtap), VLAN, subnet
@@ -343,7 +418,7 @@ When a user makes a request:
 - Show which VMs are connected to each network
 - Network topology diagram (stretch goal)
 
-### 5.8 Storage Management
+### 5.12 Storage Management
 
 - List StorageClasses with capabilities (access modes, volume expansion)
 - List PersistentVolumeClaims with status, size, bound PV
@@ -352,14 +427,14 @@ When a user makes a request:
 - Upload disk image directly from browser (with progress bar)
 - Delete PVCs/DataVolumes (with warnings about attached VMs)
 
-### 5.9 Node Overview
+### 5.13 Node Overview
 
 - List Kubernetes nodes with: status, roles, CPU/memory capacity vs allocatable vs used
 - KubeVirt-specific info: virt-handler status, supported features, VM count per node
 - Node labels and taints (relevant for VM scheduling)
 - Node detail: running VMs on this node, resource utilization charts
 
-### 5.10 Monitoring Dashboard
+### 5.14 Monitoring Dashboard
 
 - **Metrics source**: Prometheus (via metrics endpoint proxy)
 - **VM-level**: CPU usage, memory usage, disk I/O (read/write), network throughput (in/out)
@@ -367,7 +442,7 @@ When a user makes a request:
 - **Time range selector**: Last 1h, 6h, 24h, 7d, 30d, custom
 - **Charts**: Line charts for time series, bar charts for comparisons (Recharts)
 
-### 5.11 Admin Panel
+### 5.15 Admin Panel
 
 **Cluster Management:**
 - List registered clusters with status (connected/unreachable), KubeVirt version, VM count
@@ -388,6 +463,8 @@ When a user makes a request:
 - Session TTL
 - Metrics endpoint configuration
 - Guacamole service URL (for RDP)
+- Backup target configuration (NFS endpoint or S3 bucket/credentials)
+- Snapshot quota defaults (per-namespace limits)
 
 ## 6. Console Architecture — Data Flow
 
@@ -469,6 +546,40 @@ All endpoints are prefixed with `/api/v1` and scoped to a cluster via header or 
 - `POST /api/v1/clusters/{cluster}/namespaces/{ns}/vms/{name}/pause` — pause
 - `POST /api/v1/clusters/{cluster}/namespaces/{ns}/vms/{name}/unpause` — unpause
 - `POST /api/v1/clusters/{cluster}/namespaces/{ns}/vms/{name}/clone` — clone
+
+**VM Pools:**
+- `GET /api/v1/clusters/{cluster}/namespaces/{ns}/vmpools` — list VM Pools
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/vmpools` — create VM Pool
+- `GET /api/v1/clusters/{cluster}/namespaces/{ns}/vmpools/{name}` — get VM Pool
+- `PUT /api/v1/clusters/{cluster}/namespaces/{ns}/vmpools/{name}` — update VM Pool
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/vmpools/{name}/scale` — scale replicas
+- `DELETE /api/v1/clusters/{cluster}/namespaces/{ns}/vmpools/{name}` — delete VM Pool
+
+**SSH Keys:**
+- `GET /api/v1/clusters/{cluster}/namespaces/{ns}/sshkeys` — list SSH keys
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/sshkeys` — create SSH key
+- `DELETE /api/v1/clusters/{cluster}/namespaces/{ns}/sshkeys/{name}` — delete SSH key
+
+**Images / Boot Sources:**
+- `GET /api/v1/clusters/{cluster}/images` — list OS images (cluster-scoped)
+- `GET /api/v1/clusters/{cluster}/namespaces/{ns}/images` — list namespace-scoped images
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/images` — create image (from URL, registry, S3)
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/images/upload` — upload image from browser
+- `DELETE /api/v1/clusters/{cluster}/namespaces/{ns}/images/{name}` — delete image
+
+**Backups:**
+- `GET /api/v1/clusters/{cluster}/namespaces/{ns}/backups` — list backups
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/vms/{name}/backups` — create backup for VM
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/backups/{name}/restore` — restore backup
+- `DELETE /api/v1/clusters/{cluster}/namespaces/{ns}/backups/{name}` — delete backup
+
+**Backup Schedules:**
+- `GET /api/v1/clusters/{cluster}/namespaces/{ns}/backup-schedules` — list schedules
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/backup-schedules` — create schedule
+- `PUT /api/v1/clusters/{cluster}/namespaces/{ns}/backup-schedules/{name}` — update schedule
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/backup-schedules/{name}/suspend` — suspend
+- `POST /api/v1/clusters/{cluster}/namespaces/{ns}/backup-schedules/{name}/resume` — resume
+- `DELETE /api/v1/clusters/{cluster}/namespaces/{ns}/backup-schedules/{name}` — delete
 
 **Templates:**
 - `GET /api/v1/clusters/{cluster}/templates` — list VM templates (cluster-scoped)
@@ -657,3 +768,55 @@ kubevmui/
 ├── Makefile                    # Common dev commands
 └── README.md
 ```
+
+## 11. Phase 2 — Future Enhancements
+
+Features identified from competitive analysis that are valuable but not required for initial release:
+
+- **Cluster API (CAPK)**: Provision tenant Kubernetes clusters on KubeVirt VMs (kubevirt-manager feature)
+- **VM Import from external platforms**: Migration toolkit for VMware vSphere, RHV, OpenStack (OpenShift MTV)
+- **HPA Auto-scaling for VM Pools**: Horizontal Pod Autoscaler integration for VM pool scaling
+- **Liveness/Readiness probes for VM Pools**: Health probes for pool instances
+- **K8s Service / Load Balancer management**: Create ClusterIP/NodePort/LoadBalancer services for VMs
+- **Network health checkups**: Latency testing, DPDK validation, storage verification (OpenShift checkups)
+- **Topology view**: Visual graph of VMs, services, and their connections
+- **VM Folders / grouping**: Organize VMs into folders within a namespace (OpenShift 4.19+)
+- **vTPM (persistent)**: Persistent virtual Trusted Platform Module with Bitlocker support
+- **PXE/iPXE boot support**: Automated bare-metal style provisioning
+- **Storage migration**: Move VM storage between storage backends independently of compute migration
+- **Overlay/SDN networking**: Kube-OVN integration for VPC, microsegmentation (Harvester/Kubermatic)
+- **Cross-cluster live migration**: Move running VMs between clusters (OpenShift Tech Preview)
+- **AI assistant integration**: Natural language troubleshooting and management (OpenShift Lightspeed)
+
+## 12. Competitive Feature Coverage
+
+Summary of feature coverage against existing tools:
+
+| Feature Area | kubevirt-manager | OpenShift Virt | Harvester | kubevmui |
+|---|---|---|---|---|
+| VM Lifecycle (CRUD + start/stop/pause) | Yes | Yes | Yes | Yes |
+| VM Pools / Scaling | Yes | Yes | No | Yes |
+| VNC Console | Yes | Yes | Yes | Yes |
+| Serial Console | Yes | Yes | Yes | Yes |
+| RDP Console | No | Yes (file download) | No | Yes (Guacamole) |
+| Live Migration | Yes | Yes | Yes | Yes |
+| Snapshots | Yes | Yes | Yes | Yes |
+| Backups (external NFS/S3) | No | Via OADP | Yes | Yes |
+| Scheduled Backups | No | No | Yes | Yes |
+| Templates | No (uses pools) | Yes (SSP) | Yes | Yes |
+| Image Registry | Yes (custom CRD) | Yes (bootable volumes) | Yes | Yes |
+| SSH Key Management | Yes | Yes | Yes | Yes |
+| Disk Hotplug | Yes | Yes | No | Yes |
+| NIC Hotplug | No | Yes | No | Yes |
+| UEFI / Secure Boot | Yes | Yes | Yes | Yes |
+| GPU/vGPU Passthrough | No | Yes | Yes | Yes |
+| Sysprep (Windows) | No | Yes | No | Yes |
+| Scheduling (affinity/tolerations) | No | Yes | Yes | Yes |
+| Diagnostics / Guest Agent | No | Yes | Partial | Yes |
+| Multi-cluster | No | Via ACM | Via Rancher | Yes (native) |
+| OIDC SSO | Via OAuth2 proxy | Yes | Via Rancher | Yes (native) |
+| Prometheus Monitoring | Yes | Yes | Yes | Yes |
+| Network Management | View only | Full CRUD | Full CRUD | Full CRUD |
+| Storage Management | DataVolumes | Full CRUD | Full CRUD | Full CRUD |
+| RBAC Admin | No | Yes | Via Rancher | Yes |
+| Dark Modern UI | No | No | No | Yes |
