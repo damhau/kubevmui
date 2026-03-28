@@ -168,7 +168,7 @@ export function VMCreatePage() {
           style={{
             background: 'transparent',
             border: 'none',
-            color: '#9a9aa0',
+            color: '#8a8a8f',
             fontSize: 13,
             cursor: 'pointer',
             padding: 0,

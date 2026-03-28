@@ -77,11 +77,11 @@ export function TemplatesPage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#8a8a8f', fontSize: 13 }}>
               Loading templates...
             </div>
           ) : templates.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#8a8a8f', fontSize: 13 }}>
               No templates found. Create one to get started.
             </div>
           ) : (
@@ -94,7 +94,7 @@ export function TemplatesPage() {
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#6b6b73',
+                        color: '#8a8a8f',
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -119,15 +119,15 @@ export function TemplatesPage() {
                       {tpl.category ? (
                         <Badge
                           label={tpl.category}
-                          color={categoryColor[tpl.category] ?? '#6b6b73'}
+                          color={categoryColor[tpl.category] ?? '#8a8a8f'}
                         />
                       ) : (
                         <span style={{ color: '#8a8a8f' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{tpl.os_type ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{tpl.cpu ? `${tpl.cpu} vCPU` : '—'}</td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{tpl.memory ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#8a8a8f' }}>{tpl.os_type ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#8a8a8f' }}>{tpl.cpu ? `${tpl.cpu} vCPU` : '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#8a8a8f' }}>{tpl.memory ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -78,11 +78,11 @@ export function NetworksPage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#8a8a8f', fontSize: 13 }}>
               Loading network profiles...
             </div>
           ) : networks.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#8a8a8f', fontSize: 13 }}>
               No network profiles found.
             </div>
           ) : (
@@ -95,7 +95,7 @@ export function NetworksPage() {
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#6b6b73',
+                        color: '#8a8a8f',
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -118,30 +118,30 @@ export function NetworksPage() {
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ color: '#1c1c1e', fontWeight: 500 }}>{net.display_name ?? net.name}</div>
                       {net.display_name && (
-                        <div style={{ color: '#6b6b73', fontSize: 11, marginTop: 2 }}>{net.name}</div>
+                        <div style={{ color: '#8a8a8f', fontSize: 11, marginTop: 2 }}>{net.name}</div>
                       )}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       {net.type ? (
-                        <Badge label={net.type} color={typeColor[net.type] ?? '#6b6b73'} />
+                        <Badge label={net.type} color={typeColor[net.type] ?? '#8a8a8f'} />
                       ) : (
                         <span style={{ color: '#8a8a8f' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>
+                    <td style={{ padding: '10px 16px', color: '#8a8a8f' }}>
                       {net.vlan_id ?? '—'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <span
                         style={{
-                          color: net.dhcp ? '#22c55e' : '#6b6b73',
+                          color: net.dhcp ? '#22c55e' : '#8a8a8f',
                           fontSize: 12,
                         }}
                       >
                         {net.dhcp === undefined ? '—' : net.dhcp ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73', fontFamily: 'monospace', fontSize: 12 }}>
+                    <td style={{ padding: '10px 16px', color: '#8a8a8f', fontFamily: 'monospace', fontSize: 12 }}>
                       {net.subnet ?? '—'}
                     </td>
                   </tr>

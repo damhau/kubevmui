@@ -84,11 +84,11 @@ export function StoragePage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#8a8a8f', fontSize: 13 }}>
               Loading disks...
             </div>
           ) : disks.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#8a8a8f', fontSize: 13 }}>
               No disks found.
             </div>
           ) : (
@@ -101,7 +101,7 @@ export function StoragePage() {
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#6b6b73',
+                        color: '#8a8a8f',
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -122,14 +122,14 @@ export function StoragePage() {
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px', color: '#1c1c1e', fontWeight: 500 }}>{disk.name}</td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>
+                    <td style={{ padding: '10px 16px', color: '#8a8a8f' }}>
                       {disk.size_gb != null ? disk.size_gb : '—'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       {disk.performance_tier ? (
                         <Badge
                           label={disk.performance_tier}
-                          color={tierColor[disk.performance_tier] ?? '#6b6b73'}
+                          color={tierColor[disk.performance_tier] ?? '#8a8a8f'}
                         />
                       ) : (
                         <span style={{ color: '#8a8a8f' }}>—</span>
@@ -143,7 +143,7 @@ export function StoragePage() {
                             alignItems: 'center',
                             gap: 6,
                             fontSize: 12,
-                            color: diskStatusColor[disk.status] ?? '#6b6b73',
+                            color: diskStatusColor[disk.status] ?? '#8a8a8f',
                           }}
                         >
                           <span
@@ -151,7 +151,7 @@ export function StoragePage() {
                               width: 7,
                               height: 7,
                               borderRadius: '50%',
-                              background: diskStatusColor[disk.status] ?? '#6b6b73',
+                              background: diskStatusColor[disk.status] ?? '#8a8a8f',
                               flexShrink: 0,
                             }}
                           />
@@ -161,7 +161,7 @@ export function StoragePage() {
                         <span style={{ color: '#8a8a8f' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>
+                    <td style={{ padding: '10px 16px', color: '#8a8a8f' }}>
                       {disk.attached_vm ?? '—'}
                     </td>
                   </tr>
