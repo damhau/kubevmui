@@ -9,6 +9,9 @@ import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { formatTimeAgo, formatMemoryMb } from '@/lib/format'
+import { toast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { PromptModal } from '@/components/ui/PromptModal'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -147,6 +150,9 @@ export function VMListPage() {
   const createSnapshot = useCreateSnapshot()
   const createMigration = useCreateMigration()
 
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean } | null>(null)
+  const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
+
   const vms: VM[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const filtered = vms.filter(
     (vm) =>
@@ -167,6 +173,10 @@ export function VMListPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
+      toast.success('VM cloned successfully')
+    },
+    onError: () => {
+      toast.error('Failed to clone VM')
     },
   })
 
@@ -179,6 +189,10 @@ export function VMListPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
+      toast.success('VM force stopped')
+    },
+    onError: () => {
+      toast.error('Failed to force stop VM')
     },
   })
 
@@ -188,36 +202,73 @@ export function VMListPage() {
       return
     }
     if (action === 'clone') {
-      const newName = window.prompt('New VM name:', `${vm.name}-clone`)
-      if (newName) {
-        cloneMutation.mutate({ namespace: vm.namespace, name: vm.name, newName })
-      }
-      return
-    }
-    if (action === 'force-stop') {
-      if (!window.confirm(`Force stop VM "${vm.name}"? This will immediately halt the VM.`)) return
-      forceStopMutation.mutate({ namespace: vm.namespace, name: vm.name })
-      return
-    }
-    if (action === 'snapshot') {
-      createSnapshot.mutate({
-        namespace: vm.namespace,
-        vmName: vm.name,
-        snapshotName: `snap-${vm.name}-${Date.now()}`,
+      setPromptAction({
+        title: 'Clone VM',
+        message: `Enter a name for the new VM cloned from "${vm.name}":`,
+        defaultValue: `${vm.name}-clone`,
+        onConfirm: (newName) => {
+          cloneMutation.mutate({ namespace: vm.namespace, name: vm.name, newName })
+          setPromptAction(null)
+        },
       })
       return
     }
+    if (action === 'force-stop') {
+      setConfirmAction({
+        title: 'Force Stop VM',
+        message: `Force stop VM "${vm.name}"? This will immediately halt the VM.`,
+        danger: true,
+        onConfirm: () => {
+          forceStopMutation.mutate({ namespace: vm.namespace, name: vm.name })
+          setConfirmAction(null)
+        },
+      })
+      return
+    }
+    if (action === 'snapshot') {
+      createSnapshot.mutate(
+        { namespace: vm.namespace, vmName: vm.name, snapshotName: `snap-${vm.name}-${Date.now()}` },
+        {
+          onSuccess: () => toast.success('Snapshot created'),
+          onError: () => toast.error('Failed to create snapshot'),
+        },
+      )
+      return
+    }
     if (action === 'migrate') {
-      createMigration.mutate({ namespace: vm.namespace, vmName: vm.name })
+      createMigration.mutate(
+        { namespace: vm.namespace, vmName: vm.name },
+        {
+          onSuccess: () => toast.success('Migration started'),
+          onError: () => toast.error('Failed to start migration'),
+        },
+      )
       return
     }
     if (action === 'delete') {
-      if (!window.confirm(`Delete VM "${vm.name}"?`)) return
-      apiClient.delete(`/clusters/${activeCluster}/namespaces/${vm.namespace}/vms/${vm.name}`)
-        .then(() => queryClient.invalidateQueries({ queryKey: ['vms'] }))
+      setConfirmAction({
+        title: 'Delete VM',
+        message: `Delete VM "${vm.name}"? This action cannot be undone.`,
+        danger: true,
+        onConfirm: () => {
+          apiClient.delete(`/clusters/${activeCluster}/namespaces/${vm.namespace}/vms/${vm.name}`)
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ['vms'] })
+              toast.success('VM deleted')
+            })
+            .catch(() => toast.error('Failed to delete VM'))
+          setConfirmAction(null)
+        },
+      })
       return
     }
-    vmAction.mutate({ namespace: vm.namespace, name: vm.name, action })
+    vmAction.mutate(
+      { namespace: vm.namespace, name: vm.name, action },
+      {
+        onSuccess: () => toast.success(`VM ${action} requested`),
+        onError: () => toast.error(`Failed to ${action} VM`),
+      },
+    )
   }
 
   return (
@@ -339,6 +390,23 @@ export function VMListPage() {
         </div>
       </div>
 
+      <ConfirmModal
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ''}
+        message={confirmAction?.message ?? ''}
+        danger={confirmAction?.danger}
+        confirmLabel={confirmAction?.danger ? 'Delete' : 'Confirm'}
+        onConfirm={() => confirmAction?.onConfirm()}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <PromptModal
+        open={!!promptAction}
+        title={promptAction?.title ?? ''}
+        message={promptAction?.message ?? ''}
+        defaultValue={promptAction?.defaultValue ?? ''}
+        onConfirm={(value) => promptAction?.onConfirm(value)}
+        onCancel={() => setPromptAction(null)}
+      />
     </div>
   )
 }

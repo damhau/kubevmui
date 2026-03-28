@@ -3,6 +3,9 @@ import { TopBar } from '@/components/layout/TopBar'
 import { useImages, useCreateImage, useDeleteImage, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
+import { toast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { PromptModal } from '@/components/ui/PromptModal'
 
 const osColor: Record<string, string> = {
   linux: theme.status.running,
@@ -228,6 +231,9 @@ export function ImagesPage() {
     })
   }
 
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean } | null>(null)
+  const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -241,19 +247,20 @@ export function ImagesPage() {
       deleteImage.mutate(editingName, {
         onSuccess: () => {
           createImage.mutate(payload, {
-            onSuccess: resetAndClose,
-            onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to save image') },
+            onSuccess: () => { resetAndClose(); toast.success('Image saved') },
+            onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to save image'); toast.error('Failed to save image') },
           })
         },
-        onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to update image') },
+        onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to update image'); toast.error('Failed to update image') },
       })
       return
     }
     createImage.mutate(payload, {
-      onSuccess: resetAndClose,
+      onSuccess: () => { resetAndClose(); toast.success('Image created') },
       onError: (err: unknown) => {
         const e = err as { message?: string }
         setError(e.message ?? 'Failed to create image')
+        toast.error('Failed to create image')
       },
     })
   }
@@ -276,41 +283,76 @@ export function ImagesPage() {
       return
     }
     if (action === 'duplicate') {
-      const newName = window.prompt('New image name:', `${img.name}-copy`)
-      if (!newName) return
-      createImage.mutate({
-        name: newName,
-        display_name: `${img.display_name || img.name} (copy)`,
-        description: img.description,
-        os_type: img.os_type,
-        source_type: img.source_type,
-        source_url: img.source_url?.trim(),
-        size_gb: img.size_gb ?? 20,
-        storage_class: img.storage_class,
+      setPromptAction({
+        title: 'Duplicate Image',
+        message: `Enter a name for the duplicated image:`,
+        defaultValue: `${img.name}-copy`,
+        onConfirm: (newName) => {
+          createImage.mutate(
+            {
+              name: newName,
+              display_name: `${img.display_name || img.name} (copy)`,
+              description: img.description,
+              os_type: img.os_type,
+              source_type: img.source_type,
+              source_url: img.source_url?.trim(),
+              size_gb: img.size_gb ?? 20,
+              storage_class: img.storage_class,
+            },
+            {
+              onSuccess: () => toast.success('Image duplicated'),
+              onError: () => toast.error('Failed to duplicate image'),
+            },
+          )
+          setPromptAction(null)
+        },
       })
       return
     }
     if (action === 'reimport') {
-      if (!window.confirm(`Re-import "${img.display_name || img.name}"? This will delete and recreate the DataVolume.`)) return
-      deleteImage.mutate(img.name, {
-        onSuccess: () => {
-          createImage.mutate({
-            name: img.name,
-            display_name: img.display_name,
-            description: img.description,
-            os_type: img.os_type,
-            source_type: img.source_type,
-            source_url: img.source_url?.trim(),
-            size_gb: img.size_gb ?? 20,
-            storage_class: img.storage_class,
+      setConfirmAction({
+        title: 'Re-import Image',
+        message: `Re-import "${img.display_name || img.name}"? This will delete and recreate the DataVolume.`,
+        onConfirm: () => {
+          deleteImage.mutate(img.name, {
+            onSuccess: () => {
+              createImage.mutate(
+                {
+                  name: img.name,
+                  display_name: img.display_name,
+                  description: img.description,
+                  os_type: img.os_type,
+                  source_type: img.source_type,
+                  source_url: img.source_url?.trim(),
+                  size_gb: img.size_gb ?? 20,
+                  storage_class: img.storage_class,
+                },
+                {
+                  onSuccess: () => toast.success('Re-import started'),
+                  onError: () => toast.error('Failed to re-import image'),
+                },
+              )
+            },
+            onError: () => toast.error('Failed to delete image for re-import'),
           })
+          setConfirmAction(null)
         },
       })
       return
     }
     if (action === 'delete') {
-      if (!window.confirm(`Delete image "${img.display_name || img.name}"?`)) return
-      deleteImage.mutate(img.name)
+      setConfirmAction({
+        title: 'Delete Image',
+        message: `Delete image "${img.display_name || img.name}"? This action cannot be undone.`,
+        danger: true,
+        onConfirm: () => {
+          deleteImage.mutate(img.name, {
+            onSuccess: () => toast.success('Image deleted'),
+            onError: () => toast.error('Failed to delete image'),
+          })
+          setConfirmAction(null)
+        },
+      })
     }
   }
 
@@ -790,6 +832,24 @@ export function ImagesPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ''}
+        message={confirmAction?.message ?? ''}
+        danger={confirmAction?.danger}
+        confirmLabel={confirmAction?.danger ? 'Delete' : 'Confirm'}
+        onConfirm={() => confirmAction?.onConfirm()}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <PromptModal
+        open={!!promptAction}
+        title={promptAction?.title ?? ''}
+        message={promptAction?.message ?? ''}
+        defaultValue={promptAction?.defaultValue ?? ''}
+        onConfirm={(value) => promptAction?.onConfirm(value)}
+        onCancel={() => setPromptAction(null)}
+      />
     </div>
   )
 }

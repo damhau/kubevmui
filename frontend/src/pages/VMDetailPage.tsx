@@ -11,6 +11,9 @@ import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
 import { useVMMetrics } from '@/hooks/useMetrics'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { toast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { PromptModal } from '@/components/ui/PromptModal'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -132,6 +135,10 @@ export function VMDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
+      toast.success('VM cloned successfully')
+    },
+    onError: () => {
+      toast.error('Failed to clone VM')
     },
   })
 
@@ -145,6 +152,10 @@ export function VMDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
       queryClient.invalidateQueries({ queryKey: ['vm'] })
+      toast.success('VM force stopped')
+    },
+    onError: () => {
+      toast.error('Failed to force stop VM')
     },
   })
 
@@ -159,6 +170,10 @@ export function VMDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vm'] })
       setEditingRunStrategy(false)
+      toast.success('Run strategy updated')
+    },
+    onError: () => {
+      toast.error('Failed to update run strategy')
     },
   })
 
@@ -188,6 +203,8 @@ export function VMDetailPage() {
 
   const [snapshotName, setSnapshotName] = useState('')
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean; confirmLabel?: string } | null>(null)
+  const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
 
   const snapshots = Array.isArray(snapshotData?.items) ? snapshotData.items : []
 
@@ -202,16 +219,34 @@ export function VMDetailPage() {
   const handleAction = (action: string) => {
     if (!namespace || !name) return
     if (action === 'delete') {
-      if (!window.confirm(`Delete VM "${name}"?`)) return
-      apiClient.delete(`/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}`)
-        .then(() => navigate('/vms'))
+      setConfirmAction({
+        title: 'Delete VM',
+        message: `Delete VM "${name}"? This action cannot be undone.`,
+        danger: true,
+        confirmLabel: 'Delete',
+        onConfirm: () => {
+          apiClient.delete(`/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}`)
+            .then(() => {
+              toast.success('VM deleted')
+              navigate('/vms')
+            })
+            .catch(() => toast.error('Failed to delete VM'))
+          setConfirmAction(null)
+        },
+      })
       return
     }
     if (action === 'console') {
       navigate(`/vms/${namespace}/${name}/console`)
       return
     }
-    vmAction.mutate({ namespace, name, action })
+    vmAction.mutate(
+      { namespace, name, action },
+      {
+        onSuccess: () => toast.success(`VM ${action} requested`),
+        onError: () => toast.error(`Failed to ${action} VM`),
+      },
+    )
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -300,10 +335,15 @@ export function VMDetailPage() {
           ))}
           <button
             onClick={() => {
-              const newName = window.prompt('New VM name:', `${name}-clone`)
-              if (newName && namespace && name) {
-                cloneMutation.mutate(newName)
-              }
+              setPromptAction({
+                title: 'Clone VM',
+                message: `Enter a name for the new VM cloned from "${name}":`,
+                defaultValue: `${name}-clone`,
+                onConfirm: (newName) => {
+                  if (namespace && name) cloneMutation.mutate(newName)
+                  setPromptAction(null)
+                },
+              })
             }}
             disabled={cloneMutation.isPending}
             style={{
@@ -349,8 +389,16 @@ export function VMDetailPage() {
           {vm?.status === 'Running' && (
             <button
               onClick={() => {
-                if (!window.confirm(`Force stop VM "${name}"? This will immediately halt the VM.`)) return
-                forceStopMutation.mutate()
+                setConfirmAction({
+                  title: 'Force Stop VM',
+                  message: `Force stop VM "${name}"? This will immediately halt the VM.`,
+                  danger: true,
+                  confirmLabel: 'Force Stop',
+                  onConfirm: () => {
+                    forceStopMutation.mutate()
+                    setConfirmAction(null)
+                  },
+                })
               }}
               disabled={forceStopMutation.isPending}
               style={{
@@ -854,8 +902,22 @@ export function VMDetailPage() {
                               <button
                                 onClick={() => {
                                   if (!namespace || !name) return
-                                  if (!window.confirm(`Remove disk "${disk.name}" from VM "${name}"?`)) return
-                                  removeVolume.mutate({ namespace, vmName: name, volName: disk.name })
+                                  setConfirmAction({
+                                    title: 'Remove Disk',
+                                    message: `Remove disk "${disk.name}" from VM "${name}"?`,
+                                    danger: true,
+                                    confirmLabel: 'Remove',
+                                    onConfirm: () => {
+                                      removeVolume.mutate(
+                                        { namespace, vmName: name, volName: disk.name },
+                                        {
+                                          onSuccess: () => toast.success('Disk removed'),
+                                          onError: () => toast.error('Failed to remove disk'),
+                                        },
+                                      )
+                                      setConfirmAction(null)
+                                    },
+                                  })
                                 }}
                                 disabled={removeVolume.isPending}
                                 style={{
@@ -1054,8 +1116,22 @@ export function VMDetailPage() {
                               <button
                                 onClick={() => {
                                   if (!namespace || !name) return
-                                  if (!window.confirm(`Remove interface "${net.name}" from VM "${name}"?`)) return
-                                  removeInterface.mutate({ namespace, vmName: name, ifaceName: net.name })
+                                  setConfirmAction({
+                                    title: 'Remove Interface',
+                                    message: `Remove interface "${net.name}" from VM "${name}"?`,
+                                    danger: true,
+                                    confirmLabel: 'Remove',
+                                    onConfirm: () => {
+                                      removeInterface.mutate(
+                                        { namespace, vmName: name, ifaceName: net.name },
+                                        {
+                                          onSuccess: () => toast.success('Interface removed'),
+                                          onError: () => toast.error('Failed to remove interface'),
+                                        },
+                                      )
+                                      setConfirmAction(null)
+                                    },
+                                  })
                                 }}
                                 disabled={removeInterface.isPending}
                                 style={{
@@ -1236,11 +1312,25 @@ export function VMDetailPage() {
                                   <button
                                     onClick={() => {
                                       if (!namespace || !name) return
-                                      if (!window.confirm(`Restore VM "${name}" from snapshot "${snap.name}"?`)) return
-                                      restoreSnapshot.mutate(
-                                        { namespace, vmName: name, snapshotName: snap.name },
-                                        { onError: (err: unknown) => { setSnapshotError((err as { message?: string }).message ?? 'Restore failed') } },
-                                      )
+                                      setConfirmAction({
+                                        title: 'Restore Snapshot',
+                                        message: `Restore VM "${name}" from snapshot "${snap.name}"? The VM will be reverted to this snapshot state.`,
+                                        confirmLabel: 'Restore',
+                                        onConfirm: () => {
+                                          restoreSnapshot.mutate(
+                                            { namespace, vmName: name, snapshotName: snap.name },
+                                            {
+                                              onSuccess: () => toast.success('Snapshot restored'),
+                                              onError: (err: unknown) => {
+                                                const msg = (err as { message?: string }).message ?? 'Restore failed'
+                                                setSnapshotError(msg)
+                                                toast.error(msg)
+                                              },
+                                            },
+                                          )
+                                          setConfirmAction(null)
+                                        },
+                                      })
                                     }}
                                     disabled={restoreSnapshot.isPending}
                                     style={{
@@ -1261,8 +1351,22 @@ export function VMDetailPage() {
                                 <button
                                   onClick={() => {
                                     if (!namespace) return
-                                    if (!window.confirm(`Delete snapshot "${snap.name}"?`)) return
-                                    deleteSnapshot.mutate({ namespace, name: snap.name })
+                                    setConfirmAction({
+                                      title: 'Delete Snapshot',
+                                      message: `Delete snapshot "${snap.name}"? This action cannot be undone.`,
+                                      danger: true,
+                                      confirmLabel: 'Delete',
+                                      onConfirm: () => {
+                                        deleteSnapshot.mutate(
+                                          { namespace, name: snap.name },
+                                          {
+                                            onSuccess: () => toast.success('Snapshot deleted'),
+                                            onError: () => toast.error('Failed to delete snapshot'),
+                                          },
+                                        )
+                                        setConfirmAction(null)
+                                      },
+                                    })
                                   }}
                                   disabled={deleteSnapshot.isPending}
                                   style={{
@@ -1378,6 +1482,24 @@ export function VMDetailPage() {
           </>
         )}
       </div>
+
+      <ConfirmModal
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ''}
+        message={confirmAction?.message ?? ''}
+        danger={confirmAction?.danger}
+        confirmLabel={confirmAction?.confirmLabel ?? (confirmAction?.danger ? 'Delete' : 'Confirm')}
+        onConfirm={() => confirmAction?.onConfirm()}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <PromptModal
+        open={!!promptAction}
+        title={promptAction?.title ?? ''}
+        message={promptAction?.message ?? ''}
+        defaultValue={promptAction?.defaultValue ?? ''}
+        onConfirm={(value) => promptAction?.onConfirm(value)}
+        onCancel={() => setPromptAction(null)}
+      />
     </div>
   )
 }

@@ -7,6 +7,9 @@ import { useImages, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
 import { formatMemoryMb } from '@/lib/format'
 import { Modal } from '@/components/ui/Modal'
+import { toast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { PromptModal } from '@/components/ui/PromptModal'
 
 const categoryColor: Record<string, string> = {
   OS: theme.status.provisioning,
@@ -279,6 +282,9 @@ export function TemplatesPage() {
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<TemplateForm>(defaultForm)
 
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean } | null>(null)
+  const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
+
   const handleTemplateAction = (tpl: Template, action: string) => {
     if (action === 'create-vm') {
       navigate(`/vms/create?template=${encodeURIComponent(tpl.name)}`)
@@ -317,18 +323,36 @@ export function TemplatesPage() {
       return
     }
     if (action === 'duplicate') {
-      const newName = window.prompt('New template name:', `${tpl.name}-copy`)
-      if (!newName) return
-      createTemplate.mutate({
-        ...tpl,
-        name: newName,
-        display_name: `${tpl.display_name || tpl.name} (copy)`,
+      setPromptAction({
+        title: 'Duplicate Template',
+        message: `Enter a name for the duplicated template:`,
+        defaultValue: `${tpl.name}-copy`,
+        onConfirm: (newName) => {
+          createTemplate.mutate(
+            { ...tpl, name: newName, display_name: `${tpl.display_name || tpl.name} (copy)` },
+            {
+              onSuccess: () => toast.success('Template duplicated'),
+              onError: () => toast.error('Failed to duplicate template'),
+            },
+          )
+          setPromptAction(null)
+        },
       })
       return
     }
     if (action === 'delete') {
-      if (!window.confirm(`Delete template "${tpl.display_name || tpl.name}"?`)) return
-      deleteTemplate.mutate(tpl.name)
+      setConfirmAction({
+        title: 'Delete Template',
+        message: `Delete template "${tpl.display_name || tpl.name}"? This action cannot be undone.`,
+        danger: true,
+        onConfirm: () => {
+          deleteTemplate.mutate(tpl.name, {
+            onSuccess: () => toast.success('Template deleted'),
+            onError: () => toast.error('Failed to delete template'),
+          })
+          setConfirmAction(null)
+        },
+      })
     }
   }
 
@@ -407,16 +431,19 @@ export function TemplatesPage() {
               setShowCreate(false)
               setEditingName(null)
               setForm(defaultForm())
+              toast.success('Template saved')
             },
             onError: (err: unknown) => {
               const e = err as { message?: string }
               setError(e.message ?? 'Failed to save template')
+              toast.error('Failed to save template')
             },
           })
         },
         onError: (err: unknown) => {
           const e = err as { message?: string }
           setError(e.message ?? 'Failed to update template')
+          toast.error('Failed to update template')
         },
       })
     } else {
@@ -424,10 +451,12 @@ export function TemplatesPage() {
         onSuccess: () => {
           setShowCreate(false)
           setForm(defaultForm())
+          toast.success('Template created')
         },
         onError: (err: unknown) => {
           const e = err as { message?: string }
           setError(e.message ?? 'Failed to create template')
+          toast.error('Failed to create template')
         },
       })
     }
@@ -1009,6 +1038,24 @@ export function TemplatesPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ''}
+        message={confirmAction?.message ?? ''}
+        danger={confirmAction?.danger}
+        confirmLabel={confirmAction?.danger ? 'Delete' : 'Confirm'}
+        onConfirm={() => confirmAction?.onConfirm()}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <PromptModal
+        open={!!promptAction}
+        title={promptAction?.title ?? ''}
+        message={promptAction?.message ?? ''}
+        defaultValue={promptAction?.defaultValue ?? ''}
+        onConfirm={(value) => promptAction?.onConfirm(value)}
+        onCancel={() => setPromptAction(null)}
+      />
     </div>
   )
 }
