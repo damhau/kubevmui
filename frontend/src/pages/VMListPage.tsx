@@ -1,14 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
+import { theme } from '@/lib/theme'
+import { SlideOver } from '@/components/ui/SlideOver'
+import { VMCreateWizard } from '@/components/vm/VMCreateWizard'
 
 const statusColor: Record<string, string> = {
-  Running: '#22c55e',
-  Stopped: '#71717a',
-  Error: '#ef4444',
-  Migrating: '#f59e0b',
-  Provisioning: '#3b82f6',
+  Running: theme.status.running,
+  Stopped: theme.status.stopped,
+  Error: theme.status.error,
+  Migrating: theme.status.migrating,
+  Provisioning: theme.status.provisioning,
 }
 
 interface VM {
@@ -48,10 +51,10 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
       <button
         onClick={() => setOpen((v) => !v)}
         style={{
-          background: '#ffffff',
-          border: '1px solid #d0d0d5',
+          background: theme.main.card,
+          border: `1px solid ${theme.main.inputBorder}`,
           borderRadius: 5,
-          color: '#6b6b73',
+          color: theme.text.secondary,
           cursor: 'pointer',
           padding: '3px 8px',
           fontSize: 16,
@@ -68,8 +71,8 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
             right: 0,
             top: '100%',
             marginTop: 4,
-            background: '#ffffff',
-            border: '1px solid #e0e0e5',
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
             borderRadius: 7,
             minWidth: 130,
             zIndex: 100,
@@ -92,11 +95,11 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
                 border: 'none',
                 textAlign: 'left',
                 fontSize: 13,
-                color: a.danger ? '#ef4444' : '#1c1c1e',
+                color: a.danger ? theme.status.error : theme.text.primary,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               {a.label}
@@ -110,6 +113,7 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
 
 export function VMListPage() {
   const [search, setSearch] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
   const navigate = useNavigate()
   const { data, isLoading } = useVMs()
   const vmAction = useVMAction()
@@ -137,23 +141,23 @@ export function VMListPage() {
       <TopBar
         title="Virtual Machines"
         action={
-          <Link
-            to="/vms/create"
+          <button
+            onClick={() => setShowCreate(true)}
             style={{
-              background: '#6366f1',
-              color: '#fff',
+              background: theme.button.primary,
+              color: theme.button.primaryText,
               border: 'none',
-              borderRadius: 6,
+              borderRadius: theme.radius.md,
               padding: '7px 14px',
               fontSize: 13,
               fontWeight: 500,
               cursor: 'pointer',
-              textDecoration: 'none',
               whiteSpace: 'nowrap',
+              fontFamily: 'inherit',
             }}
           >
             + New VM
-          </Link>
+          </button>
         }
       />
 
@@ -167,10 +171,10 @@ export function VMListPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{
               width: 280,
-              background: '#ffffff',
-              border: '1px solid #d0d0d5',
-              borderRadius: 6,
-              color: '#1c1c1e',
+              background: theme.main.inputBg,
+              border: `1px solid ${theme.main.inputBorder}`,
+              borderRadius: theme.radius.md,
+              color: theme.text.primary,
               fontSize: 13,
               padding: '8px 12px',
               outline: 'none',
@@ -182,30 +186,30 @@ export function VMListPage() {
         {/* Table */}
         <div
           style={{
-            background: '#ffffff',
-            border: '1px solid #e0e0e5',
-            borderRadius: 8,
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: theme.radius.lg,
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
               Loading virtual machines...
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
               {search ? 'No VMs match your search.' : 'No virtual machines found.'}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ background: '#f7f7f9', borderBottom: '1px solid #e8e8ec' }}>
+                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
                   {['Name', 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
                     <th
                       key={i}
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#6b6b73',
+                        color: theme.text.secondary,
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -223,13 +227,13 @@ export function VMListPage() {
                   <tr
                     key={`${vm.namespace}/${vm.name}`}
                     onClick={() => navigate(`/vms/${vm.namespace}/${vm.name}`)}
-                    style={{ borderBottom: '1px solid #e8e8ec', cursor: 'pointer' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
+                    style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}`, cursor: 'pointer' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px' }}>
-                      <div style={{ color: '#1c1c1e', fontWeight: 500 }}>{vm.name}</div>
-                      <div style={{ color: '#6b6b73', fontSize: 11, marginTop: 2 }}>{vm.namespace}</div>
+                      <div style={{ color: theme.text.primary, fontWeight: 500 }}>{vm.name}</div>
+                      <div style={{ color: theme.text.secondary, fontSize: 11, marginTop: 2 }}>{vm.namespace}</div>
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <span
@@ -238,7 +242,7 @@ export function VMListPage() {
                           alignItems: 'center',
                           gap: 6,
                           fontSize: 12,
-                          color: statusColor[vm.status] ?? '#6b6b73',
+                          color: statusColor[vm.status] ?? theme.text.secondary,
                         }}
                       >
                         <span
@@ -246,17 +250,17 @@ export function VMListPage() {
                             width: 8,
                             height: 8,
                             borderRadius: '50%',
-                            background: statusColor[vm.status] ?? '#6b6b73',
+                            background: statusColor[vm.status] ?? theme.text.secondary,
                             flexShrink: 0,
                           }}
                         />
                         {vm.status}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.cpu} vCPU</td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.memory}</td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.node ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.age ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.cpu} vCPU</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.memory}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.node ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.age ?? '—'}</td>
                     <td style={{ padding: '10px 16px' }}>
                       <ActionsMenu vm={vm} onAction={(action) => handleAction(vm, action)} />
                     </td>
@@ -267,6 +271,18 @@ export function VMListPage() {
           )}
         </div>
       </div>
+
+      <SlideOver
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="Create Virtual Machine"
+        width={540}
+      >
+        <VMCreateWizard
+          onClose={() => setShowCreate(false)}
+          onSuccess={() => setShowCreate(false)}
+        />
+      </SlideOver>
     </div>
   )
 }
