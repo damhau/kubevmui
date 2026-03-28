@@ -66,6 +66,12 @@ class AddInterfaceRequest(BaseModel):
 class RemoveInterfaceRequest(BaseModel):
     name: str
 
+class VMCloneRequest(BaseModel):
+    new_name: str
+
+class VMPatchRequest(BaseModel):
+    run_strategy: str | None = None
+
 class VMList(BaseModel):
     items: list[VM]
     total: int

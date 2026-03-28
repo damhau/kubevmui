@@ -8,6 +8,8 @@ class KubeVirtClient:
     SUBRESOURCE_API_GROUP = "subresources.kubevirt.io"
     SNAPSHOT_API_GROUP = "snapshot.kubevirt.io"
     SNAPSHOT_API_VERSION = "v1beta1"
+    CLONE_API_GROUP = "clone.kubevirt.io"
+    CLONE_API_VERSION = "v1beta1"
 
     def __init__(self, api_client: client.ApiClient):
         self.api_client = api_client
@@ -145,6 +147,14 @@ class KubeVirtClient:
                 "memory_allocatable": node.status.allocatable.get("memory", "0"),
             })
         return nodes
+
+    # --- Clone ---
+
+    def create_clone(self, namespace: str, body: dict) -> dict:
+        return self.custom_api.create_namespaced_custom_object(
+            group=self.CLONE_API_GROUP, version=self.CLONE_API_VERSION,
+            namespace=namespace, plural="virtualmachineclones", body=body,
+        )
 
     # --- Snapshots ---
 

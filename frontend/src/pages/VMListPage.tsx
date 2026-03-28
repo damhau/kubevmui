@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
 import { useCreateSnapshot } from '@/hooks/useSnapshots'
 import { useCreateMigration } from '@/hooks/useMigrations'
+import apiClient from '@/lib/api-client'
+import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
@@ -62,7 +65,9 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
   const actions = [
     { label: 'Start', action: 'start' },
     { label: 'Stop', action: 'stop' },
+    { label: 'Force Stop', action: 'force-stop', danger: true },
     { label: 'Restart', action: 'restart' },
+    { label: 'Clone', action: 'clone' },
     { label: 'Console', action: 'console' },
     { label: 'Delete', action: 'delete', danger: true },
   ]
@@ -147,9 +152,49 @@ export function VMListPage() {
       vm.namespace?.toLowerCase().includes(search.toLowerCase()),
   )
 
+  const { activeCluster } = useUIStore()
+  const queryClient = useQueryClient()
+
+  const cloneMutation = useMutation({
+    mutationFn: async ({ namespace, name, newName }: { namespace: string; name: string; newName: string }) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}/clone`,
+        { new_name: newName },
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+
+  const forceStopMutation = useMutation({
+    mutationFn: async ({ namespace, name }: { namespace: string; name: string }) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}/force-stop`,
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+
   const handleAction = (vm: VM, action: string) => {
     if (action === 'console') {
       navigate(`/vms/${vm.namespace}/${vm.name}/console`)
+      return
+    }
+    if (action === 'clone') {
+      const newName = window.prompt('New VM name:', `${vm.name}-clone`)
+      if (newName) {
+        cloneMutation.mutate({ namespace: vm.namespace, name: vm.name, newName })
+      }
+      return
+    }
+    if (action === 'force-stop') {
+      if (!window.confirm(`Force stop VM "${vm.name}"? This will immediately halt the VM.`)) return
+      forceStopMutation.mutate({ namespace: vm.namespace, name: vm.name })
       return
     }
     if (action === 'delete') {

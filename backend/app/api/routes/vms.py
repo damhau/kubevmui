@@ -4,7 +4,7 @@ from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
 from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
-from app.models.vm import VM, VMCreate, VMList, AddVolumeRequest, AddInterfaceRequest
+from app.models.vm import VM, VMCreate, VMList, AddVolumeRequest, AddInterfaceRequest, VMCloneRequest, VMPatchRequest
 from app.services.vm_service import VMService
 
 router = APIRouter(
@@ -71,6 +71,37 @@ def delete_vm(
 ):
     svc = _get_service(cluster, cm)
     svc.delete_vm(ns, name)
+
+
+@router.post("/vms/{name}/clone", status_code=201)
+def clone_vm(
+    cluster: str, ns: str, name: str, body: VMCloneRequest,
+    _user: UserInfo = Depends(get_current_user), cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.clone_vm(ns, name, body.new_name)
+    return {"status": "ok", "new_name": body.new_name}
+
+
+@router.post("/vms/{name}/force-stop", status_code=200)
+def force_stop_vm(
+    cluster: str, ns: str, name: str,
+    _user: UserInfo = Depends(get_current_user), cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.force_stop(ns, name)
+    return {"status": "ok"}
+
+
+@router.patch("/vms/{name}", status_code=200)
+def patch_vm(
+    cluster: str, ns: str, name: str, body: VMPatchRequest,
+    _user: UserInfo = Depends(get_current_user), cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    if body.run_strategy:
+        svc.update_run_strategy(ns, name, body.run_strategy)
+    return {"status": "ok"}
 
 
 @router.post("/vms/{name}/{action}", status_code=200)

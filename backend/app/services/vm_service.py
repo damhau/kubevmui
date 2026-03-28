@@ -317,3 +317,35 @@ class VMService:
 
     def remove_interface(self, namespace: str, vm_name: str, name: str) -> None:
         self.kv.remove_interface(namespace, vm_name, {"name": name})
+
+    def clone_vm(self, namespace: str, source_name: str, new_name: str) -> dict:
+        manifest = {
+            "apiVersion": "clone.kubevirt.io/v1beta1",
+            "kind": "VirtualMachineClone",
+            "metadata": {
+                "name": f"clone-{source_name}-{int(datetime.now(UTC).timestamp())}",
+                "namespace": namespace,
+            },
+            "spec": {
+                "source": {
+                    "apiGroup": "kubevirt.io",
+                    "kind": "VirtualMachine",
+                    "name": source_name,
+                },
+                "target": {
+                    "apiGroup": "kubevirt.io",
+                    "kind": "VirtualMachine",
+                    "name": new_name,
+                },
+            },
+        }
+        return self.kv.create_clone(namespace, manifest)
+
+    def force_stop(self, namespace: str, name: str) -> None:
+        """Force stop by patching runStrategy to Halted."""
+        body = {"spec": {"runStrategy": "Halted"}}
+        self.kv.patch_vm(namespace, name, body)
+
+    def update_run_strategy(self, namespace: str, name: str, strategy: str) -> None:
+        body = {"spec": {"runStrategy": strategy}}
+        self.kv.patch_vm(namespace, name, body)

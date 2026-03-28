@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
@@ -70,7 +70,49 @@ export function VMDetailPage() {
   const navigate = useNavigate()
   const { activeCluster } = useUIStore()
   const vmAction = useVMAction()
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [editingRunStrategy, setEditingRunStrategy] = useState(false)
+
+  const cloneMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}/clone`,
+        { new_name: newName },
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+
+  const forceStopMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}/force-stop`,
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+    },
+  })
+
+  const updateRunStrategyMutation = useMutation({
+    mutationFn: async (strategy: string) => {
+      const { data } = await apiClient.patch(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}`,
+        { run_strategy: strategy },
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      setEditingRunStrategy(false)
+    },
+  })
 
   const { data: vm, isLoading } = useQuery({
     queryKey: ['vm', activeCluster, namespace, name],
@@ -198,6 +240,52 @@ export function VMDetailPage() {
               {btn.label}
             </button>
           ))}
+          <button
+            onClick={() => {
+              const newName = window.prompt('New VM name:', `${name}-clone`)
+              if (newName && namespace && name) {
+                cloneMutation.mutate(newName)
+              }
+            }}
+            disabled={cloneMutation.isPending}
+            style={{
+              background: theme.main.card,
+              color: theme.text.primary,
+              border: `1px solid ${theme.main.inputBorder}`,
+              borderRadius: theme.radius.md,
+              padding: '6px 12px',
+              fontSize: 12,
+              cursor: cloneMutation.isPending ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+              opacity: cloneMutation.isPending ? 0.6 : 1,
+            }}
+          >
+            {cloneMutation.isPending ? 'Cloning...' : 'Clone'}
+          </button>
+          {vm?.status === 'Running' && (
+            <button
+              onClick={() => {
+                if (!window.confirm(`Force stop VM "${name}"? This will immediately halt the VM.`)) return
+                forceStopMutation.mutate()
+              }}
+              disabled={forceStopMutation.isPending}
+              style={{
+                background: 'rgba(239,68,68,0.08)',
+                color: theme.status.error,
+                border: `1px solid rgba(239,68,68,0.3)`,
+                borderRadius: theme.radius.md,
+                padding: '6px 12px',
+                fontSize: 12,
+                cursor: forceStopMutation.isPending ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 500,
+                opacity: forceStopMutation.isPending ? 0.6 : 1,
+              }}
+            >
+              {forceStopMutation.isPending ? 'Force Stopping...' : 'Force Stop'}
+            </button>
+          )}
           {vm?.status === 'Running' && (
             <button
               onClick={() => {
@@ -354,7 +442,63 @@ export function VMDetailPage() {
                     : vm.ip ?? '—'
                 } mono />
                 <InfoRow label="OS Type" value={vm.os_type ?? vm.os} />
-                <InfoRow label="Run Strategy" value={vm.run_strategy} />
+                <InfoRow label="Run Strategy" value={
+                  editingRunStrategy ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <select
+                        defaultValue={vm.run_strategy}
+                        onChange={(e) => updateRunStrategyMutation.mutate(e.target.value)}
+                        disabled={updateRunStrategyMutation.isPending}
+                        style={{
+                          background: theme.main.inputBg,
+                          border: `1px solid ${theme.main.inputBorder}`,
+                          borderRadius: theme.radius.md,
+                          padding: '4px 8px',
+                          fontSize: 13,
+                          color: theme.text.primary,
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {['Always', 'Halted', 'Manual', 'RerunOnFailure'].map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setEditingRunStrategy(false)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: theme.text.secondary,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{vm.run_strategy}</span>
+                      <button
+                        onClick={() => setEditingRunStrategy(true)}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${theme.main.inputBorder}`,
+                          borderRadius: theme.radius.sm,
+                          padding: '1px 6px',
+                          fontSize: 11,
+                          cursor: 'pointer',
+                          color: theme.text.secondary,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )
+                } />
                 <InfoRow label="Creation Time" value={vm.created_at ?? vm.creation_timestamp} />
                 {vm.labels && Object.keys(vm.labels).length > 0 && (
                   <InfoRow
