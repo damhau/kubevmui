@@ -56,6 +56,7 @@ function TemplateActionsMenu({ onAction }: { onAction: (action: string) => void 
 
   const actions = [
     { label: 'Create VM', action: 'create-vm' },
+    { label: 'Edit', action: 'edit' },
     { label: 'Duplicate', action: 'duplicate' },
     { label: 'Delete', action: 'delete', danger: true },
   ]
@@ -258,12 +259,44 @@ export function TemplatesPage() {
   const deleteTemplate = useDeleteTemplate()
   const templates: Template[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
+  const [editingName, setEditingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<TemplateForm>(defaultForm)
 
   const handleTemplateAction = (tpl: Template, action: string) => {
     if (action === 'create-vm') {
       navigate(`/vms/create?template=${encodeURIComponent(tpl.name)}`)
+      return
+    }
+    if (action === 'edit') {
+      setForm({
+        display_name: tpl.display_name || tpl.name,
+        name: tpl.name,
+        category: tpl.category || 'custom',
+        os_type: tpl.os_type || '',
+        cpu: tpl.compute?.cpu_cores ?? 2,
+        memory_mb: tpl.compute?.memory_mb ?? 2048,
+        disks: (tpl.disks || []).map((d: any) => ({
+          name: d.name || '',
+          source_type: d.source_type || 'pvc',
+          size_gb: d.size_gb || 20,
+          bus: d.bus || 'virtio',
+          image: d.image || '',
+          clone_source: d.clone_source || '',
+          clone_namespace: d.clone_namespace || '',
+          storage_class: d.storage_class || '',
+        })),
+        nics: (tpl.networks || []).map((n: any) => ({
+          name: n.name || '',
+          network_profile: n.network_profile || '',
+        })),
+        cloud_init_user_data: tpl.cloud_init_user_data || '',
+        cloud_init_network_data: tpl.cloud_init_network_data || '',
+        autoattach_pod_interface: tpl.autoattach_pod_interface ?? true,
+      })
+      setEditingName(tpl.name)
+      setError(null)
+      setShowCreate(true)
       return
     }
     if (action === 'duplicate') {
@@ -348,16 +381,39 @@ export function TemplatesPage() {
       cloud_init_network_data: form.cloud_init_network_data || null,
       autoattach_pod_interface: form.autoattach_pod_interface,
     }
-    createTemplate.mutate(payload, {
-      onSuccess: () => {
-        setShowCreate(false)
-        setForm(defaultForm())
-      },
-      onError: (err: unknown) => {
-        const e = err as { message?: string }
-        setError(e.message ?? 'Failed to create template')
-      },
-    })
+    if (editingName) {
+      // Edit: delete old, then create new
+      deleteTemplate.mutate(editingName, {
+        onSuccess: () => {
+          createTemplate.mutate(payload, {
+            onSuccess: () => {
+              setShowCreate(false)
+              setEditingName(null)
+              setForm(defaultForm())
+            },
+            onError: (err: unknown) => {
+              const e = err as { message?: string }
+              setError(e.message ?? 'Failed to save template')
+            },
+          })
+        },
+        onError: (err: unknown) => {
+          const e = err as { message?: string }
+          setError(e.message ?? 'Failed to update template')
+        },
+      })
+    } else {
+      createTemplate.mutate(payload, {
+        onSuccess: () => {
+          setShowCreate(false)
+          setForm(defaultForm())
+        },
+        onError: (err: unknown) => {
+          const e = err as { message?: string }
+          setError(e.message ?? 'Failed to create template')
+        },
+      })
+    }
   }
 
   return (
@@ -367,8 +423,10 @@ export function TemplatesPage() {
         action={
           <button
             onClick={() => {
-              setShowCreate(true)
+              setForm(defaultForm())
+              setEditingName(null)
               setError(null)
+              setShowCreate(true)
             }}
             style={{
               background: theme.button.primary,
@@ -488,7 +546,7 @@ export function TemplatesPage() {
       </div>
 
       {/* ── Create Template Modal ── */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Template" maxWidth={600}>
+      <Modal open={showCreate} onClose={() => { setShowCreate(false); setEditingName(null) }} title={editingName ? 'Edit Template' : 'New Template'} maxWidth={600}>
         <form onSubmit={handleSubmit}>
           {/* BASIC INFO */}
           <div style={sectionLabelStyle}>Basic Info</div>
@@ -856,7 +914,7 @@ export function TemplatesPage() {
                 opacity: createTemplate.isPending ? 0.7 : 1,
               }}
             >
-              {createTemplate.isPending ? 'Creating...' : 'Create Template'}
+              {createTemplate.isPending || deleteTemplate.isPending ? 'Saving...' : editingName ? 'Save Template' : 'Create Template'}
             </button>
           </div>
         </form>
