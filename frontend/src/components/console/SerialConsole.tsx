@@ -1,25 +1,48 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import 'xterm/css/xterm.css'
+import type { ConnectionStatus } from './VNCConsole'
 
 interface SerialConsoleProps {
   cluster: string
   namespace: string
   vmName: string
+  onStatusChange?: (status: ConnectionStatus) => void
 }
 
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+export interface SerialConsoleRef {
+  disconnect: () => void
+}
 
-export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps) {
+export const SerialConsole = forwardRef<SerialConsoleRef, SerialConsoleProps>(function SerialConsole({ cluster, namespace, vmName, onStatusChange }, ref) {
   const terminalRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
   const mountTimeRef = useRef(0)
-  const [status, setStatus] = useState<ConnectionStatus>('connecting')
+  const [status, setStatusRaw] = useState<ConnectionStatus>('connecting')
+
+  const setStatus = (s: ConnectionStatus) => {
+    setStatusRaw(s)
+    onStatusChange?.(s)
+  }
+
+  useImperativeHandle(ref, () => ({
+    disconnect: () => {
+      if (wsRef.current) {
+        wsRef.current.onopen = null
+        wsRef.current.onmessage = null
+        wsRef.current.onclose = null
+        wsRef.current.onerror = null
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      setStatus('disconnected')
+    },
+  }))
 
   useEffect(() => {
     const container = terminalRef.current
@@ -143,4 +166,4 @@ export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps
       <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
     </div>
   )
-}
+})

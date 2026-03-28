@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
 import RFBModule from '@novnc/novnc/lib/rfb'
 
 const RFB = (RFBModule as any).default || RFBModule
@@ -7,16 +7,37 @@ interface VNCConsoleProps {
   cluster: string
   namespace: string
   vmName: string
+  onStatusChange?: (status: ConnectionStatus) => void
 }
 
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
-export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
+export interface VNCConsoleRef {
+  sendCtrlAltDel: () => void
+  disconnect: () => void
+}
+
+export const VNCConsole = forwardRef<VNCConsoleRef, VNCConsoleProps>(function VNCConsole({ cluster, namespace, vmName, onStatusChange }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const rfbRef = useRef<any>(null)
   const mountTimeRef = useRef(0)
-  const [status, setStatus] = useState<ConnectionStatus>('connecting')
+  const [status, setStatusRaw] = useState<ConnectionStatus>('connecting')
   const [errorMessage, setErrorMessage] = useState<string>('')
+
+  const setStatus = (s: ConnectionStatus) => {
+    setStatusRaw(s)
+    onStatusChange?.(s)
+  }
+
+  useImperativeHandle(ref, () => ({
+    sendCtrlAltDel: () => {
+      rfbRef.current?.sendCtrlAltDel()
+    },
+    disconnect: () => {
+      rfbRef.current?.disconnect()
+      rfbRef.current = null
+    },
+  }))
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -112,4 +133,4 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
       <div ref={containerRef} style={{ width: '100%', height: '100%', background: '#000' }} />
     </div>
   )
-}
+})
