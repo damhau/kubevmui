@@ -5,6 +5,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Network } from 'lucide-react'
 
 const typeColor: Record<string, string> = {
@@ -299,9 +300,7 @@ export function NetworksPage() {
             </span>
           </div>
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              Loading network profiles...
-            </div>
+            <TableSkeleton rows={2} cols={5} />
           ) : networks.length === 0 ? (
             <EmptyState
               icon={<Network size={24} />}
@@ -409,9 +408,7 @@ export function NetworksPage() {
             </span>
           </div>
           {allNADsLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              Loading cluster NADs...
-            </div>
+            <TableSkeleton rows={2} cols={5} />
           ) : clusterNADs.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
               No NADs found in other namespaces.

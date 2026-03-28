@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Copy } from 'lucide-react'
 
 const categoryColor: Record<string, string> = {
@@ -503,9 +504,7 @@ export function TemplatesPage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              Loading templates...
-            </div>
+            <TableSkeleton rows={3} cols={8} />
           ) : templates.length === 0 ? (
             <EmptyState
               icon={<Copy size={24} />}

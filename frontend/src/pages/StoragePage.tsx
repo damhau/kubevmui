@@ -4,6 +4,7 @@ import { useDisks, useCreateDisk, useDeleteDisk } from '@/hooks/useDisks'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { HardDrive } from 'lucide-react'
 
 const tierColor: Record<string, string> = {
@@ -215,9 +216,7 @@ export function StoragePage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              Loading disks...
-            </div>
+            <TableSkeleton rows={3} cols={6} />
           ) : disks.length === 0 ? (
             <EmptyState
               icon={<HardDrive size={24} />}

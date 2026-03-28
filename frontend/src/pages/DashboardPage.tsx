@@ -4,6 +4,7 @@ import { useImages } from '@/hooks/useImages'
 import { useNavigate } from 'react-router-dom'
 import { theme } from '@/lib/theme'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton'
 import { Monitor, AlertTriangle, Loader2 } from 'lucide-react'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
@@ -161,7 +162,15 @@ export function DashboardPage() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         {isLoading ? (
-          <div style={{ color: theme.text.secondary, fontSize: 13 }}>Loading dashboard data...</div>
+          <>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+              <CardSkeleton />
+              <CardSkeleton />
+              <CardSkeleton />
+              <CardSkeleton />
+            </div>
+            <TableSkeleton rows={5} cols={6} />
+          </>
         ) : (
           <>
             {/* Stat cards */}

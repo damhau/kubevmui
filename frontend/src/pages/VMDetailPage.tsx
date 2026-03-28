@@ -14,6 +14,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -483,7 +484,12 @@ export function VMDetailPage() {
       {/* Tab content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         {isLoading ? (
-          <div style={{ color: theme.text.secondary, fontSize: 13 }}>Loading VM details...</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <CardSkeleton height={100} />
+            <CardSkeleton height={100} />
+            <CardSkeleton height={100} />
+            <CardSkeleton height={100} />
+          </div>
         ) : !vm ? (
           <div style={{ color: theme.text.secondary, fontSize: 13 }}>VM not found.</div>
         ) : (

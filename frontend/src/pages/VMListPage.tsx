@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Monitor } from 'lucide-react'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
@@ -331,9 +332,7 @@ export function VMListPage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
-              Loading virtual machines...
-            </div>
+            <TableSkeleton rows={5} cols={7} />
           ) : filtered.length === 0 ? (
             search ? (
               <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>

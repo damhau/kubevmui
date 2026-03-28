@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Disc } from 'lucide-react'
 
 const osColor: Record<string, string> = {
@@ -410,16 +411,7 @@ export function ImagesPage() {
           }}
         >
           {isLoading ? (
-            <div
-              style={{
-                padding: 40,
-                textAlign: 'center',
-                color: theme.text.dim,
-                fontSize: 13,
-              }}
-            >
-              Loading images...
-            </div>
+            <TableSkeleton rows={3} cols={8} />
           ) : images.length === 0 ? (
             <EmptyState
               icon={<Disc size={24} />}

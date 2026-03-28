@@ -5,6 +5,7 @@ import { useNodeMetrics } from '@/hooks/useMetrics'
 import { theme } from '@/lib/theme'
 import { ChevronDown, ChevronRight, Server, Cpu, MemoryStick, Monitor } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface NodeItem {
@@ -315,9 +316,7 @@ export function NodesPage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
-              Loading nodes...
-            </div>
+            <TableSkeleton rows={2} cols={7} />
           ) : filtered.length === 0 ? (
             search ? (
               <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>

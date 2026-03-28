@@ -4,6 +4,7 @@ import { useSSHKeys, useCreateSSHKey, useDeleteSSHKey } from '@/hooks/useSSHKeys
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { TableSkeleton } from '@/components/ui/Skeleton'
 import { KeyRound } from 'lucide-react'
 
 interface SSHKey {
@@ -190,9 +191,7 @@ export function SSHKeysPage() {
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              Loading SSH keys...
-            </div>
+            <TableSkeleton rows={3} cols={4} />
           ) : keys.length === 0 ? (
             <EmptyState
               icon={<KeyRound size={24} />}
