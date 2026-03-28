@@ -135,7 +135,7 @@ export function Sidebar() {
       </div>
 
       {/* Namespace selector */}
-      <div style={{ padding: '12px 12px 0' }}>
+      <div style={{ padding: '12px 12px 0', position: 'relative' }}>
         <div
           style={{ marginBottom: 4, fontSize: 10, color: theme.sidebar.sectionLabel, textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}
         >
@@ -175,11 +175,19 @@ export function Sidebar() {
         {nsOpen && (
           <div
             style={{
+              position: 'absolute',
+              left: 12,
+              right: 12,
+              top: '100%',
               marginTop: 4,
               background: theme.sidebar.bgHover,
               border: `1px solid ${theme.sidebar.border}`,
               borderRadius: theme.radius.md,
               overflow: 'hidden',
+              zIndex: 200,
+              maxHeight: 250,
+              overflowY: 'auto',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
             }}
           >
             {namespaces.map((ns) => (
