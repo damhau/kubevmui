@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import RFBModule from '@novnc/novnc/lib/rfb'
 
-// Handle CJS default export interop
 const RFB = (RFBModule as any).default || RFBModule
 
 interface VNCConsoleProps {
@@ -14,57 +13,60 @@ type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const initRef = useRef(false)
   const rfbRef = useRef<any>(null)
+  const mountTimeRef = useRef(0)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [errorMessage, setErrorMessage] = useState<string>('')
 
   useEffect(() => {
-    // StrictMode: skip the first mount entirely, only init on the second
-    if (!initRef.current) {
-      initRef.current = true
-      return
-    }
-
     if (!containerRef.current) return
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/vnc/${cluster}/${namespace}/${vmName}`
+    const now = Date.now()
+    const isStrictModeFirstMount = mountTimeRef.current === 0
+    mountTimeRef.current = now
 
-    setStatus('connecting')
-    setErrorMessage('')
+    const initTimer = setTimeout(() => {
+      if (!containerRef.current) return
 
-    try {
-      const rfb = new RFB(containerRef.current, wsUrl)
-      rfb.scaleViewport = true
-      rfb.resizeSession = true
-      rfb.background = '#000000'
-      rfbRef.current = rfb
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const wsUrl = `${protocol}//${window.location.host}/ws/vnc/${cluster}/${namespace}/${vmName}`
 
-      rfb.addEventListener('connect', () => {
-        setStatus('connected')
-      })
+      setStatus('connecting')
+      setErrorMessage('')
 
-      rfb.addEventListener('disconnect', (e: Event) => {
-        rfbRef.current = null
-        const detail = (e as CustomEvent).detail
-        if (detail?.clean) {
-          setStatus('disconnected')
-        } else {
-          setStatus('error')
-          setErrorMessage('Connection lost unexpectedly')
-        }
-      })
+      try {
+        const rfb = new RFB(containerRef.current, wsUrl)
+        rfb.scaleViewport = true
+        rfb.resizeSession = true
+        rfb.background = '#000000'
+        rfbRef.current = rfb
 
-      rfb.addEventListener('credentialsrequired', () => {
-        setErrorMessage('VM requires credentials')
-      })
-    } catch (err) {
-      setStatus('error')
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect')
-    }
+        rfb.addEventListener('connect', () => {
+          setStatus('connected')
+        })
+
+        rfb.addEventListener('disconnect', (e: Event) => {
+          rfbRef.current = null
+          const detail = (e as CustomEvent).detail
+          if (detail?.clean) {
+            setStatus('disconnected')
+          } else {
+            setStatus('error')
+            setErrorMessage('Connection lost unexpectedly')
+          }
+        })
+
+        rfb.addEventListener('credentialsrequired', () => {
+          setErrorMessage('VM requires credentials')
+        })
+      } catch (err) {
+        setStatus('error')
+        setErrorMessage(err instanceof Error ? err.message : 'Failed to connect')
+      }
+    }, isStrictModeFirstMount ? 50 : 0)
 
     return () => {
+      clearTimeout(initTimer)
       if (rfbRef.current) {
         rfbRef.current.disconnect()
         rfbRef.current = null

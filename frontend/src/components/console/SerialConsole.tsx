@@ -14,88 +14,99 @@ type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
-  const initRef = useRef(false)
   const termRef = useRef<Terminal | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
+  const mountTimeRef = useRef(0)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
 
   useEffect(() => {
-    // StrictMode: skip the first mount entirely, only init on the second
-    if (!initRef.current) {
-      initRef.current = true
-      return
-    }
-
     const container = terminalRef.current
     if (!container) return
 
-    const term = new Terminal({
-      theme: {
-        background: '#0a0a0b',
-        foreground: '#e4e4e7',
-        cursor: '#6366f1',
-        selectionBackground: '#6366f140',
-      },
-      fontFamily: 'JetBrains Mono, Fira Code, Consolas, monospace',
-      fontSize: 14,
-      cursorBlink: true,
-      scrollback: 5000,
-    })
-    termRef.current = term
+    // Detect StrictMode rapid remount: if cleanup ran <100ms ago, this is the real mount
+    const now = Date.now()
+    const isStrictModeFirstMount = mountTimeRef.current === 0
+    mountTimeRef.current = now
 
-    const fitAddon = new FitAddon()
-    fitRef.current = fitAddon
-    term.loadAddon(fitAddon)
-    term.loadAddon(new WebLinksAddon())
-    term.open(container)
+    // Schedule init with a small delay to let StrictMode cleanup run first
+    const initTimer = setTimeout(() => {
+      if (!terminalRef.current) return // component was unmounted during delay
 
-    requestAnimationFrame(() => {
-      try { fitAddon.fit() } catch { /* not ready */ }
-    })
+      const term = new Terminal({
+        theme: {
+          background: '#0a0a0b',
+          foreground: '#e4e4e7',
+          cursor: '#6366f1',
+          selectionBackground: '#6366f140',
+        },
+        fontFamily: 'JetBrains Mono, Fira Code, Consolas, monospace',
+        fontSize: 14,
+        cursorBlink: true,
+        scrollback: 5000,
+      })
+      termRef.current = term
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws/console/${cluster}/${namespace}/${vmName}`
-    const ws = new WebSocket(wsUrl)
-    wsRef.current = ws
+      const fitAddon = new FitAddon()
+      fitRef.current = fitAddon
+      term.loadAddon(fitAddon)
+      term.loadAddon(new WebLinksAddon())
+      term.open(terminalRef.current)
 
-    ws.onopen = () => {
-      setStatus('connected')
-      term.focus()
-    }
+      requestAnimationFrame(() => {
+        try { fitAddon.fit() } catch { /* not ready */ }
+      })
 
-    ws.onmessage = (event: MessageEvent) => {
-      termRef.current?.write(event.data as string)
-    }
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const wsUrl = `${protocol}//${window.location.host}/ws/console/${cluster}/${namespace}/${vmName}`
+      const ws = new WebSocket(wsUrl)
+      wsRef.current = ws
 
-    ws.onclose = () => {
-      setStatus('disconnected')
-      try { termRef.current?.write('\r\n\x1b[33m--- Session disconnected ---\x1b[0m\r\n') } catch { /* */ }
-    }
-
-    ws.onerror = () => {
-      setStatus('error')
-      try { termRef.current?.write('\r\n\x1b[31m--- Connection error ---\x1b[0m\r\n') } catch { /* */ }
-    }
-
-    term.onData((data: string) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(data)
+      ws.onopen = () => {
+        setStatus('connected')
+        term.focus()
       }
-    })
 
-    const resizeObserver = new ResizeObserver(() => {
-      try { fitRef.current?.fit() } catch { /* */ }
-    })
-    resizeObserver.observe(container)
-    observerRef.current = resizeObserver
+      ws.onmessage = (event: MessageEvent) => {
+        termRef.current?.write(event.data as string)
+      }
+
+      ws.onclose = () => {
+        setStatus('disconnected')
+        try { termRef.current?.write('\r\n\x1b[33m--- Session disconnected ---\x1b[0m\r\n') } catch { /* */ }
+      }
+
+      ws.onerror = () => {
+        setStatus('error')
+        try { termRef.current?.write('\r\n\x1b[31m--- Connection error ---\x1b[0m\r\n') } catch { /* */ }
+      }
+
+      term.onData((data: string) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(data)
+        }
+      })
+
+      const resizeObserver = new ResizeObserver(() => {
+        try { fitRef.current?.fit() } catch { /* */ }
+      })
+      resizeObserver.observe(terminalRef.current)
+      observerRef.current = resizeObserver
+    }, isStrictModeFirstMount ? 50 : 0)
 
     return () => {
+      clearTimeout(initTimer)
       observerRef.current?.disconnect()
       observerRef.current = null
-      wsRef.current?.close()
-      wsRef.current = null
+      if (wsRef.current) {
+        wsRef.current.onopen = null
+        wsRef.current.onmessage = null
+        wsRef.current.onclose = null
+        wsRef.current.onerror = null
+        wsRef.current.close()
+        wsRef.current = null
+      }
       termRef.current?.dispose()
       termRef.current = null
       fitRef.current = null
