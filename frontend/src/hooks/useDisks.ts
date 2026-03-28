@@ -31,3 +31,19 @@ export function useCreateDisk() {
     },
   })
 }
+
+export function useDeleteDisk() {
+  const queryClient = useQueryClient()
+  const { activeCluster, activeNamespace } = useUIStore()
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const { data } = await apiClient.delete(
+        `/clusters/${activeCluster}/namespaces/${activeNamespace}/disks/${name}`,
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disks'] })
+    },
+  })
+}

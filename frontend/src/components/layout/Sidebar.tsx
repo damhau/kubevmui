@@ -55,12 +55,16 @@ export function Sidebar() {
   const { data: namespacesData } = useNamespaces()
   const [nsOpen, setNsOpen] = useState(false)
 
-  const namespaces: string[] =
-    Array.isArray(namespacesData)
-      ? namespacesData.map((n: { name?: string } | string) =>
-          typeof n === 'string' ? n : n.name ?? String(n)
-        )
-      : ['default']
+  const rawNamespaces = Array.isArray(namespacesData?.items)
+    ? namespacesData.items
+    : Array.isArray(namespacesData)
+      ? namespacesData
+      : []
+  const namespaces: string[] = rawNamespaces.length > 0
+    ? rawNamespaces.map((n: { name?: string } | string) =>
+        typeof n === 'string' ? n : n.name ?? String(n)
+      )
+    : ['default']
 
   return (
     <aside

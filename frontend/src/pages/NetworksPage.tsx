@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useNetworks, useCreateNetwork, useAllNetworks } from '@/hooks/useNetworks'
+import { useNetworks, useCreateNetwork, useDeleteNetwork, useAllNetworks } from '@/hooks/useNetworks'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
@@ -50,11 +50,86 @@ interface NetworkForm {
   gateway: string
 }
 
+function ActionsMenu({ actions, onAction }: { actions: { label: string; action: string; danger?: boolean }[]; onAction: (action: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: theme.main.card,
+          border: `1px solid ${theme.main.inputBorder}`,
+          borderRadius: 5,
+          color: theme.text.secondary,
+          cursor: 'pointer',
+          padding: '3px 8px',
+          fontSize: 16,
+          lineHeight: 1,
+          fontFamily: 'inherit',
+        }}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '100%',
+            marginTop: 4,
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: 7,
+            minWidth: 140,
+            zIndex: 100,
+            overflow: 'hidden',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          }}
+        >
+          {actions.map((a) => (
+            <button
+              key={a.action}
+              onClick={() => { setOpen(false); onAction(a.action) }}
+              style={{
+                width: '100%',
+                display: 'block',
+                padding: '8px 14px',
+                background: 'transparent',
+                border: 'none',
+                textAlign: 'left',
+                fontSize: 13,
+                color: a.danger ? theme.status.error : theme.text.primary,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function NetworksPage() {
   const { data, isLoading } = useNetworks()
   const { data: allNADsData, isLoading: allNADsLoading } = useAllNetworks()
   const { activeNamespace } = useUIStore()
   const createNetwork = useCreateNetwork()
+  const deleteNetwork = useDeleteNetwork()
   const networks: NetworkProfile[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const allNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
     Array.isArray(allNADsData?.items) ? allNADsData.items : []
@@ -90,6 +165,11 @@ export function NetworksPage() {
     color: theme.text.secondary,
     marginBottom: 6,
     fontWeight: 500,
+  }
+
+  const handleDelete = (name: string) => {
+    if (!confirm(`Delete network profile "${name}"?`)) return
+    deleteNetwork.mutate(name)
   }
 
   const handleDisplayNameChange = (val: string) => {
@@ -228,7 +308,7 @@ export function NetworksPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                  {['Display Name', 'Type', 'VLAN ID', 'DHCP', 'Subnet'].map((col) => (
+                  {['Display Name', 'Type', 'VLAN ID', 'DHCP', 'Subnet', 'Actions'].map((col) => (
                     <th
                       key={col}
                       style={{
@@ -282,6 +362,14 @@ export function NetworksPage() {
                     </td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace", fontSize: 13 }}>
                       {net.subnet ?? '—'}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <ActionsMenu
+                        actions={[{ label: 'Delete', action: 'delete', danger: true }]}
+                        onAction={(action) => {
+                          if (action === 'delete') handleDelete(net.name)
+                        }}
+                      />
                     </td>
                   </tr>
                 ))}

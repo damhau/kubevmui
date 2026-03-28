@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useDisks, useCreateDisk } from '@/hooks/useDisks'
+import { useDisks, useCreateDisk, useDeleteDisk } from '@/hooks/useDisks'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -51,9 +51,84 @@ interface DiskForm {
   performance_tier: string
 }
 
+function ActionsMenu({ actions, onAction }: { actions: { label: string; action: string; danger?: boolean }[]; onAction: (action: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: theme.main.card,
+          border: `1px solid ${theme.main.inputBorder}`,
+          borderRadius: 5,
+          color: theme.text.secondary,
+          cursor: 'pointer',
+          padding: '3px 8px',
+          fontSize: 16,
+          lineHeight: 1,
+          fontFamily: 'inherit',
+        }}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '100%',
+            marginTop: 4,
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: 7,
+            minWidth: 140,
+            zIndex: 100,
+            overflow: 'hidden',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          }}
+        >
+          {actions.map((a) => (
+            <button
+              key={a.action}
+              onClick={() => { setOpen(false); onAction(a.action) }}
+              style={{
+                width: '100%',
+                display: 'block',
+                padding: '8px 14px',
+                background: 'transparent',
+                border: 'none',
+                textAlign: 'left',
+                fontSize: 13,
+                color: a.danger ? theme.status.error : theme.text.primary,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function StoragePage() {
   const { data, isLoading } = useDisks()
   const createDisk = useCreateDisk()
+  const deleteDisk = useDeleteDisk()
   const disks: Disk[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -82,6 +157,11 @@ export function StoragePage() {
     color: theme.text.secondary,
     marginBottom: 6,
     fontWeight: 500,
+  }
+
+  const handleDelete = (name: string) => {
+    if (!confirm(`Delete disk "${name}"?`)) return
+    deleteDisk.mutate(name)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -144,7 +224,7 @@ export function StoragePage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                  {['Name', 'Size (GB)', 'Performance Tier', 'Status', 'Attached VM'].map((col) => (
+                  {['Name', 'Size (GB)', 'Performance Tier', 'Status', 'Attached VM', 'Actions'].map((col) => (
                     <th
                       key={col}
                       style={{
@@ -212,6 +292,14 @@ export function StoragePage() {
                     </td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
                       {disk.attached_vm ?? '—'}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <ActionsMenu
+                        actions={[{ label: 'Delete', action: 'delete', danger: true }]}
+                        onAction={(action) => {
+                          if (action === 'delete') handleDelete(disk.name)
+                        }}
+                      />
                     </td>
                   </tr>
                 ))}

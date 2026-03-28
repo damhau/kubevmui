@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
 import { useSSHKeys, useCreateSSHKey, useDeleteSSHKey } from '@/hooks/useSSHKeys'
 import { theme } from '@/lib/theme'
@@ -28,6 +28,80 @@ function formatDate(iso: string | null): string {
   } catch {
     return '\u2014'
   }
+}
+
+function ActionsMenu({ actions, onAction }: { actions: { label: string; action: string; danger?: boolean }[]; onAction: (action: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: theme.main.card,
+          border: `1px solid ${theme.main.inputBorder}`,
+          borderRadius: 5,
+          color: theme.text.secondary,
+          cursor: 'pointer',
+          padding: '3px 8px',
+          fontSize: 16,
+          lineHeight: 1,
+          fontFamily: 'inherit',
+        }}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '100%',
+            marginTop: 4,
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: 7,
+            minWidth: 140,
+            zIndex: 100,
+            overflow: 'hidden',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          }}
+        >
+          {actions.map((a) => (
+            <button
+              key={a.action}
+              onClick={() => { setOpen(false); onAction(a.action) }}
+              style={{
+                width: '100%',
+                display: 'block',
+                padding: '8px 14px',
+                background: 'transparent',
+                border: 'none',
+                textAlign: 'left',
+                fontSize: 13,
+                color: a.danger ? theme.status.error : theme.text.primary,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function SSHKeysPage() {
@@ -125,9 +199,9 @@ export function SSHKeysPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                  {['Name', 'Public Key', 'Created', ''].map((col) => (
+                  {['Name', 'Public Key', 'Created', 'Actions'].map((col) => (
                     <th
-                      key={col || 'actions'}
+                      key={col}
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
@@ -172,24 +246,17 @@ export function SSHKeysPage() {
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
                       {formatDate(key.created_at)}
                     </td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleDelete(key.name)}
-                        disabled={deleteSSHKey.isPending}
-                        style={{
-                          background: 'transparent',
-                          border: `1px solid ${theme.status.error}40`,
-                          color: theme.status.error,
-                          borderRadius: theme.radius.sm,
-                          padding: '4px 10px',
-                          fontSize: 12,
-                          cursor: deleteSSHKey.isPending ? 'not-allowed' : 'pointer',
-                          fontFamily: 'inherit',
-                          opacity: deleteSSHKey.isPending ? 0.5 : 1,
+                    <td style={{ padding: '10px 16px' }}>
+                      <ActionsMenu
+                        actions={[
+                          { label: 'Copy Public Key', action: 'copy' },
+                          { label: 'Delete', action: 'delete', danger: true },
+                        ]}
+                        onAction={(action) => {
+                          if (action === 'copy') navigator.clipboard.writeText(key.public_key)
+                          if (action === 'delete') handleDelete(key.name)
                         }}
-                      >
-                        Delete
-                      </button>
+                      />
                     </td>
                   </tr>
                 ))}

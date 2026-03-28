@@ -209,8 +209,13 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
   const [step, setStep] = useState(1)
   const [error, setError] = useState('')
 
-  const namespaces: string[] = Array.isArray(namespacesData)
-    ? namespacesData.map((n: { name?: string } | string) =>
+  const rawNamespaces = Array.isArray(namespacesData?.items)
+    ? namespacesData.items
+    : Array.isArray(namespacesData)
+      ? namespacesData
+      : []
+  const namespaces: string[] = rawNamespaces.length > 0
+    ? rawNamespaces.map((n: { name?: string } | string) =>
         typeof n === 'string' ? n : n.name ?? String(n),
       )
     : ['default']
