@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import RFB from '@novnc/novnc/lib/rfb'
+import { useEffect, useRef, useState } from 'react'
+import RFBModule from '@novnc/novnc/lib/rfb'
+
+// Handle CJS default export interop
+const RFB = (RFBModule as any).default || RFBModule
 
 interface VNCConsoleProps {
   cluster: string
@@ -11,20 +14,17 @@ type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
 export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const rfbRef = useRef<RFB | null>(null)
+  const initRef = useRef(false)
+  const rfbRef = useRef<any>(null)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [errorMessage, setErrorMessage] = useState<string>('')
 
-  const cleanup = useCallback(() => {
-    if (rfbRef.current) {
-      rfbRef.current.disconnect()
-      rfbRef.current = null
-    }
-  }, [])
-
   useEffect(() => {
-    // If already initialized (StrictMode re-mount), skip
-    if (rfbRef.current) return
+    // StrictMode: skip the first mount entirely, only init on the second
+    if (!initRef.current) {
+      initRef.current = true
+      return
+    }
 
     if (!containerRef.current) return
 
@@ -42,14 +42,11 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
       rfbRef.current = rfb
 
       rfb.addEventListener('connect', () => {
-        if (!rfbRef.current) return
         setStatus('connected')
       })
 
       rfb.addEventListener('disconnect', (e: Event) => {
-        const wasOurs = rfbRef.current !== null
         rfbRef.current = null
-        if (!wasOurs) return
         const detail = (e as CustomEvent).detail
         if (detail?.clean) {
           setStatus('disconnected')
@@ -60,7 +57,6 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
       })
 
       rfb.addEventListener('credentialsrequired', () => {
-        if (!rfbRef.current) return
         setErrorMessage('VM requires credentials')
       })
     } catch (err) {
@@ -68,8 +64,13 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to connect')
     }
 
-    return cleanup
-  }, [cluster, namespace, vmName, cleanup])
+    return () => {
+      if (rfbRef.current) {
+        rfbRef.current.disconnect()
+        rfbRef.current = null
+      }
+    }
+  }, [cluster, namespace, vmName])
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -91,35 +92,22 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
         >
           {status === 'connecting' && (
             <>
-              <div style={{ fontSize: 14, color: '#e4e4e7' }}>
-                Connecting to VNC...
-              </div>
-              <div style={{ fontSize: 12 }}>
-                {vmName}
-              </div>
+              <div style={{ fontSize: 14, color: '#e4e4e7' }}>Connecting to VNC...</div>
+              <div style={{ fontSize: 12 }}>{vmName}</div>
             </>
           )}
           {status === 'disconnected' && (
-            <div style={{ fontSize: 14, color: '#e4e4e7' }}>
-              Disconnected from VNC
-            </div>
+            <div style={{ fontSize: 14, color: '#e4e4e7' }}>Disconnected from VNC</div>
           )}
           {status === 'error' && (
             <>
-              <div style={{ fontSize: 14, color: '#ef4444' }}>
-                VNC Connection Error
-              </div>
-              {errorMessage && (
-                <div style={{ fontSize: 12 }}>{errorMessage}</div>
-              )}
+              <div style={{ fontSize: 14, color: '#ef4444' }}>VNC Connection Error</div>
+              {errorMessage && <div style={{ fontSize: 12 }}>{errorMessage}</div>}
             </>
           )}
         </div>
       )}
-      <div
-        ref={containerRef}
-        style={{ width: '100%', height: '100%', background: '#000' }}
-      />
+      <div ref={containerRef} style={{ width: '100%', height: '100%', background: '#000' }} />
     </div>
   )
 }
