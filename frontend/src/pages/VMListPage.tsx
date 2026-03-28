@@ -48,10 +48,10 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
       <button
         onClick={() => setOpen((v) => !v)}
         style={{
-          background: 'transparent',
-          border: '1px solid #3a3a3f',
+          background: '#ffffff',
+          border: '1px solid #d0d0d5',
           borderRadius: 5,
-          color: '#a1a1aa',
+          color: '#6b6b73',
           cursor: 'pointer',
           padding: '3px 8px',
           fontSize: 16,
@@ -68,13 +68,13 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
             right: 0,
             top: '100%',
             marginTop: 4,
-            background: '#2e2e33',
-            border: '1px solid #3a3a3f',
+            background: '#ffffff',
+            border: '1px solid #e0e0e5',
             borderRadius: 7,
             minWidth: 130,
             zIndex: 100,
             overflow: 'hidden',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
           }}
         >
           {actions.map((a) => (
@@ -92,11 +92,11 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
                 border: 'none',
                 textAlign: 'left',
                 fontSize: 13,
-                color: a.danger ? '#ef4444' : '#e4e4e7',
+                color: a.danger ? '#ef4444' : '#1c1c1e',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#3a3a3f')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               {a.label}
@@ -167,10 +167,10 @@ export function VMListPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{
               width: 280,
-              background: '#2e2e33',
-              border: '1px solid #3a3a3f',
+              background: '#ffffff',
+              border: '1px solid #d0d0d5',
               borderRadius: 6,
-              color: '#e4e4e7',
+              color: '#1c1c1e',
               fontSize: 13,
               padding: '8px 12px',
               outline: 'none',
@@ -182,8 +182,8 @@ export function VMListPage() {
         {/* Table */}
         <div
           style={{
-            background: '#2a2a2e',
-            border: '1px solid #3a3a3f',
+            background: '#ffffff',
+            border: '1px solid #e0e0e5',
             borderRadius: 8,
           }}
         >
@@ -198,14 +198,14 @@ export function VMListPage() {
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
+                <tr style={{ background: '#f7f7f9', borderBottom: '1px solid #e8e8ec' }}>
                   {['Name', 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
                     <th
                       key={i}
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#71717a',
+                        color: '#6b6b73',
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -223,13 +223,13 @@ export function VMListPage() {
                   <tr
                     key={`${vm.namespace}/${vm.name}`}
                     onClick={() => navigate(`/vms/${vm.namespace}/${vm.name}`)}
-                    style={{ borderBottom: '1px solid #353539', cursor: 'pointer' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#2e2e33')}
+                    style={{ borderBottom: '1px solid #e8e8ec', cursor: 'pointer' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px' }}>
-                      <div style={{ color: '#e4e4e7', fontWeight: 500 }}>{vm.name}</div>
-                      <div style={{ color: '#71717a', fontSize: 11, marginTop: 2 }}>{vm.namespace}</div>
+                      <div style={{ color: '#1c1c1e', fontWeight: 500 }}>{vm.name}</div>
+                      <div style={{ color: '#6b6b73', fontSize: 11, marginTop: 2 }}>{vm.namespace}</div>
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <span
@@ -238,7 +238,7 @@ export function VMListPage() {
                           alignItems: 'center',
                           gap: 6,
                           fontSize: 12,
-                          color: statusColor[vm.status] ?? '#a1a1aa',
+                          color: statusColor[vm.status] ?? '#6b6b73',
                         }}
                       >
                         <span
@@ -246,17 +246,17 @@ export function VMListPage() {
                             width: 8,
                             height: 8,
                             borderRadius: '50%',
-                            background: statusColor[vm.status] ?? '#a1a1aa',
+                            background: statusColor[vm.status] ?? '#6b6b73',
                             flexShrink: 0,
                           }}
                         />
                         {vm.status}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>{vm.cpu} vCPU</td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>{vm.memory}</td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>{vm.node ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>{vm.age ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.cpu} vCPU</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.memory}</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.node ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.age ?? '—'}</td>
                     <td style={{ padding: '10px 16px' }}>
                       <ActionsMenu vm={vm} onAction={(action) => handleAction(vm, action)} />
                     </td>

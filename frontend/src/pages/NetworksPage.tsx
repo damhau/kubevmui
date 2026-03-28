@@ -72,8 +72,8 @@ export function NetworksPage() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         <div
           style={{
-            background: '#2a2a2e',
-            border: '1px solid #3a3a3f',
+            background: '#ffffff',
+            border: '1px solid #e0e0e5',
             borderRadius: 8,
           }}
         >
@@ -88,14 +88,14 @@ export function NetworksPage() {
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
+                <tr style={{ background: '#f7f7f9', borderBottom: '1px solid #e8e8ec' }}>
                   {['Display Name', 'Type', 'VLAN ID', 'DHCP', 'Subnet'].map((col) => (
                     <th
                       key={col}
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#71717a',
+                        color: '#6b6b73',
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -111,37 +111,37 @@ export function NetworksPage() {
                 {networks.map((net) => (
                   <tr
                     key={net.name}
-                    style={{ borderBottom: '1px solid #353539' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#2e2e33')}
+                    style={{ borderBottom: '1px solid #e8e8ec' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px' }}>
-                      <div style={{ color: '#e4e4e7', fontWeight: 500 }}>{net.display_name ?? net.name}</div>
+                      <div style={{ color: '#1c1c1e', fontWeight: 500 }}>{net.display_name ?? net.name}</div>
                       {net.display_name && (
-                        <div style={{ color: '#71717a', fontSize: 11, marginTop: 2 }}>{net.name}</div>
+                        <div style={{ color: '#6b6b73', fontSize: 11, marginTop: 2 }}>{net.name}</div>
                       )}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       {net.type ? (
-                        <Badge label={net.type} color={typeColor[net.type] ?? '#a1a1aa'} />
+                        <Badge label={net.type} color={typeColor[net.type] ?? '#6b6b73'} />
                       ) : (
-                        <span style={{ color: '#6b6b73' }}>—</span>
+                        <span style={{ color: '#8a8a8f' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>
                       {net.vlan_id ?? '—'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <span
                         style={{
-                          color: net.dhcp ? '#22c55e' : '#71717a',
+                          color: net.dhcp ? '#22c55e' : '#6b6b73',
                           fontSize: 12,
                         }}
                       >
                         {net.dhcp === undefined ? '—' : net.dhcp ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa', fontFamily: 'monospace', fontSize: 12 }}>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73', fontFamily: 'monospace', fontSize: 12 }}>
                       {net.subnet ?? '—'}
                     </td>
                   </tr>

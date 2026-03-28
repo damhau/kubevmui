@@ -71,8 +71,8 @@ export function TemplatesPage() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         <div
           style={{
-            background: '#2a2a2e',
-            border: '1px solid #3a3a3f',
+            background: '#ffffff',
+            border: '1px solid #e0e0e5',
             borderRadius: 8,
           }}
         >
@@ -87,14 +87,14 @@ export function TemplatesPage() {
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
+                <tr style={{ background: '#f7f7f9', borderBottom: '1px solid #e8e8ec' }}>
                   {['Name', 'Category', 'OS Type', 'CPU', 'Memory'].map((col) => (
                     <th
                       key={col}
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#71717a',
+                        color: '#6b6b73',
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -110,24 +110,24 @@ export function TemplatesPage() {
                 {templates.map((tpl) => (
                   <tr
                     key={tpl.name}
-                    style={{ borderBottom: '1px solid #353539' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#2e2e33')}
+                    style={{ borderBottom: '1px solid #e8e8ec' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td style={{ padding: '10px 16px', color: '#e4e4e7', fontWeight: 500 }}>{tpl.name}</td>
+                    <td style={{ padding: '10px 16px', color: '#1c1c1e', fontWeight: 500 }}>{tpl.name}</td>
                     <td style={{ padding: '10px 16px' }}>
                       {tpl.category ? (
                         <Badge
                           label={tpl.category}
-                          color={categoryColor[tpl.category] ?? '#a1a1aa'}
+                          color={categoryColor[tpl.category] ?? '#6b6b73'}
                         />
                       ) : (
-                        <span style={{ color: '#6b6b73' }}>—</span>
+                        <span style={{ color: '#8a8a8f' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>{tpl.os_type ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>{tpl.cpu ? `${tpl.cpu} vCPU` : '—'}</td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>{tpl.memory ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{tpl.os_type ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{tpl.cpu ? `${tpl.cpu} vCPU` : '—'}</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{tpl.memory ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

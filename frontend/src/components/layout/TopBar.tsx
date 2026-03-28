@@ -15,7 +15,8 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 24px',
-        borderBottom: '1px solid #2e2e33',
+        background: '#ffffff',
+        borderBottom: '1px solid #e0e0e5',
         flexShrink: 0,
         gap: 16,
       }}
@@ -27,7 +28,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
             margin: 0,
             fontSize: 18,
             fontWeight: 600,
-            color: '#f0f0f0',
+            color: '#111113',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -36,7 +37,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
           {title}
         </h1>
         {subtitle && (
-          <span style={{ fontSize: 12, color: '#71717a', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 12, color: '#8a8a8f', whiteSpace: 'nowrap' }}>
             {subtitle}
           </span>
         )}
@@ -50,22 +51,22 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            background: '#2e2e33',
-            border: '1px solid #3a3a3f',
+            background: '#f0f0f3',
+            border: '1px solid #d0d0d5',
             borderRadius: 6,
             padding: '6px 12px',
             cursor: 'text',
           }}
         >
-          <Search size={14} style={{ color: '#6b6b73', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: '#6b6b73', userSelect: 'none', whiteSpace: 'nowrap' }}>
+          <Search size={14} style={{ color: '#8a8a8f', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: '#8a8a8f', userSelect: 'none', whiteSpace: 'nowrap' }}>
             Search VMs...{' '}
             <kbd
               style={{
                 fontSize: 11,
-                color: '#3f3f46',
-                background: '#3a3a3f',
-                border: '1px solid #3f3f46',
+                color: '#8a8a8f',
+                background: '#ffffff',
+                border: '1px solid #d0d0d5',
                 borderRadius: 3,
                 padding: '0 4px',
                 fontFamily: 'inherit',

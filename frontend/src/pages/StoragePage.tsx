@@ -78,8 +78,8 @@ export function StoragePage() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         <div
           style={{
-            background: '#2a2a2e',
-            border: '1px solid #3a3a3f',
+            background: '#ffffff',
+            border: '1px solid #e0e0e5',
             borderRadius: 8,
           }}
         >
@@ -94,14 +94,14 @@ export function StoragePage() {
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
+                <tr style={{ background: '#f7f7f9', borderBottom: '1px solid #e8e8ec' }}>
                   {['Name', 'Size (GB)', 'Performance Tier', 'Status', 'Attached VM'].map((col) => (
                     <th
                       key={col}
                       style={{
                         padding: '10px 16px',
                         textAlign: 'left',
-                        color: '#71717a',
+                        color: '#6b6b73',
                         fontWeight: 500,
                         fontSize: 11,
                         textTransform: 'uppercase',
@@ -117,22 +117,22 @@ export function StoragePage() {
                 {disks.map((disk) => (
                   <tr
                     key={disk.name}
-                    style={{ borderBottom: '1px solid #353539' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#2e2e33')}
+                    style={{ borderBottom: '1px solid #e8e8ec' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td style={{ padding: '10px 16px', color: '#e4e4e7', fontWeight: 500 }}>{disk.name}</td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>
+                    <td style={{ padding: '10px 16px', color: '#1c1c1e', fontWeight: 500 }}>{disk.name}</td>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>
                       {disk.size_gb != null ? disk.size_gb : '—'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       {disk.performance_tier ? (
                         <Badge
                           label={disk.performance_tier}
-                          color={tierColor[disk.performance_tier] ?? '#a1a1aa'}
+                          color={tierColor[disk.performance_tier] ?? '#6b6b73'}
                         />
                       ) : (
-                        <span style={{ color: '#6b6b73' }}>—</span>
+                        <span style={{ color: '#8a8a8f' }}>—</span>
                       )}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
@@ -143,7 +143,7 @@ export function StoragePage() {
                             alignItems: 'center',
                             gap: 6,
                             fontSize: 12,
-                            color: diskStatusColor[disk.status] ?? '#a1a1aa',
+                            color: diskStatusColor[disk.status] ?? '#6b6b73',
                           }}
                         >
                           <span
@@ -151,17 +151,17 @@ export function StoragePage() {
                               width: 7,
                               height: 7,
                               borderRadius: '50%',
-                              background: diskStatusColor[disk.status] ?? '#a1a1aa',
+                              background: diskStatusColor[disk.status] ?? '#6b6b73',
                               flexShrink: 0,
                             }}
                           />
                           {disk.status}
                         </span>
                       ) : (
-                        <span style={{ color: '#6b6b73' }}>—</span>
+                        <span style={{ color: '#8a8a8f' }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>
+                    <td style={{ padding: '10px 16px', color: '#6b6b73' }}>
                       {disk.attached_vm ?? '—'}
                     </td>
                   </tr>

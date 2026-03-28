@@ -13,7 +13,8 @@ export function ConsolePage() {
       <div
         style={{
           padding: '14px 24px',
-          borderBottom: '1px solid #3a3a3f',
+          background: '#ffffff',
+          borderBottom: '1px solid #e0e0e5',
           display: 'flex',
           alignItems: 'center',
           gap: 16,
@@ -22,11 +23,11 @@ export function ConsolePage() {
       >
         <Link
           to={`/vms/${namespace}/${name}`}
-          style={{ color: '#71717a', textDecoration: 'none', fontSize: 13, flexShrink: 0 }}
+          style={{ color: '#6b6b73', textDecoration: 'none', fontSize: 13, flexShrink: 0 }}
         >
           ← {name}
         </Link>
-        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f0f0f0' }}>
+        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#111113' }}>
           Console — {name}
         </h1>
         <span
@@ -34,8 +35,8 @@ export function ConsolePage() {
             marginLeft: 'auto',
             fontSize: 11,
             color: '#6b6b73',
-            background: '#2e2e33',
-            border: '1px solid #3a3a3f',
+            background: '#f0f0f3',
+            border: '1px solid #d0d0d5',
             borderRadius: 4,
             padding: '3px 8px',
           }}
@@ -48,7 +49,8 @@ export function ConsolePage() {
       <div
         style={{
           display: 'flex',
-          borderBottom: '1px solid #3a3a3f',
+          background: '#ffffff',
+          borderBottom: '1px solid #e0e0e5',
           padding: '0 24px',
           flexShrink: 0,
         }}
@@ -61,7 +63,7 @@ export function ConsolePage() {
               background: 'transparent',
               border: 'none',
               borderBottom: activeTab === tab ? '2px solid #6366f1' : '2px solid transparent',
-              color: activeTab === tab ? '#e4e4e7' : '#71717a',
+              color: activeTab === tab ? '#1c1c1e' : '#6b6b73',
               cursor: 'pointer',
               padding: '10px 16px',
               fontSize: 13,
@@ -77,12 +79,12 @@ export function ConsolePage() {
         ))}
       </div>
 
-      {/* Console area */}
+      {/* Console area — kept dark (terminal) */}
       <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column' }}>
         <div
           style={{
             flex: 1,
-            background: '#1c1c1e',
+            background: '#000000',
             border: '1px solid #3a3a3f',
             borderRadius: 8,
             display: 'flex',
@@ -98,7 +100,7 @@ export function ConsolePage() {
                 style={{
                   width: 56,
                   height: 56,
-                  background: '#2e2e33',
+                  background: '#1c1c1e',
                   border: '1px solid #3a3a3f',
                   borderRadius: 12,
                   display: 'flex',
@@ -120,7 +122,7 @@ export function ConsolePage() {
                 style={{
                   marginTop: 16,
                   padding: '6px 14px',
-                  background: '#2e2e33',
+                  background: '#1c1c1e',
                   border: '1px solid #3a3a3f',
                   borderRadius: 6,
                   fontSize: 11,
@@ -138,7 +140,7 @@ export function ConsolePage() {
                 style={{
                   width: 56,
                   height: 56,
-                  background: '#2e2e33',
+                  background: '#1c1c1e',
                   border: '1px solid #3a3a3f',
                   borderRadius: 12,
                   display: 'flex',
@@ -160,7 +162,7 @@ export function ConsolePage() {
                 style={{
                   marginTop: 16,
                   padding: '6px 14px',
-                  background: '#2e2e33',
+                  background: '#1c1c1e',
                   border: '1px solid #3a3a3f',
                   borderRadius: 6,
                   fontSize: 11,

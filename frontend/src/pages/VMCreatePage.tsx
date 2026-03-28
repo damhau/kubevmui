@@ -38,10 +38,10 @@ interface FormData {
 function inputStyle(extra?: React.CSSProperties): React.CSSProperties {
   return {
     width: '100%',
-    background: '#2e2e33',
-    border: '1px solid #3a3a3f',
+    background: '#ffffff',
+    border: '1px solid #d0d0d5',
     borderRadius: 6,
-    color: '#e4e4e7',
+    color: '#1c1c1e',
     fontSize: 13,
     padding: '8px 12px',
     outline: 'none',
@@ -55,7 +55,7 @@ function labelStyle(): React.CSSProperties {
   return {
     display: 'block',
     fontSize: 12,
-    color: '#a1a1aa',
+    color: '#6b6b73',
     marginBottom: 6,
     fontWeight: 500,
   }
@@ -138,8 +138,8 @@ export function VMCreatePage() {
   const sectionCard = (children: React.ReactNode) => (
     <div
       style={{
-        background: '#2a2a2e',
-        border: '1px solid #3a3a3f',
+        background: '#ffffff',
+        border: '1px solid #e0e0e5',
         borderRadius: 8,
         padding: 24,
         maxWidth: 560,
@@ -155,7 +155,8 @@ export function VMCreatePage() {
       <div
         style={{
           padding: '16px 24px',
-          borderBottom: '1px solid #3a3a3f',
+          background: '#ffffff',
+          borderBottom: '1px solid #e0e0e5',
           display: 'flex',
           alignItems: 'center',
           gap: 16,
@@ -167,7 +168,7 @@ export function VMCreatePage() {
           style={{
             background: 'transparent',
             border: 'none',
-            color: '#71717a',
+            color: '#9a9aa0',
             fontSize: 13,
             cursor: 'pointer',
             padding: 0,
@@ -176,7 +177,7 @@ export function VMCreatePage() {
         >
           ← VMs
         </button>
-        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#f0f0f0' }}>
+        <h1 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#111113' }}>
           Create Virtual Machine
         </h1>
       </div>
@@ -185,7 +186,8 @@ export function VMCreatePage() {
       <div
         style={{
           padding: '16px 24px',
-          borderBottom: '1px solid #3a3a3f',
+          background: '#ffffff',
+          borderBottom: '1px solid #e0e0e5',
           display: 'flex',
           gap: 0,
           flexShrink: 0,
@@ -207,8 +209,8 @@ export function VMCreatePage() {
                     step === s.id
                       ? '#6366f1'
                       : step > s.id
-                        ? 'rgba(99,102,241,0.3)'
-                        : '#3a3a3f',
+                        ? '#22c55e'
+                        : '#e0e0e5',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -218,7 +220,7 @@ export function VMCreatePage() {
                     step === s.id
                       ? '#fff'
                       : step > s.id
-                        ? '#818cf8'
+                        ? '#fff'
                         : '#6b6b73',
                   flexShrink: 0,
                 }}
@@ -229,7 +231,7 @@ export function VMCreatePage() {
                 style={{
                   fontSize: 12,
                   fontWeight: step === s.id ? 600 : 400,
-                  color: step === s.id ? '#e4e4e7' : step > s.id ? '#818cf8' : '#6b6b73',
+                  color: step === s.id ? '#1c1c1e' : step > s.id ? '#22c55e' : '#6b6b73',
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -241,7 +243,7 @@ export function VMCreatePage() {
                 style={{
                   width: 24,
                   height: 1,
-                  background: step > s.id ? '#6366f1' : '#3a3a3f',
+                  background: step > s.id ? '#6366f1' : '#e0e0e5',
                 }}
               />
             )}
@@ -296,7 +298,7 @@ export function VMCreatePage() {
                 onChange={(e) => updateForm({ cpu: Number(e.target.value) })}
                 style={inputStyle()}
               />
-              <div style={{ fontSize: 11, color: '#6b6b73', marginTop: 4 }}>1 – 64 cores</div>
+              <div style={{ fontSize: 11, color: '#9a9aa0', marginTop: 4 }}>1 – 64 cores</div>
             </FieldGroup>
             <FieldGroup label="Memory (MB)">
               <input
@@ -308,7 +310,7 @@ export function VMCreatePage() {
                 onChange={(e) => updateForm({ memory: Number(e.target.value) })}
                 style={inputStyle()}
               />
-              <div style={{ fontSize: 11, color: '#6b6b73', marginTop: 4 }}>512 – 65536 MB</div>
+              <div style={{ fontSize: 11, color: '#9a9aa0', marginTop: 4 }}>512 – 65536 MB</div>
             </FieldGroup>
           </>,
         )}
@@ -319,15 +321,15 @@ export function VMCreatePage() {
               <div
                 key={i}
                 style={{
-                  background: '#2a2a2e',
-                  border: '1px solid #3a3a3f',
+                  background: '#ffffff',
+                  border: '1px solid #e0e0e5',
                   borderRadius: 8,
                   padding: 20,
                   marginBottom: 12,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#e4e4e7' }}>Disk {i + 1}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1c1c1e' }}>Disk {i + 1}</span>
                   <button
                     onClick={() => removeDisk(i)}
                     style={{
@@ -379,9 +381,9 @@ export function VMCreatePage() {
             <button
               onClick={addDisk}
               style={{
-                background: '#2e2e33',
-                border: '1px solid #3a3a3f',
-                color: '#a1a1aa',
+                background: '#ffffff',
+                border: '1px solid #d0d0d5',
+                color: '#1c1c1e',
                 borderRadius: 6,
                 padding: '8px 14px',
                 fontSize: 13,
@@ -400,15 +402,15 @@ export function VMCreatePage() {
               <div
                 key={i}
                 style={{
-                  background: '#2a2a2e',
-                  border: '1px solid #3a3a3f',
+                  background: '#ffffff',
+                  border: '1px solid #e0e0e5',
                   borderRadius: 8,
                   padding: 20,
                   marginBottom: 12,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#e4e4e7' }}>NIC {i + 1}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1c1c1e' }}>NIC {i + 1}</span>
                   <button
                     onClick={() => removeNIC(i)}
                     style={{
@@ -449,9 +451,9 @@ export function VMCreatePage() {
             <button
               onClick={addNIC}
               style={{
-                background: '#2e2e33',
-                border: '1px solid #3a3a3f',
-                color: '#a1a1aa',
+                background: '#ffffff',
+                border: '1px solid #d0d0d5',
+                color: '#1c1c1e',
                 borderRadius: 6,
                 padding: '8px 14px',
                 fontSize: 13,
@@ -490,14 +492,14 @@ export function VMCreatePage() {
         {step === 6 && (
           <div
             style={{
-              background: '#2a2a2e',
-              border: '1px solid #3a3a3f',
+              background: '#ffffff',
+              border: '1px solid #e0e0e5',
               borderRadius: 8,
               padding: 24,
               maxWidth: 560,
             }}
           >
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#f0f0f0', marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#111113', marginBottom: 16 }}>
               Review Configuration
             </div>
             {[
@@ -517,12 +519,12 @@ export function VMCreatePage() {
                   display: 'flex',
                   gap: 16,
                   padding: '9px 0',
-                  borderBottom: '1px solid #353539',
+                  borderBottom: '1px solid #e8e8ec',
                   fontSize: 13,
                 }}
               >
-                <span style={{ minWidth: 120, color: '#71717a', fontWeight: 500, flexShrink: 0 }}>{label}</span>
-                <span style={{ color: '#e4e4e7' }}>{value}</span>
+                <span style={{ minWidth: 120, color: '#8a8a8f', fontWeight: 500, flexShrink: 0 }}>{label}</span>
+                <span style={{ color: '#1c1c1e' }}>{value}</span>
               </div>
             ))}
 
@@ -531,7 +533,7 @@ export function VMCreatePage() {
                 style={{
                   marginTop: 16,
                   padding: '10px 12px',
-                  background: 'rgba(239,68,68,0.1)',
+                  background: 'rgba(239,68,68,0.08)',
                   border: '1px solid rgba(239,68,68,0.3)',
                   borderRadius: 6,
                   color: '#ef4444',
@@ -549,7 +551,8 @@ export function VMCreatePage() {
       <div
         style={{
           padding: '14px 24px',
-          borderTop: '1px solid #3a3a3f',
+          background: '#ffffff',
+          borderTop: '1px solid #e0e0e5',
           display: 'flex',
           justifyContent: 'space-between',
           flexShrink: 0,
@@ -558,9 +561,9 @@ export function VMCreatePage() {
         <button
           onClick={() => (step === 1 ? navigate('/vms') : setStep((s) => s - 1))}
           style={{
-            background: '#2e2e33',
-            border: '1px solid #3a3a3f',
-            color: '#a1a1aa',
+            background: '#ffffff',
+            border: '1px solid #d0d0d5',
+            color: '#1c1c1e',
             borderRadius: 6,
             padding: '7px 16px',
             fontSize: 13,
