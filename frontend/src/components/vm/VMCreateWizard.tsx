@@ -164,7 +164,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
           gap: 0,
           flexShrink: 0,
           overflowX: 'hidden',
-          flexWrap: 'wrap',
+          flexWrap: 'nowrap',
           justifyContent: 'center',
         }}
       >
@@ -173,11 +173,11 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
             key={s.id}
             style={{ display: 'flex', alignItems: 'center', gap: 0 }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px' }}>
               <div
                 style={{
-                  width: 26,
-                  height: 26,
+                  width: 22,
+                  height: 22,
                   borderRadius: '50%',
                   background:
                     step === s.id
@@ -188,7 +188,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: 700,
                   color:
                     step === s.id
@@ -203,7 +203,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
               </div>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: step === s.id ? 600 : 400,
                   color: step === s.id ? theme.text.primary : step > s.id ? theme.status.running : theme.text.secondary,
                   whiteSpace: 'nowrap',
@@ -215,7 +215,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
             {i < STEPS.length - 1 && (
               <div
                 style={{
-                  width: 24,
+                  width: 16,
                   height: 1,
                   background: step > s.id ? theme.accent : theme.main.cardBorder,
                 }}
