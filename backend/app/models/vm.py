@@ -8,8 +8,11 @@ class VMDiskRef(BaseModel):
     size_gb: int
     bus: str = "virtio"
     boot_order: int | None = None
-    source_type: str = "pvc"  # "pvc" or "container_disk"
+    source_type: str = "pvc"  # "pvc", "container_disk", or "datavolume_clone"
     image: str = ""  # container disk image URL (only for source_type="container_disk")
+    clone_source: str = ""  # name of the source DataVolume/PVC to clone from
+    clone_namespace: str = ""  # namespace of the source (defaults to VM namespace)
+    storage_class: str = ""  # storage class for the cloned DV
 
 class VMNetworkRef(BaseModel):
     name: str
@@ -64,6 +67,7 @@ class VMCreate(BaseModel):
     node_selector: dict[str, str] = {}
     tolerations: list[dict] = []
     eviction_strategy: str | None = None  # "LiveMigrate" or None
+    autoattach_pod_interface: bool = True
 
 class AddVolumeRequest(BaseModel):
     name: str

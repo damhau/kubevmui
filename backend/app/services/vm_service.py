@@ -180,6 +180,7 @@ def _build_manifest(request: VMCreate) -> dict:
     """Build a KubeVirt VirtualMachine manifest from a VMCreate request."""
     disks = []
     volumes = []
+    data_volume_templates = []
 
     for disk_ref in request.disks:
         disk_entry = {
@@ -193,6 +194,30 @@ def _build_manifest(request: VMCreate) -> dict:
             volumes.append({
                 "name": disk_ref.name,
                 "containerDisk": {"image": disk_ref.image},
+            })
+        elif disk_ref.source_type == "datavolume_clone":
+            dv_name = f"{request.name}-{disk_ref.name}-dv"
+            dv_template = {
+                "metadata": {"name": dv_name},
+                "spec": {
+                    "source": {
+                        "pvc": {
+                            "name": disk_ref.clone_source,
+                            "namespace": disk_ref.clone_namespace or request.namespace,
+                        },
+                    },
+                    "pvc": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": f"{disk_ref.size_gb}Gi"}},
+                    },
+                },
+            }
+            if disk_ref.storage_class:
+                dv_template["spec"]["pvc"]["storageClassName"] = disk_ref.storage_class
+            data_volume_templates.append(dv_template)
+            volumes.append({
+                "name": disk_ref.name,
+                "dataVolume": {"name": dv_name},
             })
         else:
             volumes.append({
@@ -251,6 +276,9 @@ def _build_manifest(request: VMCreate) -> dict:
         },
     }
 
+    if not request.autoattach_pod_interface:
+        domain["devices"]["autoattachPodInterface"] = False
+
     if request.firmware_boot_mode:
         firmware = {}
         if request.firmware_boot_mode == "uefi":
@@ -280,7 +308,7 @@ def _build_manifest(request: VMCreate) -> dict:
     if request.eviction_strategy:
         spec_section["evictionStrategy"] = request.eviction_strategy
 
-    return {
+    manifest = {
         "apiVersion": "kubevirt.io/v1",
         "kind": "VirtualMachine",
         "metadata": {
@@ -297,6 +325,11 @@ def _build_manifest(request: VMCreate) -> dict:
             },
         },
     }
+
+    if data_volume_templates:
+        manifest["spec"]["dataVolumeTemplates"] = data_volume_templates
+
+    return manifest
 
 
 class VMService:
