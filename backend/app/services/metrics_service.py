@@ -107,6 +107,37 @@ class MetricsService:
             "network_tx": extract_values(net_tx_data),
         }
 
+    def get_node_metrics(self, node_name: str, start: str, end: str, step: str = "60s") -> dict:
+        """Get CPU and memory metrics for a specific node.
+
+        Uses node_uname_info to map nodename to instance, then queries node_exporter metrics.
+        """
+        # Join via node_uname_info to resolve nodename → instance
+        cpu_query = (
+            f'1 - avg(rate(node_cpu_seconds_total{{mode="idle"}}[5m]) '
+            f'* on(instance) group_left(nodename) node_uname_info{{nodename="{node_name}"}})'
+        )
+        memory_query = (
+            f'1 - ((node_memory_MemAvailable_bytes '
+            f'* on(instance) group_left(nodename) node_uname_info{{nodename="{node_name}"}}) '
+            f'/ (node_memory_MemTotal_bytes '
+            f'* on(instance) group_left(nodename) node_uname_info{{nodename="{node_name}"}}))'
+        )
+
+        cpu_data = self.query_range(cpu_query, start, end, step)
+        memory_data = self.query_range(memory_query, start, end, step)
+
+        def extract_values(result: list[dict]) -> list[dict]:
+            if not result:
+                return []
+            values = result[0].get("values", [])
+            return [{"timestamp": v[0], "value": float(v[1])} for v in values]
+
+        return {
+            "cpu_usage_pct": extract_values(cpu_data),
+            "memory_usage_pct": extract_values(memory_data),
+        }
+
     def get_cluster_metrics(self, start: str, end: str, step: str = "300s") -> dict:
         """Get cluster-level VM metrics."""
         pod_count_query = 'count(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"})'

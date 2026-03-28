@@ -63,3 +63,19 @@ def get_cluster_metrics(
         return svc.get_cluster_metrics(start, end, step)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Prometheus query failed: {str(e)[:200]}")
+
+
+@router.get("/nodes/{node_name}/metrics")
+def get_node_metrics(
+    cluster: str,
+    node_name: str,
+    range: str = Query("1h"),
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    start, end, step = _parse_range(range)
+    try:
+        return svc.get_node_metrics(node_name, start, end, step)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Prometheus query failed: {str(e)[:200]}")

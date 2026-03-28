@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
 import { useNodes, useNode } from '@/hooks/useNodes'
+import { useNodeMetrics } from '@/hooks/useMetrics'
 import { theme } from '@/lib/theme'
 import { ChevronDown, ChevronRight, Server, Cpu, MemoryStick, Monitor } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface NodeItem {
   name: string
@@ -95,8 +97,49 @@ function VMStatusBadge({ status }: { status: string }) {
   )
 }
 
+function NodeMetricChart({ title, data: chartData, color }: { title: string; data: Array<{ timestamp: number; value: number }>; color: string }) {
+  if (chartData.length === 0) {
+    return (
+      <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.md, padding: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.heading, marginBottom: 8 }}>{title}</div>
+        <div style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.dim, fontSize: 12 }}>No data</div>
+      </div>
+    )
+  }
+  return (
+    <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.md, padding: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.heading, marginBottom: 8 }}>{title}</div>
+      <ResponsiveContainer width="100%" height={140}>
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.main.cardBorder} />
+          <XAxis
+            dataKey="timestamp"
+            tickFormatter={(ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            tick={{ fontSize: 9, fill: theme.text.dim }}
+            stroke={theme.main.cardBorder}
+          />
+          <YAxis
+            tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+            domain={[0, 1]}
+            tick={{ fontSize: 9, fill: theme.text.dim }}
+            stroke={theme.main.cardBorder}
+            width={40}
+          />
+          <Tooltip
+            contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: 6, fontSize: 11 }}
+            labelFormatter={(ts: number) => new Date(Number(ts) * 1000).toLocaleTimeString()}
+            formatter={(value: number) => [`${(value * 100).toFixed(1)}%`, '']}
+          />
+          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 function NodeDetail({ name }: { name: string }) {
   const { data, isLoading } = useNode(name)
+  const { data: metricsData } = useNodeMetrics(name, '1h')
 
   if (isLoading) {
     return (
@@ -136,6 +179,24 @@ function NodeDetail({ name }: { name: string }) {
           </span>
           <span style={{ fontSize: 11, color: theme.text.dim }}>(allocatable / capacity)</span>
         </div>
+      </div>
+
+      {/* VM list */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+        Running VMs ({vms.length})
+      </div>
+      {/* Node Metrics */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <NodeMetricChart
+          title="CPU Usage (%)"
+          data={metricsData?.cpu_usage_pct ?? []}
+          color={theme.accent}
+        />
+        <NodeMetricChart
+          title="Memory Usage (%)"
+          data={metricsData?.memory_usage_pct ?? []}
+          color={theme.status.running}
+        />
       </div>
 
       {/* VM list */}

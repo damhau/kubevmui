@@ -18,6 +18,22 @@ export function useVMMetrics(namespace: string, vmName: string, range: string = 
   })
 }
 
+export function useNodeMetrics(nodeName: string, range: string = '1h') {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['node-metrics', activeCluster, nodeName, range],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/nodes/${nodeName}/metrics`,
+        { params: { range } }
+      )
+      return data
+    },
+    enabled: !!nodeName,
+    refetchInterval: 30000,
+  })
+}
+
 export function useClusterMetrics(range: string = '24h') {
   const { activeCluster } = useUIStore()
   return useQuery({
