@@ -15,9 +15,11 @@ type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
+  const cleanedUp = useRef(false)
 
   useEffect(() => {
     if (!terminalRef.current) return
+    cleanedUp.current = false
 
     const term = new Terminal({
       theme: {
@@ -37,13 +39,18 @@ export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps
     term.loadAddon(fitAddon)
     term.loadAddon(webLinksAddon)
     term.open(terminalRef.current)
-    fitAddon.fit()
+
+    // Delay fit() to ensure DOM layout is complete
+    const fitTimer = setTimeout(() => {
+      try { fitAddon.fit() } catch { /* terminal may not be ready */ }
+    }, 50)
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${protocol}//${window.location.host}/ws/console/${cluster}/${namespace}/${vmName}`
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {
+      if (cleanedUp.current) { ws.close(); return }
       setStatus('connected')
       term.focus()
     }
@@ -53,13 +60,15 @@ export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps
     }
 
     ws.onclose = () => {
+      if (cleanedUp.current) return
       setStatus('disconnected')
-      term.write('\r\n\x1b[33m--- Session disconnected ---\x1b[0m\r\n')
+      try { term.write('\r\n\x1b[33m--- Session disconnected ---\x1b[0m\r\n') } catch { /* disposed */ }
     }
 
     ws.onerror = () => {
+      if (cleanedUp.current) return
       setStatus('error')
-      term.write('\r\n\x1b[31m--- Connection error ---\x1b[0m\r\n')
+      try { term.write('\r\n\x1b[31m--- Connection error ---\x1b[0m\r\n') } catch { /* disposed */ }
     }
 
     term.onData((data: string) => {
@@ -68,12 +77,15 @@ export function SerialConsole({ cluster, namespace, vmName }: SerialConsoleProps
       }
     })
 
+    const container = terminalRef.current
     const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit()
+      try { fitAddon.fit() } catch { /* terminal may be disposed */ }
     })
-    resizeObserver.observe(terminalRef.current)
+    resizeObserver.observe(container)
 
     return () => {
+      cleanedUp.current = true
+      clearTimeout(fitTimer)
       resizeObserver.disconnect()
       ws.close()
       term.dispose()

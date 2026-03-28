@@ -12,11 +12,13 @@ type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const rfbRef = useRef<RFB | null>(null)
+  const cleanedUp = useRef(false)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [errorMessage, setErrorMessage] = useState<string>('')
 
   useEffect(() => {
     if (!containerRef.current) return
+    cleanedUp.current = false
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${protocol}//${window.location.host}/ws/vnc/${cluster}/${namespace}/${vmName}`
@@ -33,12 +35,14 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
       rfbRef.current = rfb
 
       rfb.addEventListener('connect', () => {
+        if (cleanedUp.current) return
         setStatus('connected')
       })
 
       rfb.addEventListener('disconnect', (e: Event) => {
-        const detail = (e as CustomEvent).detail
         rfbRef.current = null
+        if (cleanedUp.current) return
+        const detail = (e as CustomEvent).detail
         if (detail?.clean) {
           setStatus('disconnected')
         } else {
@@ -48,14 +52,18 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
       })
 
       rfb.addEventListener('credentialsrequired', () => {
+        if (cleanedUp.current) return
         setErrorMessage('VM requires credentials')
       })
     } catch (err) {
-      setStatus('error')
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect')
+      if (!cleanedUp.current) {
+        setStatus('error')
+        setErrorMessage(err instanceof Error ? err.message : 'Failed to connect')
+      }
     }
 
     return () => {
+      cleanedUp.current = true
       if (rfbRef.current) {
         rfbRef.current.disconnect()
         rfbRef.current = null
