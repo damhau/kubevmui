@@ -126,6 +126,22 @@ class KubeVirtClient:
         result = self.core_api.list_namespace()
         return [ns.metadata.name for ns in result.items]
 
+    def list_events(self, namespace: str, field_selector: str = "") -> list[dict]:
+        result = self.core_api.list_namespaced_event(
+            namespace=namespace, field_selector=field_selector,
+        )
+        events = []
+        for e in result.items:
+            events.append({
+                "timestamp": (e.last_timestamp or e.event_time or e.metadata.creation_timestamp or "").isoformat()
+                    if hasattr(e.last_timestamp or e.event_time or e.metadata.creation_timestamp, 'isoformat')
+                    else str(e.last_timestamp or e.event_time or ""),
+                "type": e.type or "",
+                "reason": e.reason or "",
+                "message": e.message or "",
+            })
+        return sorted(events, key=lambda x: x["timestamp"], reverse=True)
+
     def list_nodes(self) -> list[dict]:
         result = self.core_api.list_node()
         nodes = []

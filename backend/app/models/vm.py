@@ -25,6 +25,12 @@ class VMCompute(BaseModel):
     cores_per_socket: int | None = None
     threads_per_core: int = 1
 
+class VMEvent(BaseModel):
+    timestamp: str = ""
+    type: str = ""  # Normal, Warning
+    reason: str = ""
+    message: str = ""
+
 class VM(ResourceMeta):
     status: VMStatus = VMStatus.unknown
     health: HealthStatus = HealthStatus.unknown
@@ -37,6 +43,7 @@ class VM(ResourceMeta):
     run_strategy: str = "RerunOnFailure"
     description: str = ""
     template_name: str | None = None
+    events: list[VMEvent] = []
 
 class VMCreate(BaseModel):
     name: str

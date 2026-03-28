@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from app.core.k8s_client import KubeVirtClient
 from app.models.common import HealthStatus, VMStatus
-from app.models.vm import VM, VMCompute, VMCreate, VMDiskRef, VMNetworkRef
+from app.models.vm import VM, VMCompute, VMCreate, VMDiskRef, VMEvent, VMNetworkRef
 
 
 def _parse_memory(mem_str: str) -> int:
@@ -317,7 +317,29 @@ class VMService:
         if vm_raw is None:
             return None
         vmi_raw = self.kv.get_vmi(namespace, name)
-        return _vm_from_raw(vm_raw, vmi_raw)
+        vm = _vm_from_raw(vm_raw, vmi_raw)
+        try:
+            raw_events = self.kv.list_events(
+                namespace,
+                field_selector=f"involvedObject.name={name},involvedObject.kind=VirtualMachine",
+            )
+            # Also get VMI events
+            raw_events += self.kv.list_events(
+                namespace,
+                field_selector=f"involvedObject.name={name},involvedObject.kind=VirtualMachineInstance",
+            )
+            vm.events = [
+                VMEvent(
+                    timestamp=e.get("timestamp", ""),
+                    type=e.get("type", ""),
+                    reason=e.get("reason", ""),
+                    message=e.get("message", ""),
+                )
+                for e in sorted(raw_events, key=lambda x: x.get("timestamp", ""), reverse=True)
+            ]
+        except Exception:
+            vm.events = []
+        return vm
 
     def create_vm(self, request: VMCreate) -> VM:
         manifest = _build_manifest(request)
