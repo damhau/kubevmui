@@ -54,6 +54,7 @@ export function NetworksPage() {
   const createNetwork = useCreateNetwork()
   const networks: NetworkProfile[] = Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<NetworkForm>({
     display_name: '',
     name: '',
@@ -95,9 +96,17 @@ export function NetworksPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    createNetwork.mutate(form)
-    setShowCreate(false)
-    setForm({ display_name: '', name: '', type: 'bridge', vlan_id: '', dhcp: true, subnet: '', gateway: '' })
+    setError(null)
+    createNetwork.mutate(form, {
+      onSuccess: () => {
+        setShowCreate(false)
+        setForm({ display_name: '', name: '', type: 'bridge', vlan_id: '', dhcp: true, subnet: '', gateway: '' })
+      },
+      onError: (err: unknown) => {
+        const e = err as { message?: string }
+        setError(e.message ?? 'Failed to create network profile')
+      },
+    })
   }
 
   return (
@@ -106,7 +115,7 @@ export function NetworksPage() {
         title="Network Profiles"
         action={
           <button
-            onClick={() => setShowCreate(true)}
+            onClick={() => { setShowCreate(true); setError(null) }}
             style={{
               background: theme.button.primary,
               color: theme.button.primaryText,
@@ -284,6 +293,9 @@ export function NetworksPage() {
               style={inputStyle}
             />
           </div>
+          {error && (
+            <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{error}</div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
             <button
               type="button"
@@ -303,6 +315,7 @@ export function NetworksPage() {
             </button>
             <button
               type="submit"
+              disabled={createNetwork.isPending}
               style={{
                 background: theme.button.primary,
                 border: 'none',
@@ -311,11 +324,12 @@ export function NetworksPage() {
                 padding: '7px 16px',
                 fontSize: 13,
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: createNetwork.isPending ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit',
+                opacity: createNetwork.isPending ? 0.7 : 1,
               }}
             >
-              Create Network Profile
+              {createNetwork.isPending ? 'Creating...' : 'Create Network Profile'}
             </button>
           </div>
         </form>

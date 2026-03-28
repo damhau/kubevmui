@@ -52,6 +52,7 @@ export function TemplatesPage() {
   const createTemplate = useCreateTemplate()
   const templates: Template[] = Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<TemplateForm>({
     display_name: '',
     name: '',
@@ -92,9 +93,17 @@ export function TemplatesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    createTemplate.mutate(form)
-    setShowCreate(false)
-    setForm({ display_name: '', name: '', category: 'linux', os_type: '', cpu: 2, memory_mb: 2048 })
+    setError(null)
+    createTemplate.mutate(form, {
+      onSuccess: () => {
+        setShowCreate(false)
+        setForm({ display_name: '', name: '', category: 'linux', os_type: '', cpu: 2, memory_mb: 2048 })
+      },
+      onError: (err: unknown) => {
+        const e = err as { message?: string }
+        setError(e.message ?? 'Failed to create template')
+      },
+    })
   }
 
   return (
@@ -103,7 +112,7 @@ export function TemplatesPage() {
         title="Templates"
         action={
           <button
-            onClick={() => setShowCreate(true)}
+            onClick={() => { setShowCreate(true); setError(null) }}
             style={{
               background: theme.button.primary,
               color: theme.button.primaryText,
@@ -258,6 +267,9 @@ export function TemplatesPage() {
               />
             </div>
           </div>
+          {error && (
+            <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{error}</div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
             <button
               type="button"
@@ -277,6 +289,7 @@ export function TemplatesPage() {
             </button>
             <button
               type="submit"
+              disabled={createTemplate.isPending}
               style={{
                 background: theme.button.primary,
                 border: 'none',
@@ -285,11 +298,12 @@ export function TemplatesPage() {
                 padding: '7px 16px',
                 fontSize: 13,
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: createTemplate.isPending ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit',
+                opacity: createTemplate.isPending ? 0.7 : 1,
               }}
             >
-              Create Template
+              {createTemplate.isPending ? 'Creating...' : 'Create Template'}
             </button>
           </div>
         </form>

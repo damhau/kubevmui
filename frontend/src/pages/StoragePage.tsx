@@ -56,6 +56,7 @@ export function StoragePage() {
   const createDisk = useCreateDisk()
   const disks: Disk[] = Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<DiskForm>({
     name: '',
     size_gb: 20,
@@ -85,9 +86,17 @@ export function StoragePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    createDisk.mutate(form)
-    setShowCreate(false)
-    setForm({ name: '', size_gb: 20, performance_tier: '' })
+    setError(null)
+    createDisk.mutate(form, {
+      onSuccess: () => {
+        setShowCreate(false)
+        setForm({ name: '', size_gb: 20, performance_tier: '' })
+      },
+      onError: (err: unknown) => {
+        const e = err as { message?: string }
+        setError(e.message ?? 'Failed to create disk')
+      },
+    })
   }
 
   return (
@@ -96,7 +105,7 @@ export function StoragePage() {
         title="Disks"
         action={
           <button
-            onClick={() => setShowCreate(true)}
+            onClick={() => { setShowCreate(true); setError(null) }}
             style={{
               background: theme.button.primary,
               color: theme.button.primaryText,
@@ -244,6 +253,9 @@ export function StoragePage() {
               style={inputStyle}
             />
           </div>
+          {error && (
+            <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{error}</div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
             <button
               type="button"
@@ -263,6 +275,7 @@ export function StoragePage() {
             </button>
             <button
               type="submit"
+              disabled={createDisk.isPending}
               style={{
                 background: theme.button.primary,
                 border: 'none',
@@ -271,11 +284,12 @@ export function StoragePage() {
                 padding: '7px 16px',
                 fontSize: 13,
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: createDisk.isPending ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit',
+                opacity: createDisk.isPending ? 0.7 : 1,
               }}
             >
-              Create Disk
+              {createDisk.isPending ? 'Creating...' : 'Create Disk'}
             </button>
           </div>
         </form>
