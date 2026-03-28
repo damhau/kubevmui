@@ -31,3 +31,16 @@ export function useCreateTemplate() {
     },
   })
 }
+
+export function useDeleteTemplate() {
+  const queryClient = useQueryClient()
+  const { activeCluster, activeNamespace } = useUIStore()
+  return useMutation({
+    mutationFn: async (name: string) => {
+      await apiClient.delete(`/clusters/${activeCluster}/namespaces/${activeNamespace}/templates/${name}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}

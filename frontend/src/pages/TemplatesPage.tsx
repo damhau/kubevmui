@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useTemplates, useCreateTemplate } from '@/hooks/useTemplates'
+import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -13,10 +13,13 @@ const categoryColor: Record<string, string> = {
 
 interface Template {
   name: string
+  display_name?: string
   category?: string
   os_type?: string
   cpu?: number
   memory?: string
+  disks?: unknown[]
+  networks?: unknown[]
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -38,6 +41,24 @@ function Badge({ label, color }: { label: string; color: string }) {
   )
 }
 
+/* ── Form types ── */
+
+interface TemplateDisk {
+  name: string
+  source_type: 'pvc' | 'container_disk' | 'datavolume_clone'
+  size_gb: number
+  bus: string
+  image: string
+  clone_source: string
+  clone_namespace: string
+  storage_class: string
+}
+
+interface TemplateNIC {
+  name: string
+  network_profile: string
+}
+
 interface TemplateForm {
   display_name: string
   name: string
@@ -45,59 +66,189 @@ interface TemplateForm {
   os_type: string
   cpu: number
   memory_mb: number
+  disks: TemplateDisk[]
+  nics: TemplateNIC[]
+  cloud_init_user_data: string
+  cloud_init_network_data: string
+  autoattach_pod_interface: boolean
 }
+
+const emptyDisk = (): TemplateDisk => ({
+  name: '',
+  source_type: 'container_disk',
+  size_gb: 20,
+  bus: 'virtio',
+  image: '',
+  clone_source: '',
+  clone_namespace: '',
+  storage_class: '',
+})
+
+const emptyNIC = (): TemplateNIC => ({
+  name: '',
+  network_profile: 'pod',
+})
+
+const defaultForm = (): TemplateForm => ({
+  display_name: '',
+  name: '',
+  category: 'linux',
+  os_type: '',
+  cpu: 2,
+  memory_mb: 2048,
+  disks: [],
+  nics: [],
+  cloud_init_user_data: '',
+  cloud_init_network_data: '',
+  autoattach_pod_interface: true,
+})
+
+/* ── Styles ── */
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: theme.main.inputBg,
+  border: `1px solid ${theme.main.inputBorder}`,
+  borderRadius: theme.radius.md,
+  color: theme.text.primary,
+  fontSize: 13,
+  padding: '8px 12px',
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 12,
+  color: theme.text.secondary,
+  marginBottom: 6,
+  fontWeight: 500,
+}
+
+const sectionLabelStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  color: theme.text.secondary,
+  marginBottom: 10,
+  marginTop: 20,
+  paddingBottom: 6,
+  borderBottom: `1px solid ${theme.main.cardBorder}`,
+}
+
+const smallBtnStyle: React.CSSProperties = {
+  background: theme.button.secondary,
+  border: `1px solid ${theme.button.secondaryBorder}`,
+  color: theme.button.secondaryText,
+  borderRadius: theme.radius.sm,
+  padding: '4px 10px',
+  fontSize: 12,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+}
+
+const removeBtnStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  color: theme.status.error,
+  cursor: 'pointer',
+  fontSize: 16,
+  padding: '2px 6px',
+  lineHeight: 1,
+  borderRadius: theme.radius.sm,
+}
+
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle,
+  minHeight: 80,
+  resize: 'vertical',
+  fontFamily: theme.typography.mono.fontFamily,
+  fontSize: 12,
+}
+
+/* ── Component ── */
 
 export function TemplatesPage() {
   const { data, isLoading } = useTemplates()
   const createTemplate = useCreateTemplate()
+  const deleteTemplate = useDeleteTemplate()
   const templates: Template[] = Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState<TemplateForm>({
-    display_name: '',
-    name: '',
-    category: 'linux',
-    os_type: '',
-    cpu: 2,
-    memory_mb: 2048,
-  })
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    background: theme.main.inputBg,
-    border: `1px solid ${theme.main.inputBorder}`,
-    borderRadius: theme.radius.md,
-    color: theme.text.primary,
-    fontSize: 13,
-    padding: '8px 12px',
-    outline: 'none',
-    fontFamily: 'inherit',
-    boxSizing: 'border-box',
-  }
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: 12,
-    color: theme.text.secondary,
-    marginBottom: 6,
-    fontWeight: 500,
-  }
+  const [form, setForm] = useState<TemplateForm>(defaultForm)
 
   const handleDisplayNameChange = (val: string) => {
     setForm((f) => ({
       ...f,
       display_name: val,
-      name: val.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''),
+      name: val
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, ''),
     }))
+  }
+
+  const updateDisk = (idx: number, patch: Partial<TemplateDisk>) => {
+    setForm((f) => ({
+      ...f,
+      disks: f.disks.map((d, i) => (i === idx ? { ...d, ...patch } : d)),
+    }))
+  }
+
+  const removeDisk = (idx: number) => {
+    setForm((f) => ({ ...f, disks: f.disks.filter((_, i) => i !== idx) }))
+  }
+
+  const updateNIC = (idx: number, patch: Partial<TemplateNIC>) => {
+    setForm((f) => ({
+      ...f,
+      nics: f.nics.map((n, i) => (i === idx ? { ...n, ...patch } : n)),
+    }))
+  }
+
+  const removeNIC = (idx: number) => {
+    setForm((f) => ({ ...f, nics: f.nics.filter((_, i) => i !== idx) }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    createTemplate.mutate(form, {
+    const payload = {
+      display_name: form.display_name,
+      name: form.name,
+      category: form.category,
+      os_type: form.os_type || null,
+      compute: {
+        cpu_cores: form.cpu,
+        memory_mb: form.memory_mb,
+        sockets: 1,
+        threads_per_core: 1,
+      },
+      disks: form.disks.map((d) => ({
+        name: d.name,
+        size_gb: d.size_gb,
+        bus: d.bus,
+        source_type: d.source_type,
+        image: d.image || undefined,
+        clone_source: d.clone_source || undefined,
+        clone_namespace: d.clone_namespace || undefined,
+        storage_class: d.storage_class || undefined,
+      })),
+      networks: form.nics.map((n) => ({
+        name: n.name,
+        network_profile: n.network_profile,
+      })),
+      cloud_init_user_data: form.cloud_init_user_data || null,
+      cloud_init_network_data: form.cloud_init_network_data || null,
+      autoattach_pod_interface: form.autoattach_pod_interface,
+    }
+    createTemplate.mutate(payload, {
       onSuccess: () => {
         setShowCreate(false)
-        setForm({ display_name: '', name: '', category: 'linux', os_type: '', cpu: 2, memory_mb: 2048 })
+        setForm(defaultForm())
       },
       onError: (err: unknown) => {
         const e = err as { message?: string }
@@ -106,13 +257,21 @@ export function TemplatesPage() {
     })
   }
 
+  const handleDelete = (name: string) => {
+    if (!window.confirm(`Delete template "${name}"?`)) return
+    deleteTemplate.mutate(name)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar
         title="Templates"
         action={
           <button
-            onClick={() => { setShowCreate(true); setError(null) }}
+            onClick={() => {
+              setShowCreate(true)
+              setError(null)
+            }}
             style={{
               background: theme.button.primary,
               color: theme.button.primaryText,
@@ -150,23 +309,30 @@ export function TemplatesPage() {
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
-                  {['Name', 'Category', 'OS Type', 'CPU', 'Memory'].map((col) => (
-                    <th
-                      key={col}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        color: theme.text.secondary,
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                      }}
-                    >
-                      {col}
-                    </th>
-                  ))}
+                <tr
+                  style={{
+                    background: theme.main.tableHeaderBg,
+                    borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                  }}
+                >
+                  {['Name', 'Category', 'OS Type', 'CPU', 'Memory', 'Disks', 'Networks', ''].map(
+                    (col) => (
+                      <th
+                        key={col || '_actions'}
+                        style={{
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          color: theme.text.secondary,
+                          fontWeight: 600,
+                          fontSize: 11,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                        }}
+                      >
+                        {col}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -177,7 +343,16 @@ export function TemplatesPage() {
                     onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{tpl.name}</td>
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        color: theme.text.primary,
+                        fontWeight: 500,
+                        fontSize: 14,
+                      }}
+                    >
+                      {tpl.display_name || tpl.name}
+                    </td>
                     <td style={{ padding: '10px 16px' }}>
                       {tpl.category ? (
                         <Badge
@@ -188,9 +363,40 @@ export function TemplatesPage() {
                         <span style={{ color: theme.text.dim }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{tpl.os_type ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{tpl.cpu ? `${tpl.cpu} vCPU` : '—'}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{tpl.memory ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                      {tpl.os_type ?? '—'}
+                    </td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                      {tpl.cpu ? `${tpl.cpu} vCPU` : '—'}
+                    </td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                      {tpl.memory ?? '—'}
+                    </td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                      {tpl.disks?.length ?? 0}
+                    </td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                      {tpl.networks?.length ?? 0}
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                      <button
+                        onClick={() => handleDelete(tpl.name)}
+                        disabled={deleteTemplate.isPending}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${theme.status.error}40`,
+                          color: theme.status.error,
+                          borderRadius: theme.radius.sm,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          opacity: deleteTemplate.isPending ? 0.5 : 1,
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -199,8 +405,11 @@ export function TemplatesPage() {
         </div>
       </div>
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Template">
+      {/* ── Create Template Modal ── */}
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Template" maxWidth={600}>
         <form onSubmit={handleSubmit}>
+          {/* BASIC INFO */}
+          <div style={sectionLabelStyle}>Basic Info</div>
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Display Name</label>
             <input
@@ -221,28 +430,33 @@ export function TemplatesPage() {
               style={inputStyle}
             />
           </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Category</label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              style={inputStyle}
-            >
-              <option value="linux">Linux</option>
-              <option value="windows">Windows</option>
-              <option value="custom">Custom</option>
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <label style={labelStyle}>Category</label>
+              <select
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                style={inputStyle}
+              >
+                <option value="linux">Linux</option>
+                <option value="windows">Windows</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>OS Type</label>
+              <input
+                type="text"
+                value={form.os_type}
+                onChange={(e) => setForm((f) => ({ ...f, os_type: e.target.value }))}
+                placeholder="e.g. ubuntu22.04"
+                style={inputStyle}
+              />
+            </div>
           </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>OS Type</label>
-            <input
-              type="text"
-              value={form.os_type}
-              onChange={(e) => setForm((f) => ({ ...f, os_type: e.target.value }))}
-              placeholder="e.g. ubuntu22.04"
-              style={inputStyle}
-            />
-          </div>
+
+          {/* COMPUTE */}
+          <div style={sectionLabelStyle}>Compute</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={labelStyle}>CPU Cores</label>
@@ -267,6 +481,263 @@ export function TemplatesPage() {
               />
             </div>
           </div>
+
+          {/* DISKS */}
+          <div style={sectionLabelStyle}>
+            <span>Disks</span>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, disks: [...f.disks, emptyDisk()] }))}
+              style={{ ...smallBtnStyle, marginLeft: 12, verticalAlign: 'middle' }}
+            >
+              + Add Disk
+            </button>
+          </div>
+          {form.disks.length === 0 && (
+            <div style={{ color: theme.text.dim, fontSize: 12, marginBottom: 10 }}>
+              No disks configured.
+            </div>
+          )}
+          {form.disks.map((disk, idx) => (
+            <div
+              key={idx}
+              style={{
+                background: theme.main.tableHeaderBg,
+                border: `1px solid ${theme.main.cardBorder}`,
+                borderRadius: theme.radius.md,
+                padding: 12,
+                marginBottom: 10,
+                position: 'relative',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => removeDisk(idx)}
+                style={{ ...removeBtnStyle, position: 'absolute', top: 8, right: 8 }}
+                title="Remove disk"
+              >
+                x
+              </button>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <div>
+                  <label style={labelStyle}>Name</label>
+                  <input
+                    type="text"
+                    value={disk.name}
+                    onChange={(e) => updateDisk(idx, { name: e.target.value })}
+                    placeholder="disk-0"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Source Type</label>
+                  <select
+                    value={disk.source_type}
+                    onChange={(e) =>
+                      updateDisk(idx, {
+                        source_type: e.target.value as TemplateDisk['source_type'],
+                      })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="container_disk">Container Disk</option>
+                    <option value="datavolume_clone">Clone from Image</option>
+                    <option value="pvc">PVC</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Bus</label>
+                  <select
+                    value={disk.bus}
+                    onChange={(e) => updateDisk(idx, { bus: e.target.value })}
+                    style={inputStyle}
+                  >
+                    <option value="virtio">virtio</option>
+                    <option value="sata">sata</option>
+                    <option value="scsi">scsi</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Container Disk fields */}
+              {disk.source_type === 'container_disk' && (
+                <div>
+                  <label style={labelStyle}>Image URL</label>
+                  <input
+                    type="text"
+                    value={disk.image}
+                    onChange={(e) => updateDisk(idx, { image: e.target.value })}
+                    placeholder="registry.example.com/image:tag"
+                    style={inputStyle}
+                  />
+                </div>
+              )}
+
+              {/* DataVolume Clone fields */}
+              {disk.source_type === 'datavolume_clone' && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 10,
+                  }}
+                >
+                  <div>
+                    <label style={labelStyle}>Clone Source (DV name)</label>
+                    <input
+                      type="text"
+                      value={disk.clone_source}
+                      onChange={(e) => updateDisk(idx, { clone_source: e.target.value })}
+                      placeholder="golden-image-dv"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Clone Namespace</label>
+                    <input
+                      type="text"
+                      value={disk.clone_namespace}
+                      onChange={(e) => updateDisk(idx, { clone_namespace: e.target.value })}
+                      placeholder="default"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Size (GB)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={disk.size_gb}
+                      onChange={(e) => updateDisk(idx, { size_gb: Number(e.target.value) })}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Storage Class</label>
+                    <input
+                      type="text"
+                      value={disk.storage_class}
+                      onChange={(e) => updateDisk(idx, { storage_class: e.target.value })}
+                      placeholder="longhorn"
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* NETWORKS */}
+          <div style={sectionLabelStyle}>
+            <span>Networks</span>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, nics: [...f.nics, emptyNIC()] }))}
+              style={{ ...smallBtnStyle, marginLeft: 12, verticalAlign: 'middle' }}
+            >
+              + Add NIC
+            </button>
+          </div>
+          {form.nics.length === 0 && (
+            <div style={{ color: theme.text.dim, fontSize: 12, marginBottom: 10 }}>
+              No network interfaces configured.
+            </div>
+          )}
+          {form.nics.map((nic, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr auto',
+                gap: 10,
+                alignItems: 'end',
+                marginBottom: 10,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>Name</label>
+                <input
+                  type="text"
+                  value={nic.name}
+                  onChange={(e) => updateNIC(idx, { name: e.target.value })}
+                  placeholder="nic-0"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Network Profile</label>
+                <input
+                  type="text"
+                  value={nic.network_profile}
+                  onChange={(e) => updateNIC(idx, { network_profile: e.target.value })}
+                  placeholder="pod"
+                  style={inputStyle}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeNIC(idx)}
+                style={removeBtnStyle}
+                title="Remove NIC"
+              >
+                x
+              </button>
+            </div>
+          ))}
+
+          {/* CLOUD-INIT */}
+          <div style={sectionLabelStyle}>Cloud-Init</div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>User Data</label>
+            <textarea
+              value={form.cloud_init_user_data}
+              onChange={(e) => setForm((f) => ({ ...f, cloud_init_user_data: e.target.value }))}
+              placeholder={'#cloud-config\npackages:\n  - nginx'}
+              style={textareaStyle}
+            />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Network Data</label>
+            <textarea
+              value={form.cloud_init_network_data}
+              onChange={(e) => setForm((f) => ({ ...f, cloud_init_network_data: e.target.value }))}
+              placeholder="network:\n  version: 2\n  ethernets: ..."
+              style={textareaStyle}
+            />
+          </div>
+
+          {/* OPTIONS */}
+          <div style={sectionLabelStyle}>Options</div>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 13,
+              color: theme.text.primary,
+              cursor: 'pointer',
+              marginBottom: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={form.autoattach_pod_interface}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, autoattach_pod_interface: e.target.checked }))
+              }
+              style={{ accentColor: theme.accent }}
+            />
+            Attach default pod network interface
+          </label>
+
+          {/* ERROR / ACTIONS */}
           {error && (
             <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{error}</div>
           )}
