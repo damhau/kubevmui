@@ -8,6 +8,8 @@ import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot 
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
 import { useAddVolume, useRemoveVolume, useAddInterface, useRemoveInterface } from '@/hooks/useHotplug'
 import { theme } from '@/lib/theme'
+import { useVMMetrics } from '@/hooks/useMetrics'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -38,7 +40,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-type Tab = 'overview' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
+type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
 
 function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
@@ -66,6 +68,48 @@ function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode
   )
 }
 
+function MetricChart({ title, data, color, formatValue }: { title: string; data: any[]; color: string; formatValue: (v: number) => string }) {
+  return (
+    <div style={{
+      background: theme.main.card,
+      border: `1px solid ${theme.main.cardBorder}`,
+      borderRadius: theme.radius.lg,
+      padding: 16,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>{title}</div>
+      {data.length === 0 ? (
+        <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.secondary, fontSize: 13 }}>
+          No data available
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke={theme.main.cardBorder} />
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={(ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              tick={{ fontSize: 10, fill: theme.text.secondary }}
+              stroke={theme.main.cardBorder}
+            />
+            <YAxis
+              tickFormatter={(v) => formatValue(v)}
+              tick={{ fontSize: 10, fill: theme.text.secondary }}
+              stroke={theme.main.cardBorder}
+              width={50}
+            />
+            <Tooltip
+              contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: 6, fontSize: 12 }}
+              labelFormatter={(ts) => new Date(Number(ts) * 1000).toLocaleString()}
+              formatter={(value: number) => [formatValue(value), '']}
+            />
+            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  )
+}
+
 export function VMDetailPage() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>()
   const navigate = useNavigate()
@@ -74,6 +118,8 @@ export function VMDetailPage() {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [editingRunStrategy, setEditingRunStrategy] = useState(false)
+  const [metricsRange, setMetricsRange] = useState('1h')
+  const { data: metricsData, isLoading: metricsLoading } = useVMMetrics(namespace!, name!, metricsRange)
 
   const cloneMutation = useMutation({
     mutationFn: async (newName: string) => {
@@ -171,6 +217,7 @@ export function VMDetailPage() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'metrics', label: 'Metrics' },
     { id: 'disks', label: 'Disks' },
     { id: 'network', label: 'Network' },
     { id: 'snapshots', label: 'Snapshots' },
@@ -564,6 +611,65 @@ export function VMDetailPage() {
                 )}
               </div>
               </>
+            )}
+
+            {/* Metrics */}
+            {activeTab === 'metrics' && (
+              <div>
+                {/* Time range selector */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  {['1h', '6h', '24h', '7d'].map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setMetricsRange(r)}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontFamily: 'inherit',
+                        borderRadius: theme.radius.md,
+                        cursor: 'pointer',
+                        background: metricsRange === r ? theme.accent : theme.main.card,
+                        color: metricsRange === r ? '#fff' : theme.text.primary,
+                        border: metricsRange === r ? `1px solid ${theme.accent}` : `1px solid ${theme.main.inputBorder}`,
+                        fontWeight: metricsRange === r ? 600 : 400,
+                      }}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+
+                {metricsLoading ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>Loading metrics...</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <MetricChart
+                      title="CPU Usage (cores)"
+                      data={metricsData?.cpu ?? []}
+                      color={theme.accent}
+                      formatValue={(v) => `${v.toFixed(2)}`}
+                    />
+                    <MetricChart
+                      title="Memory Usage"
+                      data={(metricsData?.memory ?? []).map((d: any) => ({ ...d, value: d.value / (1024 * 1024) }))}
+                      color={theme.status.running}
+                      formatValue={(v) => `${v.toFixed(0)} MB`}
+                    />
+                    <MetricChart
+                      title="Network Receive"
+                      data={(metricsData?.network_rx ?? []).map((d: any) => ({ ...d, value: d.value / 1024 }))}
+                      color={theme.status.provisioning}
+                      formatValue={(v) => `${v.toFixed(1)} KB/s`}
+                    />
+                    <MetricChart
+                      title="Network Transmit"
+                      data={(metricsData?.network_tx ?? []).map((d: any) => ({ ...d, value: d.value / 1024 }))}
+                      color={theme.status.migrating}
+                      formatValue={(v) => `${v.toFixed(1)} KB/s`}
+                    />
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Disks */}
