@@ -8,6 +8,7 @@ import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot 
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
 import { useAddVolume, useRemoveVolume, useAddInterface, useRemoveInterface } from '@/hooks/useHotplug'
 import { theme } from '@/lib/theme'
+import { formatDate, formatMemoryMb } from '@/lib/format'
 import { useVMMetrics } from '@/hooks/useMetrics'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -515,8 +516,8 @@ export function VMDetailPage() {
                 >
                 <InfoRow label="Namespace" value={namespace} />
                 <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
-                <InfoRow label="CPU Cores" value={`${vm.cpu ?? '—'} vCPU`} />
-                <InfoRow label="Memory" value={vm.memory} />
+                <InfoRow label="CPU Cores" value={`${vm.compute?.cpu_cores ?? '—'} vCPU`} />
+                <InfoRow label="Memory" value={formatMemoryMb(vm.compute?.memory_mb)} />
                 <InfoRow label="Node" value={vm.node} mono />
                 <InfoRow label="IP Addresses" value={
                   vm.ip_addresses?.length
@@ -581,7 +582,7 @@ export function VMDetailPage() {
                     </div>
                   )
                 } />
-                <InfoRow label="Creation Time" value={vm.created_at ?? vm.creation_timestamp} />
+                <InfoRow label="Creation Time" value={formatDate(vm.created_at ?? vm.creation_timestamp)} />
                 {vm.labels && Object.keys(vm.labels).length > 0 && (
                   <InfoRow
                     label="Labels"

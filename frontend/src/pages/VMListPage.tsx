@@ -8,6 +8,7 @@ import { useCreateMigration } from '@/hooks/useMigrations'
 import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
+import { formatTimeAgo, formatMemoryMb } from '@/lib/format'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -42,10 +43,9 @@ interface VM {
   name: string
   namespace: string
   status: string
-  cpu: number
-  memory: string
+  compute?: { cpu_cores?: number; memory_mb?: number }
   node?: string
-  age?: string
+  created_at?: string
 }
 
 function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void }) {
@@ -324,10 +324,10 @@ export function VMListPage() {
                     <td style={{ padding: '10px 16px' }}>
                       <StatusBadge status={vm.status} />
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.cpu} vCPU</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.memory}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.compute?.cpu_cores ?? '—'} vCPU</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{formatMemoryMb(vm.compute?.memory_mb)}</td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.node ?? '—'}</td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.age ?? '—'}</td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{formatTimeAgo(vm.created_at)}</td>
                     <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
                       <ActionsMenu vm={vm} onAction={(action) => handleAction(vm, action)} />
                     </td>

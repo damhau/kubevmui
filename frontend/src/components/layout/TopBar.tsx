@@ -5,9 +5,10 @@ interface TopBarProps {
   title: string
   subtitle?: string
   action?: React.ReactNode
+  searchPlaceholder?: string
 }
 
-export function TopBar({ title, subtitle, action }: TopBarProps) {
+export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...' }: TopBarProps) {
   return (
     <header
       style={{
@@ -61,7 +62,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
         >
           <Search size={14} style={{ color: theme.text.dim, flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: theme.text.dim, userSelect: 'none', whiteSpace: 'nowrap' }}>
-            Search VMs...{' '}
+            {searchPlaceholder}{' '}
             <kbd
               style={{
                 fontSize: 11,

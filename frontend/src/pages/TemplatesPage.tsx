@@ -5,6 +5,7 @@ import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useT
 import { useAllNetworks } from '@/hooks/useNetworks'
 import { useImages, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
+import { formatMemoryMb } from '@/lib/format'
 import { Modal } from '@/components/ui/Modal'
 
 const categoryColor: Record<string, string> = {
@@ -19,10 +20,12 @@ interface Template {
   display_name?: string
   category?: string
   os_type?: string
-  cpu?: number
-  memory?: string
+  compute?: { cpu_cores?: number; memory_mb?: number }
   disks?: unknown[]
   networks?: unknown[]
+  cloud_init_user_data?: string
+  cloud_init_network_data?: string
+  autoattach_pod_interface?: boolean
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -537,10 +540,10 @@ export function TemplatesPage() {
                       {tpl.os_type ?? '—'}
                     </td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
-                      {tpl.cpu ? `${tpl.cpu} vCPU` : '—'}
+                      {tpl.compute?.cpu_cores ? `${tpl.compute.cpu_cores} vCPU` : '—'}
                     </td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
-                      {tpl.memory ?? '—'}
+                      {formatMemoryMb(tpl.compute?.memory_mb)}
                     </td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
                       {tpl.disks?.length ?? 0}
