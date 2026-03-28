@@ -1,10 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
 import { theme } from '@/lib/theme'
-import { Modal } from '@/components/ui/Modal'
-import { VMCreateWizard } from '@/components/vm/VMCreateWizard'
 
 const statusColor: Record<string, string> = {
   Running: theme.status.running,
@@ -113,7 +111,6 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
 
 export function VMListPage() {
   const [search, setSearch] = useState('')
-  const [showCreate, setShowCreate] = useState(false)
   const navigate = useNavigate()
   const { data, isLoading } = useVMs()
   const vmAction = useVMAction()
@@ -141,9 +138,10 @@ export function VMListPage() {
       <TopBar
         title="Virtual Machines"
         action={
-          <button
-            onClick={() => setShowCreate(true)}
+          <Link
+            to="/vms/create"
             style={{
+              display: 'inline-block',
               background: theme.button.primary,
               color: theme.button.primaryText,
               border: 'none',
@@ -154,10 +152,11 @@ export function VMListPage() {
               cursor: 'pointer',
               whiteSpace: 'nowrap',
               fontFamily: 'inherit',
+              textDecoration: 'none',
             }}
           >
             + New VM
-          </button>
+          </Link>
         }
       />
 
@@ -272,18 +271,6 @@ export function VMListPage() {
         </div>
       </div>
 
-      <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Create Virtual Machine"
-        maxWidth={720}
-        height="70vh"
-      >
-        <VMCreateWizard
-          onClose={() => setShowCreate(false)}
-          onSuccess={() => setShowCreate(false)}
-        />
-      </Modal>
     </div>
   )
 }
