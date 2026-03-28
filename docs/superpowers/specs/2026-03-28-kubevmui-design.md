@@ -754,16 +754,22 @@ The backend resolves the cluster to its kubeconfig, applies user impersonation h
 
 ## 8. UI Design
 
-### 8.1 Visual Style
+### 8.1 Visual Style & Theme System
 
-- **Theme**: Dark modern, inspired by Vercel/Linear
-- **Background**: Near-black (#0a0a0b) main, slightly lighter sidebar (#111113)
-- **Borders**: Subtle zinc (#27272a)
+All colors are defined in a single `frontend/src/lib/theme.ts` file. Components import from theme — never hardcode hex values. This allows theme changes in one place.
+
+**Theme tokens:**
+- **Sidebar**: dark background (#242428), lighter text, indigo accents
+- **Main content area**: light gray background (#f0f0f3), white cards (#ffffff)
+- **Borders**: light (#e0e0e5 cards, #d0d0d5 inputs, #e8e8ec table rows)
+- **Text**: dark primary (#1c1c1e), muted (#6b6b73), dim (#8a8a8f), headings (#111113)
 - **Accent**: Indigo (#6366f1) for primary actions, active states, links
 - **Status colors**: Green (#22c55e) running, amber (#f59e0b) warning/migrating, red (#ef4444) error, gray (#71717a) stopped, blue (#3b82f6) provisioning
+- **Inputs**: white background (#ffffff), light border (#d0d0d5)
+- **Table headers**: light gray (#f7f7f9)
 - **Typography**: Inter (sans-serif), monospace for technical values (IPs, resource names)
 - **Spacing**: Consistent 4px grid, generous padding in cards and tables
-- **Borders/Shadows**: 1px solid borders, no box shadows (flat design)
+- **Borders/Shadows**: 1px solid borders, subtle shadows on modals only
 
 ### 8.2 Layout
 
@@ -776,7 +782,10 @@ The backend resolves the cluster to its kubeconfig, applies user impersonation h
 
 - **VM lifecycle**: Dropdown menu on each VM row (start/stop/restart/console/delete)
 - **Bulk actions**: Checkbox selection + action bar at top of table
-- **Create wizard**: Multi-step with progress indicator, back/next navigation, summary review
+- **Object creation via modals**: All "create new" workflows open in modals/slide-overs, not separate pages:
+  - **VM Create**: Right slide-over panel (480px wide) with multi-step wizard inside. User sees the VM list behind the panel, maintaining context.
+  - **Simple creates** (disk, network profile, SSH key, template): Centered dialog modal with form fields. Quick create without losing context.
+  - **Confirmation dialogs** (delete, force stop, restore): Centered small modal with warning and confirm/cancel buttons.
 - **Console**: Opens in dedicated full-width view (no sidebar), tab bar for VNC/Serial/RDP
 - **Cluster switching**: Dropdown in sidebar, switches all views to the selected cluster
 - **Notifications**: Toast messages for action results (success/error), persistent for errors
