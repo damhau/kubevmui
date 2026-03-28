@@ -22,6 +22,8 @@ interface ImageItem {
   os_type?: string
   source_type?: string
   source_url?: string
+  size_gb?: number
+  storage_class?: string
   created_at?: string
   dv_phase?: string
   dv_progress?: string
@@ -166,8 +168,9 @@ export function ImagesPage() {
   const storageClasses: string[] = Array.isArray(storageClassData?.items) ? storageClassData.items.map((sc: { name: string }) => sc.name) : []
   const images: ImageItem[] = Array.isArray(data?.items) ? data.items : []
   const [showCreate, setShowCreate] = useState(false)
+  const [editingName, setEditingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState<ImageForm>({
+  const defaultForm: ImageForm = {
     display_name: '',
     name: '',
     description: '',
@@ -176,7 +179,8 @@ export function ImagesPage() {
     source_url: '',
     size_gb: 20,
     storage_class: '',
-  })
+  }
+  const [form, setForm] = useState<ImageForm>(defaultForm)
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -227,20 +231,26 @@ export function ImagesPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    createImage.mutate(form, {
-      onSuccess: () => {
-        setShowCreate(false)
-        setForm({
-          display_name: '',
-          name: '',
-          description: '',
-          os_type: 'linux',
-          source_type: 'registry',
-          source_url: '',
-          size_gb: 20,
-          storage_class: '',
-        })
-      },
+    const payload = { ...form, source_url: form.source_url.trim() }
+    const resetAndClose = () => {
+      setShowCreate(false)
+      setEditingName(null)
+      setForm(defaultForm)
+    }
+    if (editingName) {
+      deleteImage.mutate(editingName, {
+        onSuccess: () => {
+          createImage.mutate(payload, {
+            onSuccess: resetAndClose,
+            onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to save image') },
+          })
+        },
+        onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to update image') },
+      })
+      return
+    }
+    createImage.mutate(payload, {
+      onSuccess: resetAndClose,
       onError: (err: unknown) => {
         const e = err as { message?: string }
         setError(e.message ?? 'Failed to create image')
@@ -248,9 +258,60 @@ export function ImagesPage() {
     })
   }
 
-  const handleDelete = (name: string) => {
-    if (!confirm(`Delete image "${name}"?`)) return
-    deleteImage.mutate(name)
+  const handleImageAction = (img: ImageItem, action: string) => {
+    if (action === 'edit') {
+      setForm({
+        display_name: img.display_name || img.name,
+        name: img.name,
+        description: img.description || '',
+        os_type: img.os_type || 'linux',
+        source_type: img.source_type || 'registry',
+        source_url: img.source_url || '',
+        size_gb: img.size_gb ?? 20,
+        storage_class: img.storage_class || '',
+      })
+      setEditingName(img.name)
+      setError(null)
+      setShowCreate(true)
+      return
+    }
+    if (action === 'duplicate') {
+      const newName = window.prompt('New image name:', `${img.name}-copy`)
+      if (!newName) return
+      createImage.mutate({
+        name: newName,
+        display_name: `${img.display_name || img.name} (copy)`,
+        description: img.description,
+        os_type: img.os_type,
+        source_type: img.source_type,
+        source_url: img.source_url?.trim(),
+        size_gb: img.size_gb ?? 20,
+        storage_class: img.storage_class,
+      })
+      return
+    }
+    if (action === 'reimport') {
+      if (!window.confirm(`Re-import "${img.display_name || img.name}"? This will delete and recreate the DataVolume.`)) return
+      deleteImage.mutate(img.name, {
+        onSuccess: () => {
+          createImage.mutate({
+            name: img.name,
+            display_name: img.display_name,
+            description: img.description,
+            os_type: img.os_type,
+            source_type: img.source_type,
+            source_url: img.source_url?.trim(),
+            size_gb: img.size_gb ?? 20,
+            storage_class: img.storage_class,
+          })
+        },
+      })
+      return
+    }
+    if (action === 'delete') {
+      if (!window.confirm(`Delete image "${img.display_name || img.name}"?`)) return
+      deleteImage.mutate(img.name)
+    }
   }
 
   const formatDate = (d?: string) => {
@@ -273,8 +334,10 @@ export function ImagesPage() {
         action={
           <button
             onClick={() => {
-              setShowCreate(true)
+              setForm(defaultForm)
+              setEditingName(null)
               setError(null)
+              setShowCreate(true)
             }}
             style={{
               background: theme.button.primary,
@@ -489,10 +552,13 @@ export function ImagesPage() {
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <ActionsMenu
-                        actions={[{ label: 'Delete', action: 'delete', danger: true }]}
-                        onAction={(action) => {
-                          if (action === 'delete') handleDelete(img.name)
-                        }}
+                        actions={[
+                          { label: 'Edit', action: 'edit' },
+                          { label: 'Duplicate', action: 'duplicate' },
+                          { label: 'Re-import', action: 'reimport' },
+                          { label: 'Delete', action: 'delete', danger: true },
+                        ]}
+                        onAction={(action) => handleImageAction(img, action)}
                       />
                     </td>
                   </tr>
@@ -505,8 +571,8 @@ export function ImagesPage() {
 
       <Modal
         open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Add Boot Source Image"
+        onClose={() => { setShowCreate(false); setEditingName(null) }}
+        title={editingName ? 'Edit Boot Source Image' : 'Add Boot Source Image'}
         maxWidth={540}
       >
         <form onSubmit={handleSubmit}>
@@ -719,7 +785,7 @@ export function ImagesPage() {
                 opacity: createImage.isPending || !form.name ? 0.7 : 1,
               }}
             >
-              {createImage.isPending ? 'Creating...' : 'Add Image'}
+              {createImage.isPending || deleteImage.isPending ? 'Saving...' : editingName ? 'Save Image' : 'Add Image'}
             </button>
           </div>
         </form>
