@@ -4,12 +4,14 @@ import { useNamespaces } from '@/hooks/useNamespaces'
 import { theme } from '@/lib/theme'
 
 const STEPS = [
-  { id: 1, label: 'Basic Information', description: 'Name, namespace, and description for your virtual machine' },
+  { id: 1, label: 'Basic Information', description: 'Name, namespace, and description' },
   { id: 2, label: 'Compute Resources', description: 'CPU and memory configuration' },
-  { id: 3, label: 'Storage', description: 'Configure disk volumes for the virtual machine' },
-  { id: 4, label: 'Networking', description: 'Network interface configuration' },
-  { id: 5, label: 'Cloud-Init', description: 'Initialization scripts and SSH keys' },
-  { id: 6, label: 'Review & Create', description: 'Review your configuration before creating the VM' },
+  { id: 3, label: 'Firmware', description: 'Boot mode and security options' },
+  { id: 4, label: 'Storage', description: 'Configure disk volumes' },
+  { id: 5, label: 'Networking', description: 'Network interface configuration' },
+  { id: 6, label: 'Scheduling', description: 'Node placement and affinity' },
+  { id: 7, label: 'Cloud-Init', description: 'Initialization scripts and SSH keys' },
+  { id: 8, label: 'Review & Create', description: 'Review configuration' },
 ]
 
 const COMPUTE_PRESETS = [
@@ -24,6 +26,8 @@ interface Disk {
   name: string
   size_gb: number
   bus: 'virtio' | 'sata' | 'scsi'
+  source_type: 'pvc' | 'container_disk'
+  image: string
 }
 
 interface NIC {
@@ -42,6 +46,10 @@ interface FormData {
   nics: NIC[]
   user_data: string
   ssh_key: string
+  firmware: 'default' | 'bios' | 'uefi'
+  secure_boot: boolean
+  node_selector: string
+  eviction_strategy: string
 }
 
 interface VMCreateWizardProps {
@@ -197,13 +205,17 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
     nics: [{ name: 'default', network_profile: 'pod' }],
     user_data: '',
     ssh_key: '',
+    firmware: 'default',
+    secure_boot: false,
+    node_selector: '',
+    eviction_strategy: '',
   })
 
   const updateForm = (patch: Partial<FormData>) => setForm((f) => ({ ...f, ...patch }))
 
   const addDisk = () =>
     updateForm({
-      disks: [...form.disks, { name: `disk${form.disks.length}`, size_gb: 10, bus: 'virtio' }],
+      disks: [...form.disks, { name: `disk${form.disks.length}`, size_gb: 10, bus: 'virtio', source_type: 'pvc', image: '' }],
     })
 
   const removeDisk = (i: number) =>
@@ -239,6 +251,8 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
         name: d.name,
         size_gb: d.size_gb,
         bus: d.bus,
+        source_type: d.source_type,
+        image: d.image,
       })),
       networks: form.nics.map((n) => ({
         name: n.name,
@@ -247,6 +261,12 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
       cloud_init_user_data: form.user_data || null,
       run_strategy: 'RerunOnFailure',
       labels: {},
+      firmware_boot_mode: form.firmware === 'default' ? null : form.firmware,
+      secure_boot: form.secure_boot,
+      node_selector: form.node_selector
+        ? Object.fromEntries(form.node_selector.split(',').map((kv) => kv.trim().split('=')))
+        : {},
+      eviction_strategy: form.eviction_strategy || null,
     }
     createVM.mutate(payload, {
       onSuccess: () => onSuccess(),
@@ -559,8 +579,86 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
             </SectionCard>
           )}
 
-          {/* Step 3 — Storage */}
+          {/* Step 3 — Firmware */}
           {step === 3 && (
+            <SectionCard>
+              <FieldGroup label="Boot Mode">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {(['default', 'bios', 'uefi'] as const).map((mode) => (
+                    <label
+                      key={mode}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 14px',
+                        background: form.firmware === mode ? theme.accentLight : theme.main.card,
+                        border: form.firmware === mode
+                          ? `2px solid ${theme.accent}`
+                          : `1px solid ${theme.main.cardBorder}`,
+                        borderRadius: theme.radius.md,
+                        cursor: 'pointer',
+                        margin: form.firmware === mode ? 0 : 1,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="firmware"
+                        value={mode}
+                        checked={form.firmware === mode}
+                        onChange={() => updateForm({ firmware: mode, secure_boot: false })}
+                        style={{ accentColor: theme.accent }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: theme.text.heading }}>
+                          {mode === 'default' ? 'Default' : mode.toUpperCase()}
+                        </div>
+                        <div style={{ fontSize: 12, color: theme.text.secondary }}>
+                          {mode === 'default' && 'Use KubeVirt default bootloader'}
+                          {mode === 'bios' && 'Legacy BIOS boot mode'}
+                          {mode === 'uefi' && 'UEFI boot mode with optional Secure Boot'}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </FieldGroup>
+              {form.firmware === 'uefi' && (
+                <FieldGroup label="Secure Boot">
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 14px',
+                      background: theme.main.card,
+                      border: `1px solid ${theme.main.cardBorder}`,
+                      borderRadius: theme.radius.md,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.secure_boot}
+                      onChange={(e) => updateForm({ secure_boot: e.target.checked })}
+                      style={{ accentColor: theme.accent }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: theme.text.heading }}>
+                        Enable Secure Boot
+                      </div>
+                      <div style={{ fontSize: 12, color: theme.text.secondary }}>
+                        Requires UEFI-compatible guest OS and signed bootloader
+                      </div>
+                    </div>
+                  </label>
+                </FieldGroup>
+              )}
+            </SectionCard>
+          )}
+
+          {/* Step 4 — Storage */}
+          {step === 4 && (
             <div>
               {form.disks.map((disk, i) => {
                 const barPercent = Math.min((disk.size_gb / MAX_DISK_SIZE_GB) * 100, 100)
@@ -613,7 +711,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                             Disk {i + 1}
                           </span>
                           {/* Bus badge */}
-                          <div style={{ marginTop: 3 }}>
+                          <div style={{ marginTop: 3, display: 'flex', gap: 4 }}>
                             <span
                               style={{
                                 display: 'inline-block',
@@ -627,6 +725,20 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                               }}
                             >
                               {disk.bus}
+                            </span>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '1px 7px',
+                                borderRadius: 20,
+                                fontSize: 11,
+                                fontWeight: 500,
+                                background: disk.source_type === 'container_disk' ? '#fdf2f8' : '#f0fdf4',
+                                color: disk.source_type === 'container_disk' ? '#be185d' : '#16a34a',
+                                border: `1px solid ${disk.source_type === 'container_disk' ? '#fbcfe8' : '#bbf7d0'}`,
+                              }}
+                            >
+                              {disk.source_type === 'container_disk' ? 'container' : 'pvc'}
                             </span>
                           </div>
                         </div>
@@ -648,75 +760,143 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                       </button>
                     </div>
 
-                    {/* Size bar */}
+                    {/* Source type selector */}
                     <div style={{ marginBottom: 14 }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: 5,
-                        }}
-                      >
-                        <span style={{ fontSize: 11, color: theme.text.secondary, fontWeight: 500 }}>
-                          SIZE
-                        </span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: theme.text.primary }}>
-                          {disk.size_gb} GB
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          height: 6,
-                          background: theme.main.tableHeaderBg,
-                          borderRadius: 3,
-                          overflow: 'hidden',
-                          border: `1px solid ${theme.main.cardBorder}`,
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: '100%',
-                            width: `${barPercent}%`,
-                            background: theme.accent,
-                            borderRadius: 3,
-                            transition: 'width 0.2s ease',
-                          }}
-                        />
-                      </div>
+                      <FieldGroup label="Source Type">
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          {(['pvc', 'container_disk'] as const).map((st) => (
+                            <button
+                              key={st}
+                              onClick={() => updateDisk(i, { source_type: st })}
+                              style={{
+                                padding: '6px 14px',
+                                fontSize: 13,
+                                fontFamily: 'inherit',
+                                borderRadius: theme.radius.md,
+                                cursor: 'pointer',
+                                background: disk.source_type === st ? theme.accentLight : theme.main.card,
+                                border: disk.source_type === st
+                                  ? `2px solid ${theme.accent}`
+                                  : `1px solid ${theme.main.cardBorder}`,
+                                color: disk.source_type === st ? theme.accent : theme.text.primary,
+                                fontWeight: disk.source_type === st ? 600 : 400,
+                                margin: disk.source_type === st ? 0 : 1,
+                              }}
+                            >
+                              {st === 'pvc' ? 'PVC' : 'Container Disk'}
+                            </button>
+                          ))}
+                        </div>
+                      </FieldGroup>
                     </div>
 
-                    {/* Form fields */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                      <FieldGroup label="Name">
-                        <input
-                          type="text"
-                          value={disk.name}
-                          onChange={(e) => updateDisk(i, { name: e.target.value })}
-                          style={inputStyle()}
-                        />
-                      </FieldGroup>
-                      <FieldGroup label="Size (GB)">
-                        <input
-                          type="number"
-                          min={1}
-                          value={disk.size_gb}
-                          onChange={(e) => updateDisk(i, { size_gb: Number(e.target.value) })}
-                          style={inputStyle()}
-                        />
-                      </FieldGroup>
-                      <FieldGroup label="Bus">
-                        <select
-                          value={disk.bus}
-                          onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })}
-                          style={inputStyle()}
-                        >
-                          <option value="virtio">virtio</option>
-                          <option value="sata">sata</option>
-                          <option value="scsi">scsi</option>
-                        </select>
-                      </FieldGroup>
-                    </div>
+                    {disk.source_type === 'container_disk' ? (
+                      <>
+                        {/* Container disk fields */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                          <FieldGroup label="Name">
+                            <input
+                              type="text"
+                              value={disk.name}
+                              onChange={(e) => updateDisk(i, { name: e.target.value })}
+                              style={inputStyle()}
+                            />
+                          </FieldGroup>
+                          <FieldGroup label="Image URL">
+                            <input
+                              type="text"
+                              value={disk.image}
+                              onChange={(e) => updateDisk(i, { image: e.target.value })}
+                              placeholder="registry.io/image:tag"
+                              style={inputStyle()}
+                            />
+                          </FieldGroup>
+                          <FieldGroup label="Bus">
+                            <select
+                              value={disk.bus}
+                              onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })}
+                              style={inputStyle()}
+                            >
+                              <option value="virtio">virtio</option>
+                              <option value="sata">sata</option>
+                              <option value="scsi">scsi</option>
+                            </select>
+                          </FieldGroup>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Size bar */}
+                        <div style={{ marginBottom: 14 }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              marginBottom: 5,
+                            }}
+                          >
+                            <span style={{ fontSize: 11, color: theme.text.secondary, fontWeight: 500 }}>
+                              SIZE
+                            </span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: theme.text.primary }}>
+                              {disk.size_gb} GB
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              height: 6,
+                              background: theme.main.tableHeaderBg,
+                              borderRadius: 3,
+                              overflow: 'hidden',
+                              border: `1px solid ${theme.main.cardBorder}`,
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: '100%',
+                                width: `${barPercent}%`,
+                                background: theme.accent,
+                                borderRadius: 3,
+                                transition: 'width 0.2s ease',
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* PVC form fields */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                          <FieldGroup label="Name">
+                            <input
+                              type="text"
+                              value={disk.name}
+                              onChange={(e) => updateDisk(i, { name: e.target.value })}
+                              style={inputStyle()}
+                            />
+                          </FieldGroup>
+                          <FieldGroup label="Size (GB)">
+                            <input
+                              type="number"
+                              min={1}
+                              value={disk.size_gb}
+                              onChange={(e) => updateDisk(i, { size_gb: Number(e.target.value) })}
+                              style={inputStyle()}
+                            />
+                          </FieldGroup>
+                          <FieldGroup label="Bus">
+                            <select
+                              value={disk.bus}
+                              onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })}
+                              style={inputStyle()}
+                            >
+                              <option value="virtio">virtio</option>
+                              <option value="sata">sata</option>
+                              <option value="scsi">scsi</option>
+                            </select>
+                          </FieldGroup>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )
               })}
@@ -738,8 +918,8 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
             </div>
           )}
 
-          {/* Step 4 — Networking */}
-          {step === 4 && (
+          {/* Step 5 — Networking */}
+          {step === 5 && (
             <div>
               {form.nics.map((nic, i) => (
                 <div
@@ -818,8 +998,39 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
             </div>
           )}
 
-          {/* Step 5 — Cloud-Init */}
-          {step === 5 && (
+          {/* Step 6 — Scheduling */}
+          {step === 6 && (
+            <SectionCard>
+              <FieldGroup label="Node Selector">
+                <input
+                  type="text"
+                  value={form.node_selector}
+                  onChange={(e) => updateForm({ node_selector: e.target.value })}
+                  placeholder="e.g. kubernetes.io/os=linux, node-type=gpu"
+                  style={inputStyle()}
+                />
+                <div style={{ fontSize: 11, color: theme.text.placeholder, marginTop: 4 }}>
+                  Comma-separated key=value pairs for node selection constraints
+                </div>
+              </FieldGroup>
+              <FieldGroup label="Eviction Strategy">
+                <select
+                  value={form.eviction_strategy}
+                  onChange={(e) => updateForm({ eviction_strategy: e.target.value })}
+                  style={inputStyle()}
+                >
+                  <option value="">None</option>
+                  <option value="LiveMigrate">LiveMigrate</option>
+                </select>
+                <div style={{ fontSize: 11, color: theme.text.placeholder, marginTop: 4 }}>
+                  LiveMigrate will automatically migrate the VM before node maintenance
+                </div>
+              </FieldGroup>
+            </SectionCard>
+          )}
+
+          {/* Step 7 — Cloud-Init */}
+          {step === 7 && (
             <SectionCard>
               <FieldGroup label="User Data (cloud-init)">
                 <textarea
@@ -842,8 +1053,8 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
             </SectionCard>
           )}
 
-          {/* Step 6 — Review & Create */}
-          {step === 6 && (
+          {/* Step 8 — Review & Create */}
+          {step === 8 && (
             <SectionCard>
               <div
                 style={{ fontSize: 16, fontWeight: 600, color: theme.text.heading, marginBottom: 16 }}
@@ -948,6 +1159,39 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                 <Badge label={`${form.memory} MB`} variant="neutral" />
               </div>
 
+              {/* Firmware row */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 16,
+                  padding: '9px 0',
+                  borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                  fontSize: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <span
+                  style={{
+                    minWidth: 130,
+                    color: theme.text.secondary,
+                    fontWeight: 500,
+                    flexShrink: 0,
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  Firmware
+                </span>
+                <Badge
+                  label={form.firmware === 'default' ? 'Default' : form.firmware.toUpperCase()}
+                  variant="neutral"
+                />
+                {form.firmware === 'uefi' && form.secure_boot && (
+                  <Badge label="Secure Boot" variant="success" />
+                )}
+              </div>
+
               {/* Disks row */}
               <div
                 style={{
@@ -979,8 +1223,17 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                       <span style={{ fontSize: 13, color: theme.text.primary, marginRight: 2 }}>
                         {d.name}
                       </span>
-                      <Badge label={`${d.size_gb} GB`} variant="neutral" />
+                      {d.source_type === 'container_disk' ? (
+                        <Badge label="container" variant="warning" />
+                      ) : (
+                        <Badge label={`${d.size_gb} GB`} variant="neutral" />
+                      )}
                       <Badge label={d.bus} variant="info" />
+                      {d.source_type === 'container_disk' && d.image && (
+                        <span style={{ fontSize: 11, color: theme.text.secondary }}>
+                          {d.image}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1023,6 +1276,40 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Scheduling row */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 16,
+                  padding: '9px 0',
+                  borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                  fontSize: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <span
+                  style={{
+                    minWidth: 130,
+                    color: theme.text.secondary,
+                    fontWeight: 500,
+                    flexShrink: 0,
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  Scheduling
+                </span>
+                {form.node_selector ? (
+                  <Badge label={form.node_selector} variant="info" />
+                ) : (
+                  <Badge label="No constraints" variant="neutral" />
+                )}
+                {form.eviction_strategy && (
+                  <Badge label={form.eviction_strategy} variant="warning" />
+                )}
               </div>
 
               {/* Cloud-Init row */}
@@ -1136,7 +1423,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
             ← Back
           </button>
 
-          {step < 6 ? (
+          {step < 8 ? (
             <button
               onClick={() => setStep((s) => s + 1)}
               disabled={!canNext()}

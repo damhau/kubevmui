@@ -189,10 +189,16 @@ def _build_manifest(request: VMCreate) -> dict:
         if disk_ref.boot_order is not None:
             disk_entry["bootOrder"] = disk_ref.boot_order
         disks.append(disk_entry)
-        volumes.append({
-            "name": disk_ref.name,
-            "persistentVolumeClaim": {"claimName": disk_ref.name},
-        })
+        if disk_ref.source_type == "container_disk":
+            volumes.append({
+                "name": disk_ref.name,
+                "containerDisk": {"image": disk_ref.image},
+            })
+        else:
+            volumes.append({
+                "name": disk_ref.name,
+                "persistentVolumeClaim": {"claimName": disk_ref.name},
+            })
 
     if request.cloud_init_user_data or request.cloud_init_network_data:
         disks.append({"name": "cloudinit", "disk": {"bus": "virtio"}})
@@ -230,6 +236,50 @@ def _build_manifest(request: VMCreate) -> dict:
     if request.description:
         annotations["kubevmui.io/description"] = request.description
 
+    domain = {
+        "cpu": {
+            "cores": request.compute.cpu_cores,
+            "sockets": request.compute.sockets,
+            "threads": request.compute.threads_per_core,
+        },
+        "resources": {
+            "requests": {"memory": f"{request.compute.memory_mb}Mi"},
+        },
+        "devices": {
+            "disks": disks,
+            "interfaces": interfaces,
+        },
+    }
+
+    if request.firmware_boot_mode:
+        firmware = {}
+        if request.firmware_boot_mode == "uefi":
+            firmware["bootloader"] = {"efi": {"secureBoot": request.secure_boot}}
+        elif request.firmware_boot_mode == "bios":
+            firmware["bootloader"] = {"bios": {}}
+        domain["firmware"] = firmware
+
+    spec_section = {
+        "domain": domain,
+        "networks": networks,
+        "volumes": volumes,
+    }
+
+    if request.node_selector:
+        spec_section["nodeSelector"] = request.node_selector
+    if request.tolerations:
+        spec_section["tolerations"] = [
+            {
+                "key": t["key"],
+                "operator": t.get("operator", "Equal"),
+                "value": t.get("value", ""),
+                "effect": t.get("effect", "NoSchedule"),
+            }
+            for t in request.tolerations
+        ]
+    if request.eviction_strategy:
+        spec_section["evictionStrategy"] = request.eviction_strategy
+
     return {
         "apiVersion": "kubevirt.io/v1",
         "kind": "VirtualMachine",
@@ -243,24 +293,7 @@ def _build_manifest(request: VMCreate) -> dict:
             "runStrategy": request.run_strategy,
             "template": {
                 "metadata": {"labels": {"kubevirt.io/domain": request.name}},
-                "spec": {
-                    "domain": {
-                        "cpu": {
-                            "cores": request.compute.cpu_cores,
-                            "sockets": request.compute.sockets,
-                            "threads": request.compute.threads_per_core,
-                        },
-                        "resources": {
-                            "requests": {"memory": f"{request.compute.memory_mb}Mi"},
-                        },
-                        "devices": {
-                            "disks": disks,
-                            "interfaces": interfaces,
-                        },
-                    },
-                    "networks": networks,
-                    "volumes": volumes,
-                },
+                "spec": spec_section,
             },
         },
     }

@@ -8,6 +8,8 @@ class VMDiskRef(BaseModel):
     size_gb: int
     bus: str = "virtio"
     boot_order: int | None = None
+    source_type: str = "pvc"  # "pvc" or "container_disk"
+    image: str = ""  # container disk image URL (only for source_type="container_disk")
 
 class VMNetworkRef(BaseModel):
     name: str
@@ -50,6 +52,11 @@ class VMCreate(BaseModel):
     cloud_init_network_data: str | None = None
     ssh_key_names: list[str] = []
     template_name: str | None = None
+    firmware_boot_mode: str | None = None  # "bios", "uefi", or None (default)
+    secure_boot: bool = False
+    node_selector: dict[str, str] = {}
+    tolerations: list[dict] = []
+    eviction_strategy: str | None = None  # "LiveMigrate" or None
 
 class AddVolumeRequest(BaseModel):
     name: str
