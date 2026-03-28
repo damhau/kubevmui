@@ -554,109 +554,149 @@ export function VMDetailPage() {
                   </div>
                 )}
 
-                <div
-                  style={{
-                    background: theme.main.card,
-                    border: `1px solid ${theme.main.cardBorder}`,
-                    borderRadius: theme.radius.lg,
-                    padding: '4px 20px',
-                  }}
-                >
-                <InfoRow label="Namespace" value={namespace} mono />
-                <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
-                <InfoRow label="CPU Cores" value={`${vm.compute?.cpu_cores ?? '—'} vCPU`} />
-                <InfoRow label="Memory" value={formatMemoryMb(vm.compute?.memory_mb)} />
-                <InfoRow label="Node" value={vm.node} mono />
-                <InfoRow label="IP Addresses" value={
-                  vm.ip_addresses?.length
-                    ? vm.ip_addresses.join(', ')
-                    : vm.ip ?? '—'
-                } mono />
-                <InfoRow label="OS Type" value={vm.os_type ?? vm.os} />
-                <InfoRow label="Run Strategy" value={
-                  editingRunStrategy ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <select
-                        defaultValue={vm.run_strategy}
-                        onChange={(e) => updateRunStrategyMutation.mutate(e.target.value)}
-                        disabled={updateRunStrategyMutation.isPending}
-                        style={{
-                          background: theme.main.inputBg,
-                          border: `1px solid ${theme.main.inputBorder}`,
-                          borderRadius: theme.radius.md,
-                          padding: '4px 8px',
-                          fontSize: 13,
-                          color: theme.text.primary,
-                          fontFamily: 'inherit',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {['Always', 'Halted', 'Manual', 'RerunOnFailure'].map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => setEditingRunStrategy(false)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: theme.text.secondary,
-                          cursor: 'pointer',
-                          fontSize: 12,
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        Cancel
-                      </button>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  {/* Compute card */}
+                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                      Compute
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>{vm.run_strategy}</span>
-                      <button
-                        onClick={() => setEditingRunStrategy(true)}
-                        style={{
-                          background: 'transparent',
-                          border: `1px solid ${theme.main.inputBorder}`,
-                          borderRadius: theme.radius.sm,
-                          padding: '1px 6px',
-                          fontSize: 11,
-                          cursor: 'pointer',
-                          color: theme.text.secondary,
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )
-                } />
-                <InfoRow label="Creation Time" value={formatDate(vm.created_at ?? vm.creation_timestamp)} />
-                {vm.labels && Object.keys(vm.labels).length > 0 && (
-                  <InfoRow
-                    label="Labels"
-                    value={
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {Object.entries(vm.labels).map(([k, v]) => (
-                          <span
-                            key={k}
+                    <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
+                    <InfoRow label="CPU" value={`${vm.compute?.cpu_cores ?? '—'} vCPU`} />
+                    <InfoRow label="Memory" value={formatMemoryMb(vm.compute?.memory_mb)} />
+                    <InfoRow label="Run Strategy" value={
+                      editingRunStrategy ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <select
+                            defaultValue={vm.run_strategy}
+                            onChange={(e) => updateRunStrategyMutation.mutate(e.target.value)}
+                            disabled={updateRunStrategyMutation.isPending}
                             style={{
-                              background: theme.main.bg,
+                              background: theme.main.inputBg,
                               border: `1px solid ${theme.main.inputBorder}`,
-                              borderRadius: theme.radius.sm,
-                              padding: '2px 7px',
-                              fontSize: 11,
-                              color: theme.text.secondary,
-                              fontFamily: 'monospace',
+                              borderRadius: theme.radius.md,
+                              padding: '4px 8px',
+                              fontSize: 13,
+                              color: theme.text.primary,
+                              fontFamily: 'inherit',
+                              cursor: 'pointer',
                             }}
                           >
-                            {k}={String(v)}
-                          </span>
-                        ))}
-                      </div>
-                    }
-                  />
-                )}
-              </div>
+                            {['Always', 'Halted', 'Manual', 'RerunOnFailure'].map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => setEditingRunStrategy(false)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: theme.text.secondary,
+                              cursor: 'pointer',
+                              fontSize: 12,
+                              fontFamily: 'inherit',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span>{vm.run_strategy}</span>
+                          <button
+                            onClick={() => setEditingRunStrategy(true)}
+                            style={{
+                              background: 'transparent',
+                              border: `1px solid ${theme.main.inputBorder}`,
+                              borderRadius: theme.radius.sm,
+                              padding: '1px 6px',
+                              fontSize: 11,
+                              cursor: 'pointer',
+                              color: theme.text.secondary,
+                              fontFamily: 'inherit',
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      )
+                    } />
+                  </div>
+
+                  {/* Network card */}
+                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                      Network
+                    </div>
+                    <InfoRow label="Node" value={vm.node ?? '—'} mono />
+                    <InfoRow label="IP Addresses" value={
+                      vm.ip_addresses?.length
+                        ? vm.ip_addresses.join(', ')
+                        : vm.ip ?? '—'
+                    } mono />
+                    <InfoRow label="Interfaces" value={`${vm.networks?.length ?? 0}`} />
+                  </div>
+
+                  {/* Storage card */}
+                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                      Storage
+                    </div>
+                    <InfoRow label="Disks" value={`${vm.disks?.length ?? 0}`} />
+                    <InfoRow label="Total Size" value={
+                      vm.disks?.length
+                        ? vm.disks.reduce((sum: string, d: any) => {
+                            const size = d.size || d.capacity || ''
+                            const match = size.match?.(/^(\d+)\s*(Gi|Mi|Ti)?$/)
+                            if (!match) return sum
+                            const val = parseInt(match[1], 10)
+                            const unit = match[2] || 'Gi'
+                            const inGi = unit === 'Ti' ? val * 1024 : unit === 'Mi' ? val / 1024 : val
+                            const prev = parseFloat(sum) || 0
+                            return `${(prev + inGi).toFixed(inGi % 1 ? 1 : 0)} Gi`
+                          }, '')
+                        || '—'
+                        : '—'
+                    } />
+                    <InfoRow label="Boot Disk" value={vm.disks?.[0]?.name ?? '—'} />
+                  </div>
+
+                  {/* Identity card */}
+                  <div style={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: theme.radius.lg, padding: 20 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 14 }}>
+                      Identity
+                    </div>
+                    <InfoRow label="Namespace" value={namespace} mono />
+                    <InfoRow label="OS Type" value={vm.os_type ?? vm.os ?? '—'} />
+                    <InfoRow label="Created" value={formatDate(vm.created_at ?? vm.creation_timestamp)} />
+                    <InfoRow label="Template" value={vm.template_name ?? '—'} />
+                    <InfoRow label="Description" value={vm.description || '—'} />
+                    {vm.labels && Object.keys(vm.labels).length > 0 && (
+                      <InfoRow
+                        label="Labels"
+                        value={
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {Object.entries(vm.labels).map(([k, v]) => (
+                              <span
+                                key={k}
+                                style={{
+                                  background: theme.main.bg,
+                                  border: `1px solid ${theme.main.inputBorder}`,
+                                  borderRadius: theme.radius.sm,
+                                  padding: '2px 7px',
+                                  fontSize: 11,
+                                  color: theme.text.secondary,
+                                  fontFamily: 'monospace',
+                                }}
+                              >
+                                {k}={String(v)}
+                              </span>
+                            ))}
+                          </div>
+                        }
+                      />
+                    )}
+                  </div>
+                </div>
               </>
             )}
 
