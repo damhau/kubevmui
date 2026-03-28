@@ -12,6 +12,7 @@ import { NetworksPage } from '@/pages/NetworksPage'
 import { StoragePage } from '@/pages/StoragePage'
 import { SSHKeysPage } from '@/pages/SSHKeysPage'
 import { ImagesPage } from '@/pages/ImagesPage'
+import { NodesPage } from '@/pages/NodesPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ function App() {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/networks" element={<NetworksPage />} />
             <Route path="/storage" element={<StoragePage />} />
+            <Route path="/nodes" element={<NodesPage />} />
             <Route path="/ssh-keys" element={<SSHKeysPage />} />
           </Route>
         </Routes>

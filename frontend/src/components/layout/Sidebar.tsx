@@ -8,6 +8,7 @@ import {
   HardDrive,
   Disc,
   KeyRound,
+  Server,
   ChevronDown,
   Check,
 } from 'lucide-react'
@@ -43,6 +44,7 @@ const navGroups: NavGroup[] = [
       { label: 'Images', to: '/images', icon: <Disc size={16} /> },
       { label: 'Networks', to: '/networks', icon: <Network size={16} /> },
       { label: 'Storage', to: '/storage', icon: <HardDrive size={16} /> },
+      { label: 'Nodes', to: '/nodes', icon: <Server size={16} /> },
       { label: 'SSH Keys', to: '/ssh-keys', icon: <KeyRound size={16} /> },
     ],
   },
