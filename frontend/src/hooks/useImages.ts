@@ -12,6 +12,18 @@ export function useImages() {
       )
       return data
     },
+    refetchInterval: 5000,
+  })
+}
+
+export function useStorageClasses() {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['storage-classes', activeCluster],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/clusters/${activeCluster}/storage-classes`)
+      return data
+    },
   })
 }
 
@@ -26,6 +38,8 @@ export function useCreateImage() {
       os_type?: string
       source_type?: string
       source_url?: string
+      size_gb?: number
+      storage_class?: string
     }) => {
       const { data } = await apiClient.post(
         `/clusters/${activeCluster}/namespaces/${activeNamespace}/images`,

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useImages, useCreateImage, useDeleteImage } from '@/hooks/useImages'
+import { useImages, useCreateImage, useDeleteImage, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -24,6 +24,8 @@ interface ImageItem {
   source_type?: string
   source_url?: string
   created_at?: string
+  dv_phase?: string
+  dv_progress?: string
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -52,6 +54,8 @@ interface ImageForm {
   os_type: string
   source_type: string
   source_url: string
+  size_gb: number
+  storage_class: string
 }
 
 const SUGGESTIONS = [
@@ -79,12 +83,22 @@ const SUGGESTIONS = [
     source_type: 'http',
     source_url: 'https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-virt-3.19.1-x86_64.iso',
   },
+  {
+    label: 'Rocky Linux 10 (Registry)',
+    name: 'rocky10-golden',
+    display_name: 'Rocky Linux 10',
+    os_type: 'linux',
+    source_type: 'registry',
+    source_url: 'docker://docker.io/damienh/rocky10-disk:10.1',
+  },
 ]
 
 export function ImagesPage() {
   const { data, isLoading } = useImages()
   const createImage = useCreateImage()
   const deleteImage = useDeleteImage()
+  const { data: storageClassData } = useStorageClasses()
+  const storageClasses: string[] = Array.isArray(storageClassData?.items) ? storageClassData.items.map((sc: { name: string }) => sc.name) : []
   const images: ImageItem[] = Array.isArray(data?.items) ? data.items : []
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -95,6 +109,8 @@ export function ImagesPage() {
     os_type: 'linux',
     source_type: 'container_disk',
     source_url: '',
+    size_gb: 20,
+    storage_class: '',
   })
 
   const inputStyle: React.CSSProperties = {
@@ -138,6 +154,8 @@ export function ImagesPage() {
       os_type: s.os_type,
       source_type: s.source_type,
       source_url: s.source_url,
+      size_gb: 20,
+      storage_class: '',
     })
   }
 
@@ -154,6 +172,8 @@ export function ImagesPage() {
           os_type: 'linux',
           source_type: 'container_disk',
           source_url: '',
+          size_gb: 20,
+          storage_class: '',
         })
       },
       onError: (err: unknown) => {
@@ -254,6 +274,7 @@ export function ImagesPage() {
                     'OS Type',
                     'Source Type',
                     'Source URL',
+                    'Status',
                     'Created',
                     'Actions',
                   ].map((col) => (
@@ -344,6 +365,32 @@ export function ImagesPage() {
                       title={img.source_url}
                     >
                       {img.source_url || '\u2014'}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      {img.source_type === 'container_disk' ? (
+                        <Badge label="Ready" color={theme.status.stopped} />
+                      ) : img.dv_phase ? (
+                        <Badge
+                          label={
+                            img.dv_phase === 'ImportInProgress' && img.dv_progress
+                              ? `${img.dv_phase} ${img.dv_progress}`
+                              : img.dv_progress && img.dv_phase !== 'Succeeded' && img.dv_phase !== 'Failed'
+                                ? `${img.dv_phase} ${img.dv_progress}`
+                                : img.dv_phase
+                          }
+                          color={
+                            img.dv_phase === 'Succeeded'
+                              ? theme.status.running
+                              : img.dv_phase === 'Failed'
+                                ? theme.status.error
+                                : img.dv_phase === 'ImportInProgress'
+                                  ? theme.status.provisioning
+                                  : theme.status.stopped
+                          }
+                        />
+                      ) : (
+                        <Badge label="Pending" color={theme.status.stopped} />
+                      )}
                     </td>
                     <td
                       style={{
@@ -502,11 +549,53 @@ export function ImagesPage() {
               placeholder={
                 form.source_type === 'container_disk'
                   ? 'quay.io/kubevirt/cirros-container-disk-demo'
-                  : 'https://...'
+                  : form.source_type === 'registry'
+                    ? 'docker://docker.io/org/image:tag'
+                    : 'https://...'
               }
               style={inputStyle}
             />
           </div>
+          {form.source_type !== 'container_disk' && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 12,
+                marginBottom: 14,
+              }}
+            >
+              <div>
+                <label style={labelStyle}>Size (GB)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.size_gb}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, size_gb: Number(e.target.value) || 1 }))
+                  }
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Storage Class</label>
+                <select
+                  value={form.storage_class}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, storage_class: e.target.value }))
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">Default</option>
+                  {storageClasses.map((sc) => (
+                    <option key={sc} value={sc}>
+                      {sc}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div
