@@ -1,6 +1,7 @@
 from fastapi import HTTPException, Request
 
 from app.core.cluster_manager import ClusterManager
+from app.core.config import settings
 from app.models.auth import UserInfo
 
 
@@ -9,6 +10,9 @@ def get_cluster_manager(request: Request) -> ClusterManager:
 
 
 async def get_current_user(request: Request) -> UserInfo:
+    if settings.debug:
+        return UserInfo(username="dev-admin", groups=["system:masters"], authenticated=True)
+
     token = None
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):

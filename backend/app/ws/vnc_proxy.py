@@ -104,6 +104,8 @@ async def vnc_proxy(websocket: WebSocket, cluster: str, namespace: str, vm: str)
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
+        if ssl_context and config.cert_file and config.key_file:
+            ssl_context.load_cert_chain(certfile=config.cert_file, keyfile=config.key_file)
     except Exception:
         pass
 

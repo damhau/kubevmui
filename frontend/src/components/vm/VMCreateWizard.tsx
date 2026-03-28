@@ -193,8 +193,8 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
     cpu: 2,
     memory: 4096,
     preset: 'Medium',
-    disks: [{ name: 'disk0', size_gb: 20, bus: 'virtio' }],
-    nics: [{ name: 'nic0', network_profile: 'default' }],
+    disks: [],
+    nics: [{ name: 'default', network_profile: 'pod' }],
     user_data: '',
     ssh_key: '',
   })
@@ -225,7 +225,30 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
 
   const handleSubmit = () => {
     setError('')
-    createVM.mutate(form, {
+    const payload = {
+      name: form.name,
+      namespace: form.namespace,
+      description: form.description,
+      compute: {
+        cpu_cores: form.cpu,
+        memory_mb: form.memory,
+        sockets: 1,
+        threads_per_core: 1,
+      },
+      disks: form.disks.map((d) => ({
+        name: d.name,
+        size_gb: d.size_gb,
+        bus: d.bus,
+      })),
+      networks: form.nics.map((n) => ({
+        name: n.name,
+        network_profile: n.network_profile || 'pod',
+      })),
+      cloud_init_user_data: form.user_data || null,
+      run_strategy: 'RerunOnFailure',
+      labels: {},
+    }
+    createVM.mutate(payload, {
       onSuccess: () => onSuccess(),
       onError: (err: unknown) => {
         const e = err as { message?: string }

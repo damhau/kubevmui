@@ -1,4 +1,7 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
+from kubernetes.client import ApiException
 
 from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
@@ -58,7 +61,14 @@ def create_snapshot(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    return svc.create_snapshot(ns, body)
+    try:
+        return svc.create_snapshot(ns, body)
+    except ApiException as e:
+        try:
+            detail = json.loads(e.body).get("message", str(e))
+        except (json.JSONDecodeError, TypeError):
+            detail = str(e)
+        raise HTTPException(status_code=e.status, detail=detail)
 
 
 @router.delete("/snapshots/{name}", status_code=204)
@@ -84,4 +94,11 @@ def restore_snapshot(
 ):
     svc = _get_service(cluster, cm)
     request = RestoreCreate(snapshot_name=snapshot_name)
-    return svc.restore_snapshot(ns, vm_name, request)
+    try:
+        return svc.restore_snapshot(ns, vm_name, request)
+    except ApiException as e:
+        try:
+            detail = json.loads(e.body).get("message", str(e))
+        except (json.JSONDecodeError, TypeError):
+            detail = str(e)
+        raise HTTPException(status_code=e.status, detail=detail)

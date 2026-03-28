@@ -39,6 +39,10 @@ def _map_status(vm: dict, vmi: dict | None) -> VMStatus:
         "ImagePullBackOff": VMStatus.error,
         "ErrorUnschedulable": VMStatus.error,
         "CrashLoopBackOff": VMStatus.error,
+        "ErrorPvcNotFound": VMStatus.error,
+        "ErrorDataVolumeNotFound": VMStatus.error,
+        "ErrorUnschedulable": VMStatus.error,
+        "WaitingForVolumeBinding": VMStatus.provisioning,
         "Unknown": VMStatus.unknown,
     }
     return status_map.get(printable, VMStatus.unknown)

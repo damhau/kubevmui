@@ -35,14 +35,14 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     application.include_router(auth.router)
+    application.include_router(snapshots.router)
+    application.include_router(migrations.router)
     application.include_router(vms.router)
     application.include_router(networks.router)
     application.include_router(storage.router)
     application.include_router(templates.router)
     application.include_router(dashboard.router)
     application.include_router(namespaces.router)
-    application.include_router(snapshots.router)
-    application.include_router(migrations.router)
     application.include_router(vnc_proxy.router)
     application.include_router(serial_proxy.router)
     return application
