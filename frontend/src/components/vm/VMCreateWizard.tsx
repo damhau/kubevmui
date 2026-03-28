@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useCreateVM } from '@/hooks/useVMs'
 import { useNamespaces } from '@/hooks/useNamespaces'
-import { useImages } from '@/hooks/useImages'
+import { useImages, useStorageClasses } from '@/hooks/useImages'
+import { useTemplates } from '@/hooks/useTemplates'
 import { theme } from '@/lib/theme'
 
 const STEPS = [
@@ -27,8 +28,11 @@ interface Disk {
   name: string
   size_gb: number
   bus: 'virtio' | 'sata' | 'scsi'
-  source_type: 'pvc' | 'container_disk'
+  source_type: 'pvc' | 'container_disk' | 'datavolume_clone'
   image: string
+  clone_source: string
+  clone_namespace: string
+  storage_class: string
 }
 
 interface NIC {
@@ -46,11 +50,14 @@ interface FormData {
   disks: Disk[]
   nics: NIC[]
   user_data: string
+  network_data: string
   ssh_key: string
   firmware: 'default' | 'bios' | 'uefi'
   secure_boot: boolean
   node_selector: string
   eviction_strategy: string
+  autoattach_pod_interface: boolean
+  template_name: string
 }
 
 interface VMCreateWizardProps {
@@ -187,8 +194,12 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
   const createVM = useCreateVM()
   const { data: namespacesData } = useNamespaces()
   const { data: imagesData } = useImages()
-  const registeredImages: Array<{ name: string; display_name: string; source_url: string; os_type: string }> =
+  const registeredImages: Array<{ name: string; display_name: string; source_url: string; os_type: string; source_type?: string }> =
     Array.isArray(imagesData?.items) ? imagesData.items : []
+  const { data: templatesData } = useTemplates()
+  const { data: storageClassData } = useStorageClasses()
+  const templates: Array<any> = Array.isArray(templatesData?.items) ? templatesData.items : []
+  const storageClasses: Array<{ name: string; is_default: boolean }> = Array.isArray(storageClassData?.items) ? storageClassData.items : []
   const [step, setStep] = useState(1)
   const [error, setError] = useState('')
 
@@ -208,18 +219,53 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
     disks: [],
     nics: [{ name: 'default', network_profile: 'pod' }],
     user_data: '',
+    network_data: '',
     ssh_key: '',
     firmware: 'default',
     secure_boot: false,
     node_selector: '',
     eviction_strategy: '',
+    autoattach_pod_interface: true,
+    template_name: '',
   })
 
   const updateForm = (patch: Partial<FormData>) => setForm((f) => ({ ...f, ...patch }))
 
+  const applyTemplate = (templateName: string) => {
+    const tpl = templates.find((t: any) => t.name === templateName)
+    if (!tpl) {
+      updateForm({ template_name: '' })
+      return
+    }
+    setForm((f) => ({
+      ...f,
+      template_name: templateName,
+      cpu: tpl.compute?.cpu_cores ?? f.cpu,
+      memory: tpl.compute?.memory_mb ?? f.memory,
+      preset: 'Custom',
+      disks: (tpl.disks || []).map((d: any) => ({
+        name: d.name || 'rootdisk',
+        size_gb: d.size_gb || 20,
+        bus: d.bus || 'virtio',
+        source_type: d.source_type || 'pvc',
+        image: d.image || '',
+        clone_source: d.clone_source || '',
+        clone_namespace: d.clone_namespace || '',
+        storage_class: d.storage_class || '',
+      })),
+      nics: (tpl.networks || []).map((n: any) => ({
+        name: n.name || 'default',
+        network_profile: n.network_profile || 'pod',
+      })),
+      user_data: tpl.cloud_init_user_data || '',
+      network_data: tpl.cloud_init_network_data || '',
+      autoattach_pod_interface: tpl.autoattach_pod_interface ?? true,
+    }))
+  }
+
   const addDisk = () =>
     updateForm({
-      disks: [...form.disks, { name: `disk${form.disks.length}`, size_gb: 10, bus: 'virtio', source_type: 'pvc', image: '' }],
+      disks: [...form.disks, { name: `disk${form.disks.length}`, size_gb: 10, bus: 'virtio', source_type: 'pvc', image: '', clone_source: '', clone_namespace: '', storage_class: '' }],
     })
 
   const removeDisk = (i: number) =>
@@ -257,12 +303,18 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
         bus: d.bus,
         source_type: d.source_type,
         image: d.image,
+        clone_source: d.clone_source,
+        clone_namespace: d.clone_namespace,
+        storage_class: d.storage_class,
       })),
       networks: form.nics.map((n) => ({
         name: n.name,
         network_profile: n.network_profile || 'pod',
       })),
       cloud_init_user_data: form.user_data || null,
+      cloud_init_network_data: form.network_data || null,
+      autoattach_pod_interface: form.autoattach_pod_interface,
+      template_name: form.template_name || null,
       run_strategy: 'RerunOnFailure',
       labels: {},
       firmware_boot_mode: form.firmware === 'default' ? null : form.firmware,
@@ -467,6 +519,20 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                   rows={3}
                   style={inputStyle({ resize: 'vertical' })}
                 />
+              </FieldGroup>
+              <FieldGroup label="Template (Optional)">
+                <select
+                  value={form.template_name}
+                  onChange={(e) => applyTemplate(e.target.value)}
+                  style={inputStyle()}
+                >
+                  <option value="">No template — configure manually</option>
+                  {templates.map((tpl: any) => (
+                    <option key={tpl.name} value={tpl.name}>
+                      {tpl.display_name || tpl.name} ({tpl.category})
+                    </option>
+                  ))}
+                </select>
               </FieldGroup>
             </SectionCard>
           )}
@@ -737,12 +803,12 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                                 borderRadius: 20,
                                 fontSize: 11,
                                 fontWeight: 500,
-                                background: disk.source_type === 'container_disk' ? '#fdf2f8' : '#f0fdf4',
-                                color: disk.source_type === 'container_disk' ? '#be185d' : '#16a34a',
-                                border: `1px solid ${disk.source_type === 'container_disk' ? '#fbcfe8' : '#bbf7d0'}`,
+                                background: disk.source_type === 'container_disk' ? '#fdf2f8' : disk.source_type === 'datavolume_clone' ? '#fefce8' : '#f0fdf4',
+                                color: disk.source_type === 'container_disk' ? '#be185d' : disk.source_type === 'datavolume_clone' ? '#a16207' : '#16a34a',
+                                border: `1px solid ${disk.source_type === 'container_disk' ? '#fbcfe8' : disk.source_type === 'datavolume_clone' ? '#fde047' : '#bbf7d0'}`,
                               }}
                             >
-                              {disk.source_type === 'container_disk' ? 'container' : 'pvc'}
+                              {disk.source_type === 'container_disk' ? 'container' : disk.source_type === 'datavolume_clone' ? 'clone' : 'pvc'}
                             </span>
                           </div>
                         </div>
@@ -768,7 +834,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                     <div style={{ marginBottom: 14 }}>
                       <FieldGroup label="Source Type">
                         <div style={{ display: 'flex', gap: 8 }}>
-                          {(['pvc', 'container_disk'] as const).map((st) => (
+                          {(['pvc', 'container_disk', 'datavolume_clone'] as const).map((st) => (
                             <button
                               key={st}
                               onClick={() => updateDisk(i, { source_type: st })}
@@ -787,7 +853,7 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                                 margin: disk.source_type === st ? 0 : 1,
                               }}
                             >
-                              {st === 'pvc' ? 'PVC' : 'Container Disk'}
+                              {st === 'pvc' ? 'PVC' : st === 'container_disk' ? 'Container Disk' : 'Clone from Image'}
                             </button>
                           ))}
                         </div>
@@ -854,6 +920,48 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                               onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })}
                               style={inputStyle()}
                             >
+                              <option value="virtio">virtio</option>
+                              <option value="sata">sata</option>
+                              <option value="scsi">scsi</option>
+                            </select>
+                          </FieldGroup>
+                        </div>
+                      </>
+                    ) : disk.source_type === 'datavolume_clone' ? (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <FieldGroup label="Name">
+                            <input type="text" value={disk.name} onChange={(e) => updateDisk(i, { name: e.target.value })} style={inputStyle()} />
+                          </FieldGroup>
+                          <FieldGroup label="Clone Source (Golden Image)">
+                            <select
+                              value={disk.clone_source}
+                              onChange={(e) => updateDisk(i, { clone_source: e.target.value })}
+                              style={inputStyle()}
+                            >
+                              <option value="">Select image...</option>
+                              {registeredImages
+                                .filter((img: any) => img.source_type !== 'container_disk')
+                                .map((img: any) => (
+                                  <option key={img.name} value={img.name}>{img.display_name || img.name}</option>
+                                ))}
+                            </select>
+                          </FieldGroup>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
+                          <FieldGroup label="Size (GB)">
+                            <input type="number" value={disk.size_gb} onChange={(e) => updateDisk(i, { size_gb: parseInt(e.target.value) || 10 })} style={inputStyle()} />
+                          </FieldGroup>
+                          <FieldGroup label="Storage Class">
+                            <select value={disk.storage_class} onChange={(e) => updateDisk(i, { storage_class: e.target.value })} style={inputStyle()}>
+                              <option value="">Default</option>
+                              {storageClasses.map((sc: any) => (
+                                <option key={sc.name} value={sc.name}>{sc.name}{sc.is_default ? ' (default)' : ''}</option>
+                              ))}
+                            </select>
+                          </FieldGroup>
+                          <FieldGroup label="Bus">
+                            <select value={disk.bus} onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })} style={inputStyle()}>
                               <option value="virtio">virtio</option>
                               <option value="sata">sata</option>
                               <option value="scsi">scsi</option>
@@ -958,6 +1066,19 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
           {/* Step 5 — Networking */}
           {step === 5 && (
             <div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: theme.text.primary }}>
+                  <input
+                    type="checkbox"
+                    checked={form.autoattach_pod_interface}
+                    onChange={(e) => updateForm({ autoattach_pod_interface: e.target.checked })}
+                  />
+                  Attach default pod network interface
+                </label>
+                <div style={{ fontSize: 11, color: theme.text.secondary, marginTop: 4, marginLeft: 24 }}>
+                  Disable for VMs using only bridge/Multus networking
+                </div>
+              </div>
               {form.nics.map((nic, i) => (
                 <div
                   key={i}
@@ -1078,6 +1199,15 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                   style={inputStyle({ fontFamily: 'monospace', resize: 'vertical' })}
                 />
               </FieldGroup>
+              <FieldGroup label="Network Data">
+                <textarea
+                  value={form.network_data}
+                  onChange={(e) => updateForm({ network_data: e.target.value })}
+                  placeholder={'network:\n  version: 2\n  ethernets:\n    enp1s0:\n      dhcp4: true'}
+                  rows={6}
+                  style={{ ...inputStyle(), fontFamily: 'JetBrains Mono, Fira Code, monospace', fontSize: 13, resize: 'vertical' }}
+                />
+              </FieldGroup>
               <FieldGroup label="SSH Public Key">
                 <textarea
                   value={form.ssh_key}
@@ -1105,6 +1235,10 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                 {
                   label: 'Namespace',
                   value: <span style={{ color: theme.text.primary }}>{form.namespace}</span>,
+                },
+                {
+                  label: 'Template',
+                  value: <span style={{ color: theme.text.primary }}>{form.template_name || 'None'}</span>,
                 },
                 {
                   label: 'Description',
@@ -1262,6 +1396,8 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                       </span>
                       {d.source_type === 'container_disk' ? (
                         <Badge label="container" variant="warning" />
+                      ) : d.source_type === 'datavolume_clone' ? (
+                        <Badge label="clone" variant="warning" />
                       ) : (
                         <Badge label={`${d.size_gb} GB`} variant="neutral" />
                       )}
@@ -1269,6 +1405,11 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                       {d.source_type === 'container_disk' && d.image && (
                         <span style={{ fontSize: 11, color: theme.text.secondary }}>
                           {d.image}
+                        </span>
+                      )}
+                      {d.source_type === 'datavolume_clone' && d.clone_source && (
+                        <span style={{ fontSize: 11, color: theme.text.secondary }}>
+                          clone: {d.clone_source}{d.storage_class ? ` (${d.storage_class})` : ''}
                         </span>
                       )}
                     </div>
@@ -1377,6 +1518,68 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
                   <Badge label="Configured" variant="success" />
                 ) : (
                   <Badge label="None" variant="neutral" />
+                )}
+              </div>
+
+              {/* Network Data row */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 16,
+                  padding: '9px 0',
+                  borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                  fontSize: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <span
+                  style={{
+                    minWidth: 130,
+                    color: theme.text.secondary,
+                    fontWeight: 500,
+                    flexShrink: 0,
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  Network Data
+                </span>
+                {form.network_data ? (
+                  <Badge label="Configured" variant="success" />
+                ) : (
+                  <Badge label="None" variant="neutral" />
+                )}
+              </div>
+
+              {/* Auto-attach Pod Interface row */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 16,
+                  padding: '9px 0',
+                  borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                  fontSize: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <span
+                  style={{
+                    minWidth: 130,
+                    color: theme.text.secondary,
+                    fontWeight: 500,
+                    flexShrink: 0,
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  Pod Interface
+                </span>
+                {form.autoattach_pod_interface ? (
+                  <Badge label="Yes" variant="success" />
+                ) : (
+                  <Badge label="No" variant="neutral" />
                 )}
               </div>
 
