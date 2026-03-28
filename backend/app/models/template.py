@@ -13,6 +13,8 @@ class Template(ResourceMeta):
     disks: list[VMDiskRef] = []
     networks: list[VMNetworkRef] = []
     cloud_init_user_data: str | None = None
+    cloud_init_network_data: str | None = None
+    autoattach_pod_interface: bool = True
 
 class TemplateCreate(BaseModel):
     name: str
@@ -25,6 +27,8 @@ class TemplateCreate(BaseModel):
     disks: list[VMDiskRef] = []
     networks: list[VMNetworkRef] = []
     cloud_init_user_data: str | None = None
+    cloud_init_network_data: str | None = None
+    autoattach_pod_interface: bool = True
 
 class TemplateList(BaseModel):
     items: list[Template]

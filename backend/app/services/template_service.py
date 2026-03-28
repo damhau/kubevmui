@@ -64,6 +64,8 @@ def _cm_to_template(cm) -> Template:
         disks=spec.get("disks", []),
         networks=spec.get("networks", []),
         cloud_init_user_data=spec.get("cloud_init_user_data"),
+        cloud_init_network_data=spec.get("cloud_init_network_data"),
+        autoattach_pod_interface=spec.get("autoattach_pod_interface", True),
     )
 
 
@@ -88,6 +90,8 @@ class TemplateService:
             "disks": [d.model_dump() for d in request.disks],
             "networks": [n.model_dump() for n in request.networks],
             "cloud_init_user_data": request.cloud_init_user_data,
+            "cloud_init_network_data": request.cloud_init_network_data,
+            "autoattach_pod_interface": request.autoattach_pod_interface,
         }
 
         cm = client.V1ConfigMap(
