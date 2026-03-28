@@ -1,9 +1,10 @@
 import { TopBar } from '@/components/layout/TopBar'
 import { useDashboard } from '@/hooks/useVMs'
+import { useImages } from '@/hooks/useImages'
 import { useNavigate } from 'react-router-dom'
 import { theme } from '@/lib/theme'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { Monitor } from 'lucide-react'
+import { Monitor, AlertTriangle, Loader2 } from 'lucide-react'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: theme.status.runningBg, color: theme.status.running, border: `1px solid ${theme.status.running}40` },
@@ -73,14 +74,52 @@ function StatCard({ label, value, accent, borderColor }: { label: string; value:
   )
 }
 
+function ResourceGauge({ label, used, total, unit, color }: { label: string; used: number; total: number; unit: string; color: string }) {
+  const pct = total > 0 ? (used / total) * 100 : 0
+  return (
+    <div style={{
+      background: theme.main.card,
+      border: `1px solid ${theme.main.cardBorder}`,
+      borderRadius: theme.radius.lg,
+      padding: 16,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: theme.text.secondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+        <span style={{ fontSize: 12, color: theme.text.primary, fontWeight: 500 }}>
+          {used.toFixed(1)} / {total.toFixed(1)} {unit}
+        </span>
+      </div>
+      <div style={{
+        height: 8,
+        background: theme.main.inputBg,
+        borderRadius: 4,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${Math.min(pct, 100)}%`,
+          background: pct > 80 ? theme.status.error : pct > 60 ? theme.status.migrating : color,
+          borderRadius: 4,
+          transition: 'width 0.5s ease',
+        }} />
+      </div>
+      <div style={{ fontSize: 11, color: theme.text.dim, marginTop: 4, textAlign: 'right' }}>
+        {pct.toFixed(0)}% used
+      </div>
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const { data, isLoading } = useDashboard()
+  const { data: imagesData } = useImages()
   const navigate = useNavigate()
 
   const stats = {
     total: data?.total_vms ?? 0,
     running: data?.running_vms ?? 0,
     stopped: data?.stopped_vms ?? 0,
+    error: data?.error_vms ?? 0,
     nodes: data?.node_count ?? 0,
   }
 
@@ -89,6 +128,29 @@ export function DashboardPage() {
 
   const nodes: Array<{ name: string; status: string; roles: string[]; cpu_capacity: string; memory_capacity: string; vm_count: number }> =
     data?.nodes ?? []
+
+  // Image health data
+  const images: Array<{ name: string; dv_phase?: string }> = Array.isArray(imagesData) ? imagesData : []
+  const errorImages = images.filter((img) => img.dv_phase === 'Failed')
+  const importingImages = images.filter((img) => img.dv_phase === 'ImportInProgress' || img.dv_phase === 'CloneInProgress')
+
+  // Resource utilization from nodes and VMs
+  const totalCpuCapacity = nodes.reduce((sum, n) => sum + parseInt(n.cpu_capacity || '0', 10), 0)
+  const totalMemCapacity = nodes.reduce((sum, n) => {
+    const raw = n.memory_capacity || '0'
+    const ki = parseInt(raw.replace(/Ki$/i, ''), 10)
+    return sum + (isNaN(ki) ? 0 : ki / (1024 * 1024))
+  }, 0)
+  const totalCpuAllocated = recentVMs.reduce((sum, vm) => sum + (vm.cpu || 0), 0)
+  const totalMemAllocated = recentVMs.reduce((sum, vm) => {
+    const raw = vm.memory || '0'
+    const match = raw.match(/^(\d+(?:\.\d+)?)\s*(Gi|Mi|G|M)?$/i)
+    if (!match) return sum
+    const val = parseFloat(match[1])
+    const unit = (match[2] || 'Gi').toLowerCase()
+    if (unit === 'mi' || unit === 'm') return sum + val / 1024
+    return sum + val
+  }, 0)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -103,12 +165,78 @@ export function DashboardPage() {
         ) : (
           <>
             {/* Stat cards */}
-            <div style={{ display: 'flex', gap: 16, marginBottom: 28 }}>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
               <StatCard label="Total VMs" value={stats.total} borderColor={theme.accent} />
               <StatCard label="Running VMs" value={stats.running} accent={theme.status.running} borderColor={theme.status.running} />
               <StatCard label="Stopped VMs" value={stats.stopped} accent={theme.text.secondary} borderColor={theme.status.stopped} />
+              {stats.error > 0 && (
+                <StatCard label="Error VMs" value={stats.error} accent={theme.status.error} borderColor={theme.status.error} />
+              )}
               <StatCard label="Nodes" value={stats.nodes} accent={theme.accent} borderColor={theme.status.provisioning} />
             </div>
+
+            {/* Resource Utilization */}
+            {nodes.length > 0 && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 16,
+                marginBottom: 20,
+              }}>
+                <ResourceGauge
+                  label="Cluster CPU"
+                  used={totalCpuAllocated}
+                  total={totalCpuCapacity}
+                  unit="cores"
+                  color={theme.accent}
+                />
+                <ResourceGauge
+                  label="Cluster Memory"
+                  used={totalMemAllocated}
+                  total={totalMemCapacity}
+                  unit="Gi"
+                  color={theme.status.running}
+                />
+              </div>
+            )}
+
+            {/* Health Alerts */}
+            {(stats.error > 0 || errorImages.length > 0) && (
+              <div style={{
+                background: theme.status.errorBg,
+                border: `1px solid ${theme.status.error}30`,
+                borderRadius: theme.radius.lg,
+                padding: '14px 20px',
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}>
+                <AlertTriangle size={18} style={{ color: theme.status.error, flexShrink: 0 }} />
+                <div style={{ fontSize: 13, color: theme.status.error }}>
+                  {stats.error > 0 && <span style={{ fontWeight: 500 }}>{stats.error} VM{stats.error > 1 ? 's' : ''} in error state. </span>}
+                  {errorImages.length > 0 && <span style={{ fontWeight: 500 }}>{errorImages.length} image import{errorImages.length > 1 ? 's' : ''} failed.</span>}
+                </div>
+              </div>
+            )}
+
+            {importingImages.length > 0 && (
+              <div style={{
+                background: theme.status.provisioningBg,
+                border: `1px solid ${theme.status.provisioning}30`,
+                borderRadius: theme.radius.lg,
+                padding: '14px 20px',
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}>
+                <Loader2 size={18} style={{ color: theme.status.provisioning, flexShrink: 0 }} />
+                <div style={{ fontSize: 13, color: theme.status.provisioning }}>
+                  <span style={{ fontWeight: 500 }}>{importingImages.length} image import{importingImages.length > 1 ? 's' : ''} in progress</span>
+                </div>
+              </div>
+            )}
 
             {/* Recent VMs */}
             <div
