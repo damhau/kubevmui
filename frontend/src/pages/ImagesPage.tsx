@@ -6,6 +6,8 @@ import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Disc } from 'lucide-react'
 
 const osColor: Record<string, string> = {
   linux: theme.status.running,
@@ -419,16 +421,12 @@ export function ImagesPage() {
               Loading images...
             </div>
           ) : images.length === 0 ? (
-            <div
-              style={{
-                padding: 40,
-                textAlign: 'center',
-                color: theme.text.dim,
-                fontSize: 13,
-              }}
-            >
-              No boot source images found. Click &quot;+ Add Image&quot; to register one.
-            </div>
+            <EmptyState
+              icon={<Disc size={24} />}
+              title="No Boot Source Images"
+              description="Import OS images from container registries or HTTP sources."
+              action={{ label: 'Add Image', onClick: () => { setForm(defaultForm); setEditingName(null); setError(null); setShowCreate(true) } }}
+            />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

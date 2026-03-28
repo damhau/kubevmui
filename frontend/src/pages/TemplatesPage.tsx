@@ -10,6 +10,8 @@ import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Copy } from 'lucide-react'
 
 const categoryColor: Record<string, string> = {
   OS: theme.status.provisioning,
@@ -505,9 +507,12 @@ export function TemplatesPage() {
               Loading templates...
             </div>
           ) : templates.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              No templates found. Create one to get started.
-            </div>
+            <EmptyState
+              icon={<Copy size={24} />}
+              title="No Templates"
+              description="Templates let you create VMs from pre-configured blueprints."
+              action={{ label: 'Create Template', onClick: () => { setForm(defaultForm()); setEditingName(null); setError(null); setShowCreate(true) } }}
+            />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

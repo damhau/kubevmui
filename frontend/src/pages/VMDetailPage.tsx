@@ -562,7 +562,7 @@ export function VMDetailPage() {
                     padding: '4px 20px',
                   }}
                 >
-                <InfoRow label="Namespace" value={namespace} />
+                <InfoRow label="Namespace" value={namespace} mono />
                 <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
                 <InfoRow label="CPU Cores" value={`${vm.compute?.cpu_cores ?? '—'} vCPU`} />
                 <InfoRow label="Memory" value={formatMemoryMb(vm.compute?.memory_mb)} />

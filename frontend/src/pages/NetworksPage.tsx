@@ -4,6 +4,8 @@ import { useNetworks, useCreateNetwork, useDeleteNetwork, useAllNetworks } from 
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Network } from 'lucide-react'
 
 const typeColor: Record<string, string> = {
   Bridge: theme.status.running,
@@ -301,9 +303,11 @@ export function NetworksPage() {
               Loading network profiles...
             </div>
           ) : networks.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              No network profiles in current namespace.
-            </div>
+            <EmptyState
+              icon={<Network size={24} />}
+              title="No Network Profiles"
+              description="Create network profiles to configure VM networking."
+            />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

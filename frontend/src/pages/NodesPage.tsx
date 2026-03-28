@@ -4,6 +4,7 @@ import { useNodes, useNode } from '@/hooks/useNodes'
 import { useNodeMetrics } from '@/hooks/useMetrics'
 import { theme } from '@/lib/theme'
 import { ChevronDown, ChevronRight, Server, Cpu, MemoryStick, Monitor } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface NodeItem {
@@ -318,9 +319,17 @@ export function NodesPage() {
               Loading nodes...
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
-              {search ? 'No nodes match your search.' : 'No nodes found.'}
-            </div>
+            search ? (
+              <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                No nodes match your search.
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Server size={24} />}
+                title="No Nodes Found"
+                description="Unable to retrieve cluster nodes."
+              />
+            )
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

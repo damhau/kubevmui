@@ -3,6 +3,8 @@ import { TopBar } from '@/components/layout/TopBar'
 import { useSSHKeys, useCreateSSHKey, useDeleteSSHKey } from '@/hooks/useSSHKeys'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { KeyRound } from 'lucide-react'
 
 interface SSHKey {
   name: string
@@ -192,9 +194,11 @@ export function SSHKeysPage() {
               Loading SSH keys...
             </div>
           ) : keys.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              No SSH keys found.
-            </div>
+            <EmptyState
+              icon={<KeyRound size={24} />}
+              title="No SSH Keys"
+              description="Add SSH keys to inject into your VMs via cloud-init."
+            />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

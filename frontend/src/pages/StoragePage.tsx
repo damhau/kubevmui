@@ -3,6 +3,8 @@ import { TopBar } from '@/components/layout/TopBar'
 import { useDisks, useCreateDisk, useDeleteDisk } from '@/hooks/useDisks'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { HardDrive } from 'lucide-react'
 
 const tierColor: Record<string, string> = {
   SSD: theme.status.running,
@@ -217,9 +219,11 @@ export function StoragePage() {
               Loading disks...
             </div>
           ) : disks.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              No disks found.
-            </div>
+            <EmptyState
+              icon={<HardDrive size={24} />}
+              title="No Disks"
+              description="Create persistent disks for your virtual machines."
+            />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

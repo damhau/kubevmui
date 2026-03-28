@@ -12,6 +12,8 @@ import { formatTimeAgo, formatMemoryMb } from '@/lib/format'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Monitor } from 'lucide-react'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -333,9 +335,18 @@ export function VMListPage() {
               Loading virtual machines...
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
-              {search ? 'No VMs match your search.' : 'No virtual machines found.'}
-            </div>
+            search ? (
+              <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                No VMs match your search.
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Monitor size={24} />}
+                title="No Virtual Machines"
+                description="Create your first VM to get started."
+                action={{ label: 'Create VM', onClick: () => navigate('/vms/create') }}
+              />
+            )
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>

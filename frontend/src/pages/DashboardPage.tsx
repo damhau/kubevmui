@@ -2,13 +2,36 @@ import { TopBar } from '@/components/layout/TopBar'
 import { useDashboard } from '@/hooks/useVMs'
 import { useNavigate } from 'react-router-dom'
 import { theme } from '@/lib/theme'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Monitor } from 'lucide-react'
 
-const statusColor: Record<string, string> = {
-  Running: theme.status.running,
-  Stopped: theme.status.stopped,
-  Error: theme.status.error,
-  Migrating: theme.status.migrating,
-  Provisioning: theme.status.provisioning,
+const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
+  Running:      { bg: theme.status.runningBg, color: theme.status.running, border: `1px solid ${theme.status.running}40` },
+  Stopped:      { bg: theme.status.stoppedBg, color: theme.status.stopped, border: `1px solid ${theme.status.stopped}40` },
+  Error:        { bg: theme.status.errorBg, color: theme.status.error, border: `1px solid ${theme.status.error}40` },
+  Migrating:    { bg: theme.status.migratingBg, color: theme.status.migrating, border: `1px solid ${theme.status.migrating}40` },
+  Provisioning: { bg: theme.status.provisioningBg, color: theme.status.provisioning, border: `1px solid ${theme.status.provisioning}40` },
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = statusBadge[status]
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '3px 10px',
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 500,
+        background: s?.bg ?? theme.main.bg,
+        color: s?.color ?? theme.text.secondary,
+        border: s?.border ?? `1px solid ${theme.main.cardBorder}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {status}
+    </span>
+  )
 }
 
 function StatCard({ label, value, accent, borderColor }: { label: string; value: number | string; accent?: string; borderColor?: string }) {
@@ -108,16 +131,12 @@ export function DashboardPage() {
               </div>
 
               {recentVMs.length === 0 ? (
-                <div
-                  style={{
-                    padding: 40,
-                    textAlign: 'center',
-                    color: theme.text.secondary,
-                    fontSize: 13,
-                  }}
-                >
-                  No VMs found
-                </div>
+                <EmptyState
+                  icon={<Monitor size={24} />}
+                  title="No Recent VMs"
+                  description="Create a VM to see it here."
+                  action={{ label: 'Create VM', onClick: () => navigate('/vms/create') }}
+                />
               ) : (
                 <table
                   style={{
@@ -161,26 +180,7 @@ export function DashboardPage() {
                         <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{vm.name}</td>
                         <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.namespace}</td>
                         <td style={{ padding: '10px 16px' }}>
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              fontSize: 12,
-                              color: statusColor[vm.status] ?? theme.text.secondary,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: '50%',
-                                background: statusColor[vm.status] ?? theme.text.secondary,
-                                flexShrink: 0,
-                              }}
-                            />
-                            {vm.status}
-                          </span>
+                          <StatusBadge status={vm.status} />
                         </td>
                         <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.cpu}</td>
                         <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.memory}</td>
