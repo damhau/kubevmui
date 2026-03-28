@@ -58,11 +58,14 @@ export function DashboardPage() {
     total: data?.total_vms ?? 0,
     running: data?.running_vms ?? 0,
     stopped: data?.stopped_vms ?? 0,
-    nodes: data?.nodes ?? 0,
+    nodes: data?.node_count ?? 0,
   }
 
   const recentVMs: Array<{ name: string; namespace: string; status: string; cpu: number; memory: string; node: string }> =
     data?.recent_vms ?? []
+
+  const nodes: Array<{ name: string; status: string; roles: string[]; cpu_capacity: string; memory_capacity: string; vm_count: number }> =
+    data?.nodes ?? []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -186,6 +189,98 @@ export function DashboardPage() {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+
+            {/* Nodes */}
+            <div
+              style={{
+                background: theme.main.card,
+                border: `1px solid ${theme.main.cardBorder}`,
+                borderRadius: theme.radius.lg,
+                marginTop: 20,
+              }}
+            >
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderBottom: `1px solid ${theme.main.cardBorder}`,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: theme.text.heading,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                Nodes
+                <span
+                  onClick={() => navigate('/nodes')}
+                  style={{
+                    fontSize: 12,
+                    color: theme.accent,
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  View all
+                </span>
+              </div>
+
+              {nodes.length === 0 ? (
+                <div
+                  style={{
+                    padding: 40,
+                    textAlign: 'center',
+                    color: theme.text.secondary,
+                    fontSize: 13,
+                  }}
+                >
+                  No nodes found
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 16 }}>
+                  {nodes.map((node) => (
+                    <div
+                      key={node.name}
+                      onClick={() => navigate('/nodes')}
+                      style={{
+                        flex: '1 1 220px',
+                        maxWidth: 320,
+                        background: theme.main.bg,
+                        border: `1px solid ${theme.main.cardBorder}`,
+                        borderRadius: theme.radius.md,
+                        padding: 14,
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.borderColor = theme.accent)}
+                      onMouseLeave={(e) => (e.currentTarget.style.borderColor = theme.main.cardBorder)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: theme.text.primary }}>{node.name}</span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: '2px 7px',
+                            borderRadius: 9999,
+                            background: node.status === 'Ready' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                            color: node.status === 'Ready' ? theme.status.running : theme.status.error,
+                          }}
+                        >
+                          {node.status}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, fontSize: 12, color: theme.text.secondary }}>
+                        {node.roles.length > 0 && (
+                          <span>{node.roles.join(', ')}</span>
+                        )}
+                        <span>CPU: {node.cpu_capacity}</span>
+                        <span>VMs: {node.vm_count}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </>

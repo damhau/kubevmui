@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_cluster_manager, get_current_user
@@ -33,6 +35,8 @@ def get_dashboard(
     running_vms = 0
     stopped_vms = 0
     error_vms = 0
+    all_vms = []
+    vm_node_count: dict[str, int] = {}
 
     for ns in namespaces:
         try:
@@ -40,6 +44,7 @@ def get_dashboard(
         except Exception:
             continue
         for vm in vms:
+            all_vms.append(vm)
             total_vms += 1
             if vm.status == VMStatus.running:
                 running_vms += 1
@@ -47,6 +52,12 @@ def get_dashboard(
                 stopped_vms += 1
             elif vm.status == VMStatus.error:
                 error_vms += 1
+            if vm.node:
+                vm_node_count[vm.node] = vm_node_count.get(vm.node, 0) + 1
+
+    # Enrich nodes with VM count
+    for node in nodes:
+        node["vm_count"] = vm_node_count.get(node["name"], 0)
 
     return {
         "total_vms": total_vms,
@@ -54,4 +65,20 @@ def get_dashboard(
         "stopped_vms": stopped_vms,
         "error_vms": error_vms,
         "node_count": len(nodes),
+        "nodes": nodes,
+        "recent_vms": [
+            {
+                "name": vm.name,
+                "namespace": vm.namespace,
+                "status": vm.status.value,
+                "cpu": vm.compute.cpu_cores,
+                "memory": f"{vm.compute.memory_mb}Mi",
+                "node": vm.node or "\u2014",
+            }
+            for vm in sorted(
+                all_vms,
+                key=lambda v: v.created_at or datetime.min,
+                reverse=True,
+            )[:10]
+        ],
     }
