@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import RFB from '@novnc/novnc/lib/rfb'
 
 interface VNCConsoleProps {
@@ -12,13 +12,21 @@ type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const rfbRef = useRef<RFB | null>(null)
-  const cleanedUp = useRef(false)
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [errorMessage, setErrorMessage] = useState<string>('')
 
+  const cleanup = useCallback(() => {
+    if (rfbRef.current) {
+      rfbRef.current.disconnect()
+      rfbRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
+    // If already initialized (StrictMode re-mount), skip
+    if (rfbRef.current) return
+
     if (!containerRef.current) return
-    cleanedUp.current = false
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${protocol}//${window.location.host}/ws/vnc/${cluster}/${namespace}/${vmName}`
@@ -26,22 +34,22 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
     setStatus('connecting')
     setErrorMessage('')
 
-    let rfb: RFB
     try {
-      rfb = new RFB(containerRef.current, wsUrl)
+      const rfb = new RFB(containerRef.current, wsUrl)
       rfb.scaleViewport = true
       rfb.resizeSession = true
       rfb.background = '#000000'
       rfbRef.current = rfb
 
       rfb.addEventListener('connect', () => {
-        if (cleanedUp.current) return
+        if (!rfbRef.current) return
         setStatus('connected')
       })
 
       rfb.addEventListener('disconnect', (e: Event) => {
+        const wasOurs = rfbRef.current !== null
         rfbRef.current = null
-        if (cleanedUp.current) return
+        if (!wasOurs) return
         const detail = (e as CustomEvent).detail
         if (detail?.clean) {
           setStatus('disconnected')
@@ -52,24 +60,16 @@ export function VNCConsole({ cluster, namespace, vmName }: VNCConsoleProps) {
       })
 
       rfb.addEventListener('credentialsrequired', () => {
-        if (cleanedUp.current) return
+        if (!rfbRef.current) return
         setErrorMessage('VM requires credentials')
       })
     } catch (err) {
-      if (!cleanedUp.current) {
-        setStatus('error')
-        setErrorMessage(err instanceof Error ? err.message : 'Failed to connect')
-      }
+      setStatus('error')
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect')
     }
 
-    return () => {
-      cleanedUp.current = true
-      if (rfbRef.current) {
-        rfbRef.current.disconnect()
-        rfbRef.current = null
-      }
-    }
-  }, [cluster, namespace, vmName])
+    return cleanup
+  }, [cluster, namespace, vmName, cleanup])
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
