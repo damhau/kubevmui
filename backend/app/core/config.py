@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     debug: bool = False
     cors_origins: list[str] = ["http://localhost:5173"]
     kubeconfig_path: str | None = None
+    prometheus_url: str = "http://prometheus-prometheus.monitoring:9090"
 
     @field_validator("cors_origins", mode="before")
     @classmethod
