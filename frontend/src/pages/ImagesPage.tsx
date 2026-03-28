@@ -10,7 +10,6 @@ const osColor: Record<string, string> = {
 }
 
 const sourceColor: Record<string, string> = {
-  container_disk: theme.accent,
   http: theme.status.migrating,
   pvc: theme.status.running,
   registry: theme.status.provisioning,
@@ -60,23 +59,15 @@ interface ImageForm {
 
 const SUGGESTIONS = [
   {
-    label: 'CirrOS (Container Disk)',
-    name: 'cirros-container-disk',
-    display_name: 'CirrOS',
+    label: 'Rocky Linux 10 (Registry)',
+    name: 'rocky10-golden',
+    display_name: 'Rocky Linux 10',
     os_type: 'linux',
-    source_type: 'container_disk',
-    source_url: 'quay.io/kubevirt/cirros-container-disk-demo',
+    source_type: 'registry',
+    source_url: 'docker://docker.io/damienh/rocky10-disk:10.1',
   },
   {
-    label: 'Fedora Cloud (Container Disk)',
-    name: 'fedora-container-disk',
-    display_name: 'Fedora Cloud',
-    os_type: 'linux',
-    source_type: 'container_disk',
-    source_url: 'quay.io/kubevirt/fedora-cloud-container-disk-demo',
-  },
-  {
-    label: 'Alpine (HTTP)',
+    label: 'Alpine Linux (HTTP)',
     name: 'alpine-http',
     display_name: 'Alpine Linux',
     os_type: 'linux',
@@ -84,12 +75,12 @@ const SUGGESTIONS = [
     source_url: 'https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/x86_64/alpine-virt-3.19.1-x86_64.iso',
   },
   {
-    label: 'Rocky Linux 10 (Registry)',
-    name: 'rocky10-golden',
-    display_name: 'Rocky Linux 10',
+    label: 'Ubuntu 24.04 (HTTP)',
+    name: 'ubuntu-2404',
+    display_name: 'Ubuntu 24.04',
     os_type: 'linux',
-    source_type: 'registry',
-    source_url: 'docker://docker.io/damienh/rocky10-disk:10.1',
+    source_type: 'http',
+    source_url: 'https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img',
   },
 ]
 
@@ -181,7 +172,7 @@ export function ImagesPage() {
     name: '',
     description: '',
     os_type: 'linux',
-    source_type: 'container_disk',
+    source_type: 'registry',
     source_url: '',
     size_gb: 20,
     storage_class: '',
@@ -244,7 +235,7 @@ export function ImagesPage() {
           name: '',
           description: '',
           os_type: 'linux',
-          source_type: 'container_disk',
+          source_type: 'registry',
           source_url: '',
           size_gb: 20,
           storage_class: '',
@@ -441,9 +432,7 @@ export function ImagesPage() {
                       {img.source_url || '\u2014'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
-                      {img.source_type === 'container_disk' ? (
-                        <Badge label="Ready" color={theme.status.stopped} />
-                      ) : img.dv_phase ? (
+                      {img.dv_phase ? (
                         <Badge
                           label={
                             img.dv_phase === 'ImportInProgress' && img.dv_progress
@@ -592,9 +581,8 @@ export function ImagesPage() {
                 }
                 style={inputStyle}
               >
-                <option value="container_disk">Container Disk</option>
+                <option value="registry">Registry</option>
                 <option value="http">HTTP</option>
-                <option value="pvc">PVC</option>
                 <option value="registry">Registry</option>
               </select>
             </div>
@@ -608,17 +596,14 @@ export function ImagesPage() {
                 setForm((f) => ({ ...f, source_url: e.target.value }))
               }
               placeholder={
-                form.source_type === 'container_disk'
-                  ? 'quay.io/kubevirt/cirros-container-disk-demo'
-                  : form.source_type === 'registry'
-                    ? 'docker://docker.io/org/image:tag'
-                    : 'https://...'
+                form.source_type === 'registry'
+                  ? 'docker://docker.io/org/image:tag'
+                  : 'https://example.com/disk.img'
               }
               style={inputStyle}
             />
           </div>
-          {form.source_type !== 'container_disk' && (
-            <div
+          <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
@@ -656,7 +641,6 @@ export function ImagesPage() {
                 </select>
               </div>
             </div>
-          )}
 
           {error && (
             <div

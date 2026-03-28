@@ -893,45 +893,43 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                             />
                           </FieldGroup>
                           <FieldGroup label="Boot Image">
-                            {registeredImages.length > 0 ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <select
-                                  value={registeredImages.some((img) => img.source_url === disk.image) ? disk.image : '__custom__'}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__custom__') {
-                                      updateDisk(i, { image: '' })
-                                    } else {
-                                      const img = registeredImages.find((im) => im.source_url === e.target.value)
-                                      updateDisk(i, { image: e.target.value, name: img?.name || disk.name })
-                                    }
-                                  }}
-                                  style={inputStyle()}
-                                >
-                                  {registeredImages.map((img) => (
-                                    <option key={img.name} value={img.source_url}>
-                                      {img.display_name} ({img.os_type})
-                                    </option>
-                                  ))}
-                                  <option value="__custom__">Custom image URL...</option>
-                                </select>
-                                {!registeredImages.some((img) => img.source_url === disk.image) && (
-                                  <input
-                                    type="text"
-                                    value={disk.image}
-                                    onChange={(e) => updateDisk(i, { image: e.target.value })}
-                                    placeholder="registry.io/image:tag"
-                                    style={inputStyle()}
-                                  />
-                                )}
-                              </div>
-                            ) : (
-                              <input
-                                type="text"
-                                value={disk.image}
-                                onChange={(e) => updateDisk(i, { image: e.target.value })}
-                                placeholder="registry.io/image:tag"
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <select
+                                value={[
+                                  'quay.io/kubevirt/cirros-container-disk-demo',
+                                  'quay.io/kubevirt/fedora-cloud-container-disk-demo',
+                                  'quay.io/containerdisks/ubuntu:22.04',
+                                  'quay.io/containerdisks/centos-stream:9',
+                                ].includes(disk.image) ? disk.image : '__custom__'}
+                                onChange={(e) => {
+                                  if (e.target.value === '__custom__') {
+                                    updateDisk(i, { image: '' })
+                                  } else {
+                                    updateDisk(i, { image: e.target.value })
+                                  }
+                                }}
                                 style={inputStyle()}
-                              />
+                              >
+                                <option value="quay.io/kubevirt/cirros-container-disk-demo">CirrOS (test)</option>
+                                <option value="quay.io/kubevirt/fedora-cloud-container-disk-demo">Fedora Cloud</option>
+                                <option value="quay.io/containerdisks/ubuntu:22.04">Ubuntu 22.04</option>
+                                <option value="quay.io/containerdisks/centos-stream:9">CentOS Stream 9</option>
+                                <option value="__custom__">Custom image URL...</option>
+                              </select>
+                              {![
+                                'quay.io/kubevirt/cirros-container-disk-demo',
+                                'quay.io/kubevirt/fedora-cloud-container-disk-demo',
+                                'quay.io/containerdisks/ubuntu:22.04',
+                                'quay.io/containerdisks/centos-stream:9',
+                              ].includes(disk.image) && (
+                                <input
+                                  type="text"
+                                  value={disk.image}
+                                  onChange={(e) => updateDisk(i, { image: e.target.value })}
+                                  placeholder="registry.io/image:tag"
+                                  style={inputStyle()}
+                                />
+                              )}
                             )}
                           </FieldGroup>
                           <FieldGroup label="Bus">
