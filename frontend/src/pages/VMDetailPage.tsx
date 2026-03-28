@@ -202,10 +202,8 @@ export function VMDetailPage() {
     if (!namespace || !name) return
     if (action === 'delete') {
       if (!window.confirm(`Delete VM "${name}"?`)) return
-      vmAction.mutate(
-        { namespace, name, action },
-        { onSuccess: () => navigate('/vms') },
-      )
+      apiClient.delete(`/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}`)
+        .then(() => navigate('/vms'))
       return
     }
     if (action === 'console') {

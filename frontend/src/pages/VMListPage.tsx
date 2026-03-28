@@ -213,6 +213,9 @@ export function VMListPage() {
     }
     if (action === 'delete') {
       if (!window.confirm(`Delete VM "${vm.name}"?`)) return
+      apiClient.delete(`/clusters/${activeCluster}/namespaces/${vm.namespace}/vms/${vm.name}`)
+        .then(() => queryClient.invalidateQueries({ queryKey: ['vms'] }))
+      return
     }
     vmAction.mutate({ namespace: vm.namespace, name: vm.name, action })
   }
