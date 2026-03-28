@@ -72,23 +72,23 @@ export function NetworksPage() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         <div
           style={{
-            background: '#111113',
-            border: '1px solid #27272a',
+            background: '#2a2a2e',
+            border: '1px solid #3a3a3f',
             borderRadius: 8,
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#52525b', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
               Loading network profiles...
             </div>
           ) : networks.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#52525b', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
               No network profiles found.
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #27272a' }}>
+                <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
                   {['Display Name', 'Type', 'VLAN ID', 'DHCP', 'Subnet'].map((col) => (
                     <th
                       key={col}
@@ -111,8 +111,8 @@ export function NetworksPage() {
                 {networks.map((net) => (
                   <tr
                     key={net.name}
-                    style={{ borderBottom: '1px solid #1f1f22' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#18181b')}
+                    style={{ borderBottom: '1px solid #353539' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#2e2e33')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px' }}>
@@ -125,7 +125,7 @@ export function NetworksPage() {
                       {net.type ? (
                         <Badge label={net.type} color={typeColor[net.type] ?? '#a1a1aa'} />
                       ) : (
-                        <span style={{ color: '#52525b' }}>—</span>
+                        <span style={{ color: '#6b6b73' }}>—</span>
                       )}
                     </td>
                     <td style={{ padding: '10px 16px', color: '#a1a1aa' }}>

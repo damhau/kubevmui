@@ -22,7 +22,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
         display: 'flex',
         alignItems: 'flex-start',
         padding: '10px 0',
-        borderBottom: '1px solid #1f1f22',
+        borderBottom: '1px solid #353539',
         gap: 16,
       }}
     >
@@ -79,7 +79,7 @@ export function VMDetailPage() {
       <div
         style={{
           padding: '16px 24px',
-          borderBottom: '1px solid #27272a',
+          borderBottom: '1px solid #3a3a3f',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -107,7 +107,7 @@ export function VMDetailPage() {
               margin: 0,
               fontSize: 18,
               fontWeight: 600,
-              color: '#fafafa',
+              color: '#f0f0f0',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -151,9 +151,9 @@ export function VMDetailPage() {
               key={btn.action}
               onClick={() => handleAction(btn.action)}
               style={{
-                background: btn.danger ? 'rgba(239,68,68,0.1)' : '#18181b',
+                background: btn.danger ? 'rgba(239,68,68,0.1)' : '#2e2e33',
                 color: btn.danger ? '#ef4444' : '#a1a1aa',
-                border: `1px solid ${btn.danger ? 'rgba(239,68,68,0.3)' : '#27272a'}`,
+                border: `1px solid ${btn.danger ? 'rgba(239,68,68,0.3)' : '#3a3a3f'}`,
                 borderRadius: 6,
                 padding: '6px 12px',
                 fontSize: 12,
@@ -173,7 +173,7 @@ export function VMDetailPage() {
         style={{
           display: 'flex',
           gap: 0,
-          borderBottom: '1px solid #27272a',
+          borderBottom: '1px solid #3a3a3f',
           padding: '0 24px',
           flexShrink: 0,
         }}
@@ -213,8 +213,8 @@ export function VMDetailPage() {
             {activeTab === 'overview' && (
               <div
                 style={{
-                  background: '#111113',
-                  border: '1px solid #27272a',
+                  background: '#2a2a2e',
+                  border: '1px solid #3a3a3f',
                   borderRadius: 8,
                   padding: '4px 20px',
                 }}
@@ -243,8 +243,8 @@ export function VMDetailPage() {
                           <span
                             key={k}
                             style={{
-                              background: '#18181b',
-                              border: '1px solid #27272a',
+                              background: '#2e2e33',
+                              border: '1px solid #3a3a3f',
                               borderRadius: 4,
                               padding: '2px 7px',
                               fontSize: 11,
@@ -266,15 +266,15 @@ export function VMDetailPage() {
             {activeTab === 'events' && (
               <div
                 style={{
-                  background: '#111113',
-                  border: '1px solid #27272a',
+                  background: '#2a2a2e',
+                  border: '1px solid #3a3a3f',
                   borderRadius: 8,
                 }}
               >
                 {vm.events?.length ? (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #27272a' }}>
+                      <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
                         {['Time', 'Type', 'Reason', 'Message'].map((col) => (
                           <th
                             key={col}
@@ -295,7 +295,7 @@ export function VMDetailPage() {
                     </thead>
                     <tbody>
                       {vm.events.map((evt: { timestamp: string; type: string; reason: string; message: string }, i: number) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #1f1f22' }}>
+                        <tr key={i} style={{ borderBottom: '1px solid #353539' }}>
                           <td style={{ padding: '10px 16px', color: '#71717a', fontSize: 12, whiteSpace: 'nowrap' }}>
                             {evt.timestamp}
                           </td>
@@ -317,7 +317,7 @@ export function VMDetailPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: 40, textAlign: 'center', color: '#52525b', fontSize: 13 }}>
+                  <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
                     No events found for this VM.
                   </div>
                 )}
@@ -328,8 +328,8 @@ export function VMDetailPage() {
             {activeTab === 'yaml' && (
               <pre
                 style={{
-                  background: '#111113',
-                  border: '1px solid #27272a',
+                  background: '#2a2a2e',
+                  border: '1px solid #3a3a3f',
                   borderRadius: 8,
                   padding: 20,
                   fontSize: 12,

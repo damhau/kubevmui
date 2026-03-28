@@ -13,7 +13,7 @@ export function ConsolePage() {
       <div
         style={{
           padding: '14px 24px',
-          borderBottom: '1px solid #27272a',
+          borderBottom: '1px solid #3a3a3f',
           display: 'flex',
           alignItems: 'center',
           gap: 16,
@@ -26,16 +26,16 @@ export function ConsolePage() {
         >
           ← {name}
         </Link>
-        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#fafafa' }}>
+        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f0f0f0' }}>
           Console — {name}
         </h1>
         <span
           style={{
             marginLeft: 'auto',
             fontSize: 11,
-            color: '#52525b',
-            background: '#18181b',
-            border: '1px solid #27272a',
+            color: '#6b6b73',
+            background: '#2e2e33',
+            border: '1px solid #3a3a3f',
             borderRadius: 4,
             padding: '3px 8px',
           }}
@@ -48,7 +48,7 @@ export function ConsolePage() {
       <div
         style={{
           display: 'flex',
-          borderBottom: '1px solid #27272a',
+          borderBottom: '1px solid #3a3a3f',
           padding: '0 24px',
           flexShrink: 0,
         }}
@@ -82,8 +82,8 @@ export function ConsolePage() {
         <div
           style={{
             flex: 1,
-            background: '#0a0a0b',
-            border: '1px solid #27272a',
+            background: '#1c1c1e',
+            border: '1px solid #3a3a3f',
             borderRadius: 8,
             display: 'flex',
             flexDirection: 'column',
@@ -98,8 +98,8 @@ export function ConsolePage() {
                 style={{
                   width: 56,
                   height: 56,
-                  background: '#18181b',
-                  border: '1px solid #27272a',
+                  background: '#2e2e33',
+                  border: '1px solid #3a3a3f',
                   borderRadius: 12,
                   display: 'flex',
                   alignItems: 'center',
@@ -113,15 +113,15 @@ export function ConsolePage() {
               <div style={{ fontSize: 15, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
                 VNC Console
               </div>
-              <div style={{ fontSize: 13, color: '#52525b' }}>
+              <div style={{ fontSize: 13, color: '#6b6b73' }}>
                 VNC Console — requires noVNC integration
               </div>
               <div
                 style={{
                   marginTop: 16,
                   padding: '6px 14px',
-                  background: '#18181b',
-                  border: '1px solid #27272a',
+                  background: '#2e2e33',
+                  border: '1px solid #3a3a3f',
                   borderRadius: 6,
                   fontSize: 11,
                   color: '#71717a',
@@ -138,8 +138,8 @@ export function ConsolePage() {
                 style={{
                   width: 56,
                   height: 56,
-                  background: '#18181b',
-                  border: '1px solid #27272a',
+                  background: '#2e2e33',
+                  border: '1px solid #3a3a3f',
                   borderRadius: 12,
                   display: 'flex',
                   alignItems: 'center',
@@ -153,15 +153,15 @@ export function ConsolePage() {
               <div style={{ fontSize: 15, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
                 Serial Console
               </div>
-              <div style={{ fontSize: 13, color: '#52525b' }}>
+              <div style={{ fontSize: 13, color: '#6b6b73' }}>
                 Serial Console — requires xterm.js integration
               </div>
               <div
                 style={{
                   marginTop: 16,
                   padding: '6px 14px',
-                  background: '#18181b',
-                  border: '1px solid #27272a',
+                  background: '#2e2e33',
+                  border: '1px solid #3a3a3f',
                   borderRadius: 6,
                   fontSize: 11,
                   color: '#71717a',

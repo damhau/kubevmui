@@ -60,8 +60,8 @@ export function Sidebar() {
       style={{
         width: 240,
         minWidth: 240,
-        background: '#111113',
-        borderRight: '1px solid #27272a',
+        background: '#2a2a2e',
+        borderRight: '1px solid #3a3a3f',
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -69,7 +69,7 @@ export function Sidebar() {
       }}
     >
       {/* Logo */}
-      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #27272a' }}>
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #3a3a3f' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* Icon */}
           <div
@@ -91,7 +91,7 @@ export function Sidebar() {
               <rect x="9" y="9" width="5" height="4" rx="1" fill="white" fillOpacity="0.9" />
             </svg>
           </div>
-          <span style={{ color: '#fafafa', fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
+          <span style={{ color: '#f0f0f0', fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
             kubevmui
           </span>
           <span
@@ -115,7 +115,7 @@ export function Sidebar() {
       {/* Namespace selector */}
       <div style={{ padding: '12px 12px 0' }}>
         <div
-          style={{ marginBottom: 4, fontSize: 10, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}
+          style={{ marginBottom: 4, fontSize: 10, color: '#6b6b73', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}
         >
           Namespace
         </div>
@@ -127,8 +127,8 @@ export function Sidebar() {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '7px 10px',
-            background: '#18181b',
-            border: '1px solid #27272a',
+            background: '#2e2e33',
+            border: '1px solid #3a3a3f',
             borderRadius: 6,
             color: '#e4e4e7',
             fontSize: 13,
@@ -154,8 +154,8 @@ export function Sidebar() {
           <div
             style={{
               marginTop: 4,
-              background: '#18181b',
-              border: '1px solid #27272a',
+              background: '#2e2e33',
+              border: '1px solid #3a3a3f',
               borderRadius: 6,
               overflow: 'hidden',
             }}
@@ -198,7 +198,7 @@ export function Sidebar() {
               style={{
                 padding: '6px 16px 4px',
                 fontSize: 10,
-                color: '#52525b',
+                color: '#6b6b73',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 fontWeight: 600,
@@ -239,7 +239,7 @@ export function Sidebar() {
       <div
         style={{
           padding: '12px 16px',
-          borderTop: '1px solid #27272a',
+          borderTop: '1px solid #3a3a3f',
           display: 'flex',
           alignItems: 'center',
           gap: 10,

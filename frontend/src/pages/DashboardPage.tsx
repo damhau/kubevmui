@@ -14,8 +14,8 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
   return (
     <div
       style={{
-        background: '#111113',
-        border: '1px solid #27272a',
+        background: '#2a2a2e',
+        border: '1px solid #3a3a3f',
         borderRadius: 8,
         padding: 16,
         flex: 1,
@@ -38,7 +38,7 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
         style={{
           fontSize: 28,
           fontWeight: 700,
-          color: accent ?? '#fafafa',
+          color: accent ?? '#f0f0f0',
           lineHeight: 1,
         }}
       >
@@ -85,18 +85,18 @@ export function DashboardPage() {
             {/* Recent VMs */}
             <div
               style={{
-                background: '#111113',
-                border: '1px solid #27272a',
+                background: '#2a2a2e',
+                border: '1px solid #3a3a3f',
                 borderRadius: 8,
               }}
             >
               <div
                 style={{
                   padding: '14px 16px',
-                  borderBottom: '1px solid #27272a',
+                  borderBottom: '1px solid #3a3a3f',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: '#fafafa',
+                  color: '#f0f0f0',
                 }}
               >
                 Recent Virtual Machines
@@ -107,7 +107,7 @@ export function DashboardPage() {
                   style={{
                     padding: 40,
                     textAlign: 'center',
-                    color: '#52525b',
+                    color: '#6b6b73',
                     fontSize: 13,
                   }}
                 >
@@ -122,7 +122,7 @@ export function DashboardPage() {
                   }}
                 >
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #27272a' }}>
+                    <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
                       {['Name', 'Namespace', 'Status', 'CPU', 'Memory', 'Node'].map((col) => (
                         <th
                           key={col}
@@ -147,10 +147,10 @@ export function DashboardPage() {
                         key={`${vm.namespace}/${vm.name}`}
                         onClick={() => navigate(`/vms/${vm.namespace}/${vm.name}`)}
                         style={{
-                          borderBottom: '1px solid #1f1f22',
+                          borderBottom: '1px solid #353539',
                           cursor: 'pointer',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#18181b')}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#2e2e33')}
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
                         <td style={{ padding: '10px 16px', color: '#e4e4e7', fontWeight: 500 }}>{vm.name}</td>

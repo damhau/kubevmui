@@ -34,7 +34,7 @@ export function LoginPage() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#0a0a0b',
+        background: '#1c1c1e',
         padding: 24,
       }}
     >
@@ -42,8 +42,8 @@ export function LoginPage() {
         style={{
           width: '100%',
           maxWidth: 420,
-          background: '#111113',
-          border: '1px solid #27272a',
+          background: '#2a2a2e',
+          border: '1px solid #3a3a3f',
           borderRadius: 12,
           padding: 40,
         }}
@@ -73,7 +73,7 @@ export function LoginPage() {
             style={{
               fontSize: 22,
               fontWeight: 700,
-              color: '#fafafa',
+              color: '#f0f0f0',
               letterSpacing: '-0.02em',
             }}
           >
@@ -86,7 +86,7 @@ export function LoginPage() {
             margin: '0 0 24px',
             fontSize: 16,
             fontWeight: 600,
-            color: '#fafafa',
+            color: '#f0f0f0',
             textAlign: 'center',
           }}
         >
@@ -113,8 +113,8 @@ export function LoginPage() {
               rows={5}
               style={{
                 width: '100%',
-                background: '#18181b',
-                border: '1px solid #27272a',
+                background: '#2e2e33',
+                border: '1px solid #3a3a3f',
                 borderRadius: 6,
                 color: '#e4e4e7',
                 fontSize: 13,

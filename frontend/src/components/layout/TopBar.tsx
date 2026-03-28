@@ -15,7 +15,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 24px',
-        borderBottom: '1px solid #18181b',
+        borderBottom: '1px solid #2e2e33',
         flexShrink: 0,
         gap: 16,
       }}
@@ -27,7 +27,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
             margin: 0,
             fontSize: 18,
             fontWeight: 600,
-            color: '#fafafa',
+            color: '#f0f0f0',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -50,21 +50,21 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            background: '#18181b',
-            border: '1px solid #27272a',
+            background: '#2e2e33',
+            border: '1px solid #3a3a3f',
             borderRadius: 6,
             padding: '6px 12px',
             cursor: 'text',
           }}
         >
-          <Search size={14} style={{ color: '#52525b', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: '#52525b', userSelect: 'none', whiteSpace: 'nowrap' }}>
+          <Search size={14} style={{ color: '#6b6b73', flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: '#6b6b73', userSelect: 'none', whiteSpace: 'nowrap' }}>
             Search VMs...{' '}
             <kbd
               style={{
                 fontSize: 11,
                 color: '#3f3f46',
-                background: '#27272a',
+                background: '#3a3a3f',
                 border: '1px solid #3f3f46',
                 borderRadius: 3,
                 padding: '0 4px',

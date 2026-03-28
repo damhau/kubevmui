@@ -49,7 +49,7 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
         onClick={() => setOpen((v) => !v)}
         style={{
           background: 'transparent',
-          border: '1px solid #27272a',
+          border: '1px solid #3a3a3f',
           borderRadius: 5,
           color: '#a1a1aa',
           cursor: 'pointer',
@@ -68,8 +68,8 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
             right: 0,
             top: '100%',
             marginTop: 4,
-            background: '#18181b',
-            border: '1px solid #27272a',
+            background: '#2e2e33',
+            border: '1px solid #3a3a3f',
             borderRadius: 7,
             minWidth: 130,
             zIndex: 100,
@@ -96,7 +96,7 @@ function ActionsMenu({ onAction }: { vm: VM; onAction: (action: string) => void 
                 cursor: 'pointer',
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#27272a')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#3a3a3f')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               {a.label}
@@ -167,8 +167,8 @@ export function VMListPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{
               width: 280,
-              background: '#18181b',
-              border: '1px solid #27272a',
+              background: '#2e2e33',
+              border: '1px solid #3a3a3f',
               borderRadius: 6,
               color: '#e4e4e7',
               fontSize: 13,
@@ -182,23 +182,23 @@ export function VMListPage() {
         {/* Table */}
         <div
           style={{
-            background: '#111113',
-            border: '1px solid #27272a',
+            background: '#2a2a2e',
+            border: '1px solid #3a3a3f',
             borderRadius: 8,
           }}
         >
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#52525b', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
               Loading virtual machines...
             </div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#52525b', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
               {search ? 'No VMs match your search.' : 'No virtual machines found.'}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #27272a' }}>
+                <tr style={{ borderBottom: '1px solid #3a3a3f' }}>
                   {['Name', 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
                     <th
                       key={i}
@@ -223,8 +223,8 @@ export function VMListPage() {
                   <tr
                     key={`${vm.namespace}/${vm.name}`}
                     onClick={() => navigate(`/vms/${vm.namespace}/${vm.name}`)}
-                    style={{ borderBottom: '1px solid #1f1f22', cursor: 'pointer' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#18181b')}
+                    style={{ borderBottom: '1px solid #353539', cursor: 'pointer' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#2e2e33')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '10px 16px' }}>

@@ -8,7 +8,7 @@ export function AppShell() {
         display: 'flex',
         height: '100vh',
         overflow: 'hidden',
-        background: '#0a0a0b',
+        background: '#1c1c1e',
       }}
     >
       <Sidebar />
@@ -16,7 +16,7 @@ export function AppShell() {
         style={{
           flex: 1,
           overflowY: 'auto',
-          background: '#0a0a0b',
+          background: '#1c1c1e',
         }}
       >
         <Outlet />
