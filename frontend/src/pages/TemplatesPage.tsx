@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
 import { useAllNetworks } from '@/hooks/useNetworks'
+import { useImages, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -261,6 +262,12 @@ export function TemplatesPage() {
   const { data: allNADsData } = useAllNetworks()
   const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
     Array.isArray(allNADsData?.items) ? allNADsData.items : []
+  const { data: imagesData } = useImages()
+  const registeredImages: Array<{ name: string; display_name: string; source_type: string; source_url: string }> =
+    Array.isArray(imagesData?.items) ? imagesData.items : []
+  const { data: storageClassData } = useStorageClasses()
+  const storageClasses: Array<{ name: string; is_default: boolean }> =
+    Array.isArray(storageClassData?.items) ? storageClassData.items : []
   const createTemplate = useCreateTemplate()
   const deleteTemplate = useDeleteTemplate()
   const templates: Template[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
@@ -716,35 +723,75 @@ export function TemplatesPage() {
               {/* Container Disk fields */}
               {disk.source_type === 'container_disk' && (
                 <div>
-                  <label style={labelStyle}>Image URL</label>
-                  <input
-                    type="text"
-                    value={disk.image}
-                    onChange={(e) => updateDisk(idx, { image: e.target.value })}
-                    placeholder="registry.example.com/image:tag"
-                    style={inputStyle}
-                  />
+                  <label style={labelStyle}>Boot Image</label>
+                  {registeredImages.filter((img) => img.source_type === 'container_disk').length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <select
+                        value={registeredImages.some((img) => img.source_url === disk.image) ? disk.image : '__custom__'}
+                        onChange={(e) => {
+                          if (e.target.value === '__custom__') {
+                            updateDisk(idx, { image: '' })
+                          } else {
+                            updateDisk(idx, { image: e.target.value })
+                          }
+                        }}
+                        style={inputStyle}
+                      >
+                        {registeredImages
+                          .filter((img) => img.source_type === 'container_disk')
+                          .map((img) => (
+                            <option key={img.name} value={img.source_url}>{img.display_name || img.name}</option>
+                          ))}
+                        <option value="__custom__">Custom image URL...</option>
+                      </select>
+                      {!registeredImages.some((img) => img.source_url === disk.image) && (
+                        <input
+                          type="text"
+                          value={disk.image}
+                          onChange={(e) => updateDisk(idx, { image: e.target.value })}
+                          placeholder="registry.example.com/image:tag"
+                          style={inputStyle}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={disk.image}
+                      onChange={(e) => updateDisk(idx, { image: e.target.value })}
+                      placeholder="registry.example.com/image:tag"
+                      style={inputStyle}
+                    />
+                  )}
                 </div>
               )}
 
               {/* DataVolume Clone fields */}
               {disk.source_type === 'datavolume_clone' && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 10,
-                  }}
-                >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
-                    <label style={labelStyle}>Clone Source (DV name)</label>
-                    <input
-                      type="text"
+                    <label style={labelStyle}>Golden Image</label>
+                    <select
                       value={disk.clone_source}
-                      onChange={(e) => updateDisk(idx, { clone_source: e.target.value })}
-                      placeholder="golden-image-dv"
+                      onChange={(e) => {
+                        const img = registeredImages.find((i) => i.name === e.target.value)
+                        updateDisk(idx, {
+                          clone_source: e.target.value,
+                          name: disk.name || 'rootdisk',
+                        })
+                        if (img) {
+                          // auto-fill display info
+                        }
+                      }}
                       style={inputStyle}
-                    />
+                    >
+                      <option value="">Select image...</option>
+                      {registeredImages
+                        .filter((img) => img.source_type !== 'container_disk')
+                        .map((img) => (
+                          <option key={img.name} value={img.name}>{img.display_name || img.name}</option>
+                        ))}
+                    </select>
                   </div>
                   <div>
                     <label style={labelStyle}>Clone Namespace</label>
@@ -768,13 +815,16 @@ export function TemplatesPage() {
                   </div>
                   <div>
                     <label style={labelStyle}>Storage Class</label>
-                    <input
-                      type="text"
+                    <select
                       value={disk.storage_class}
                       onChange={(e) => updateDisk(idx, { storage_class: e.target.value })}
-                      placeholder="longhorn"
                       style={inputStyle}
-                    />
+                    >
+                      <option value="">Default</option>
+                      {storageClasses.map((sc) => (
+                        <option key={sc.name} value={sc.name}>{sc.name}{sc.is_default ? ' (default)' : ''}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}
