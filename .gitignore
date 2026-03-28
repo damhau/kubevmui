@@ -1,1 +1,18 @@
 .superpowers/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+dist/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Env
+.env
+
+# Node
+node_modules/
