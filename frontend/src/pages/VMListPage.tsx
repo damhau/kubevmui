@@ -276,7 +276,7 @@ export function VMListPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         title="Create Virtual Machine"
-        maxWidth={600}
+        maxWidth={720}
       >
         <VMCreateWizard
           onClose={() => setShowCreate(false)}

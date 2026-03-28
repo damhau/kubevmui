@@ -163,7 +163,9 @@ export function VMCreateWizard({ onClose, onSuccess }: VMCreateWizardProps) {
           display: 'flex',
           gap: 0,
           flexShrink: 0,
-          overflowX: 'auto',
+          overflowX: 'hidden',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
         }}
       >
         {STEPS.map((s, i) => (
