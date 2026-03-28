@@ -275,6 +275,31 @@ export function VMDetailPage() {
           >
             {cloneMutation.isPending ? 'Cloning...' : 'Clone'}
           </button>
+          <button
+            onClick={() => {
+              if (!namespace || !name) return
+              const snapName = `snap-${name}-${Date.now()}`
+              createSnapshot.mutate(
+                { namespace, vmName: name, snapshotName: snapName },
+                { onError: (err: unknown) => { setSnapshotError((err as { message?: string }).message ?? 'Snapshot failed') } },
+              )
+            }}
+            disabled={createSnapshot.isPending}
+            style={{
+              background: theme.main.card,
+              color: theme.text.primary,
+              border: `1px solid ${theme.main.inputBorder}`,
+              borderRadius: theme.radius.md,
+              padding: '6px 12px',
+              fontSize: 12,
+              cursor: createSnapshot.isPending ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+              opacity: createSnapshot.isPending ? 0.6 : 1,
+            }}
+          >
+            {createSnapshot.isPending ? 'Snapshotting...' : 'Snapshot'}
+          </button>
           {vm?.status === 'Running' && (
             <button
               onClick={() => {
