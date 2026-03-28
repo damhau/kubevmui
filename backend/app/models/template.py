@@ -18,7 +18,7 @@ class Template(ResourceMeta):
 
 class TemplateCreate(BaseModel):
     name: str
-    namespace: str
+    namespace: str = ""
     display_name: str
     description: str = ""
     category: str = "custom"

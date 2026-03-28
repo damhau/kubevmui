@@ -40,6 +40,8 @@ def create_template(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
+    if not body.namespace:
+        body.namespace = ns
     return svc.create_template(body)
 
 
