@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
+from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.network_profile import NetworkProfile, NetworkProfileCreate, NetworkProfileList
 from app.services.network_service import NetworkService
@@ -10,6 +11,43 @@ router = APIRouter(
     prefix="/api/v1/clusters/{cluster}/namespaces/{ns}",
     tags=["networks"],
 )
+
+cluster_router = APIRouter(
+    prefix="/api/v1/clusters/{cluster}",
+    tags=["networks"],
+)
+
+
+@cluster_router.get("/networks/all")
+def list_all_networks(
+    cluster: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    api_client = cm.get_api_client(cluster)
+    if api_client is None:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
+    kv = KubeVirtClient(api_client)
+    custom_api = kv.custom_api
+    result = custom_api.list_cluster_custom_object(
+        group="k8s.cni.cncf.io",
+        version="v1",
+        plural="network-attachment-definitions",
+    )
+    items = []
+    for nad in result.get("items", []):
+        metadata = nad.get("metadata", {})
+        ns = metadata.get("namespace", "")
+        name = metadata.get("name", "")
+        items.append({
+            "name": name,
+            "namespace": ns,
+            "full_name": f"{ns}/{name}" if ns else name,
+            "display_name": metadata.get("annotations", {}).get(
+                "kubevmui.io/display-name", name
+            ),
+        })
+    return {"items": items, "total": len(items)}
 
 
 def _get_service(cluster: str, cm: ClusterManager) -> NetworkService:

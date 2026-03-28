@@ -15,6 +15,17 @@ export function useNetworks() {
   })
 }
 
+export function useAllNetworks() {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['networks-all', activeCluster],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/clusters/${activeCluster}/networks/all`)
+      return data
+    },
+  })
+}
+
 export function useCreateNetwork() {
   const queryClient = useQueryClient()
   const { activeCluster, activeNamespace } = useUIStore()

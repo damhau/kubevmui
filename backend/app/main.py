@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import auth, dashboard, images, metrics, migrations, namespaces, networks, nodes, snapshots, ssh_keys, storage, templates, vms
+from app.api.routes.networks import cluster_router as networks_cluster_router
 from app.api.routes.storage import cluster_router as storage_cluster_router
 from app.core.cluster_manager import ClusterManager
 from app.core.config import settings
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     application.include_router(ssh_keys.router)
     application.include_router(vms.router)
     application.include_router(networks.router)
+    application.include_router(networks_cluster_router)
     application.include_router(storage.router)
     application.include_router(storage_cluster_router)
     application.include_router(templates.router)

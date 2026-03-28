@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useNetworks, useCreateNetwork } from '@/hooks/useNetworks'
+import { useNetworks, useCreateNetwork, useAllNetworks } from '@/hooks/useNetworks'
+import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -51,8 +52,13 @@ interface NetworkForm {
 
 export function NetworksPage() {
   const { data, isLoading } = useNetworks()
+  const { data: allNADsData, isLoading: allNADsLoading } = useAllNetworks()
+  const { activeNamespace } = useUIStore()
   const createNetwork = useCreateNetwork()
   const networks: NetworkProfile[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
+  const allNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
+    Array.isArray(allNADsData?.items) ? allNADsData.items : []
+  const clusterNADs = allNADs.filter((nad) => nad.namespace !== activeNamespace)
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<NetworkForm>({
@@ -135,20 +141,88 @@ export function NetworksPage() {
       />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        {/* Built-in Pod Network */}
         <div
           style={{
             background: theme.main.card,
             border: `1px solid ${theme.main.cardBorder}`,
             borderRadius: theme.radius.lg,
+            marginBottom: 20,
           }}
         >
+          <div
+            style={{
+              padding: '12px 16px',
+              borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: theme.text.secondary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              Built-in
+            </span>
+          </div>
+          <div
+            style={{
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>Pod Network</div>
+              <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2 }}>
+                Default Kubernetes pod network (masquerade interface)
+              </div>
+            </div>
+            <Badge label="Always Available" color={theme.status.running} />
+          </div>
+        </div>
+
+        {/* Current Namespace Profiles */}
+        <div
+          style={{
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: theme.radius.lg,
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              padding: '12px 16px',
+              borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: theme.text.secondary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              Current Namespace
+            </span>
+          </div>
           {isLoading ? (
             <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
               Loading network profiles...
             </div>
           ) : networks.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
-              No network profiles found.
+              No network profiles in current namespace.
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -208,6 +282,89 @@ export function NetworksPage() {
                     </td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace", fontSize: 13 }}>
                       {net.subnet ?? '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Cluster NADs (other namespaces) */}
+        <div
+          style={{
+            background: theme.main.card,
+            border: `1px solid ${theme.main.cardBorder}`,
+            borderRadius: theme.radius.lg,
+          }}
+        >
+          <div
+            style={{
+              padding: '12px 16px',
+              borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: theme.text.secondary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              Cluster NADs (Other Namespaces)
+            </span>
+          </div>
+          {allNADsLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
+              Loading cluster NADs...
+            </div>
+          ) : clusterNADs.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: theme.text.dim, fontSize: 13 }}>
+              No NADs found in other namespaces.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                  {['Name', 'Namespace', 'Full Reference'].map((col) => (
+                    <th
+                      key={col}
+                      style={{
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        color: theme.text.secondary,
+                        fontWeight: 600,
+                        fontSize: 11,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                      }}
+                    >
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {clusterNADs.map((nad) => (
+                  <tr
+                    key={nad.full_name}
+                    style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '10px 16px' }}>
+                      <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{nad.display_name}</div>
+                      {nad.display_name !== nad.name && (
+                        <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2 }}>{nad.name}</div>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <Badge label={nad.namespace} color={theme.accent} />
+                    </td>
+                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace", fontSize: 13 }}>
+                      {nad.full_name}
                     </td>
                   </tr>
                 ))}

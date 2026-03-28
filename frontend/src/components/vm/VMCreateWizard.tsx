@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useCreateVM } from '@/hooks/useVMs'
 import { useNamespaces } from '@/hooks/useNamespaces'
 import { useImages, useStorageClasses } from '@/hooks/useImages'
+import { useAllNetworks } from '@/hooks/useNetworks'
 import { useTemplates } from '@/hooks/useTemplates'
 import { theme } from '@/lib/theme'
 
@@ -37,7 +38,8 @@ interface Disk {
 
 interface NIC {
   name: string
-  network_profile: string
+  type: 'pod' | 'multus'
+  network_profile: string // "pod" for pod type, "namespace/name" for multus
 }
 
 interface FormData {
@@ -199,6 +201,9 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
     Array.isArray(imagesData?.items) ? imagesData.items : []
   const { data: templatesData } = useTemplates()
   const { data: storageClassData } = useStorageClasses()
+  const { data: allNetworksData } = useAllNetworks()
+  const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
+    Array.isArray(allNetworksData?.items) ? allNetworksData.items : []
   const templates: Array<any> = Array.isArray(templatesData?.items) ? templatesData.items : []
   const storageClasses: Array<{ name: string; is_default: boolean }> = Array.isArray(storageClassData?.items) ? storageClassData.items : []
   const [step, setStep] = useState(1)
@@ -218,7 +223,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
     memory: 4096,
     preset: 'Medium',
     disks: [],
-    nics: [{ name: 'default', network_profile: 'pod' }],
+    nics: [{ name: 'default', type: 'pod' as const, network_profile: 'pod' }],
     user_data: '',
     network_data: '',
     ssh_key: '',
@@ -256,6 +261,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
       })),
       nics: (tpl.networks || []).map((n: any) => ({
         name: n.name || 'default',
+        type: (n.network_profile === 'pod' ? 'pod' : 'multus') as 'pod' | 'multus',
         network_profile: n.network_profile || 'pod',
       })),
       user_data: tpl.cloud_init_user_data || '',
@@ -285,7 +291,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
 
   const addNIC = () =>
     updateForm({
-      nics: [...form.nics, { name: `nic${form.nics.length}`, network_profile: '' }],
+      nics: [...form.nics, { name: `nic${form.nics.length}`, type: 'multus' as const, network_profile: '' }],
     })
 
   const removeNIC = (i: number) =>
@@ -1099,17 +1105,34 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                     marginBottom: 12,
                   }}
                 >
+                  {/* NIC card header */}
                   <div
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center',
+                      alignItems: 'flex-start',
                       marginBottom: 14,
                     }}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 600, color: theme.text.primary }}>
-                      NIC {i + 1}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: theme.text.primary }}>
+                        NIC {i + 1}
+                      </span>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '1px 7px',
+                          borderRadius: 20,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          background: nic.type === 'pod' ? '#eff6ff' : '#f0fdf4',
+                          color: nic.type === 'pod' ? '#2563eb' : '#16a34a',
+                          border: `1px solid ${nic.type === 'pod' ? '#bfdbfe' : '#bbf7d0'}`,
+                        }}
+                      >
+                        {nic.type === 'pod' ? 'masquerade' : 'bridge'}
+                      </span>
+                    </div>
                     <button
                       onClick={() => removeNIC(i)}
                       style={{
@@ -1126,25 +1149,105 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                       Remove
                     </button>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <FieldGroup label="Name">
-                      <input
-                        type="text"
-                        value={nic.name}
-                        onChange={(e) => updateNIC(i, { name: e.target.value })}
-                        style={inputStyle()}
-                      />
-                    </FieldGroup>
-                    <FieldGroup label="Network Profile">
-                      <input
-                        type="text"
-                        value={nic.network_profile}
-                        onChange={(e) => updateNIC(i, { network_profile: e.target.value })}
-                        placeholder="e.g. default"
-                        style={inputStyle()}
-                      />
+
+                  {/* Type selector */}
+                  <div style={{ marginBottom: 14 }}>
+                    <FieldGroup label="Network Type">
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {(['pod', 'multus'] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() =>
+                              updateNIC(i, {
+                                type: t,
+                                network_profile: t === 'pod' ? 'pod' : '',
+                                name: t === 'pod' ? 'default' : nic.name,
+                              })
+                            }
+                            style={{
+                              padding: '6px 14px',
+                              fontSize: 13,
+                              fontFamily: 'inherit',
+                              borderRadius: theme.radius.md,
+                              cursor: 'pointer',
+                              background: nic.type === t ? theme.accentLight : theme.main.card,
+                              border:
+                                nic.type === t
+                                  ? `2px solid ${theme.accent}`
+                                  : `1px solid ${theme.main.cardBorder}`,
+                              color: nic.type === t ? theme.accent : theme.text.primary,
+                              fontWeight: nic.type === t ? 600 : 400,
+                              margin: nic.type === t ? 0 : 1,
+                            }}
+                          >
+                            {t === 'pod' ? 'Pod Network' : 'Multus'}
+                          </button>
+                        ))}
+                      </div>
                     </FieldGroup>
                   </div>
+
+                  {nic.type === 'pod' ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <FieldGroup label="Name">
+                        <input
+                          type="text"
+                          value={nic.name}
+                          onChange={(e) => updateNIC(i, { name: e.target.value })}
+                          style={inputStyle()}
+                        />
+                      </FieldGroup>
+                      <FieldGroup label="Interface Type">
+                        <div
+                          style={{
+                            ...inputStyle(),
+                            background: theme.main.tableHeaderBg,
+                            color: theme.text.secondary,
+                            cursor: 'default',
+                          }}
+                        >
+                          masquerade
+                        </div>
+                      </FieldGroup>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                      <FieldGroup label="Name">
+                        <input
+                          type="text"
+                          value={nic.name}
+                          onChange={(e) => updateNIC(i, { name: e.target.value })}
+                          style={inputStyle()}
+                        />
+                      </FieldGroup>
+                      <FieldGroup label="Network Attachment">
+                        <select
+                          value={nic.network_profile}
+                          onChange={(e) => updateNIC(i, { network_profile: e.target.value })}
+                          style={inputStyle()}
+                        >
+                          <option value="">Select NAD...</option>
+                          {availableNADs.map((nad) => (
+                            <option key={nad.full_name} value={nad.full_name}>
+                              {nad.display_name} ({nad.namespace})
+                            </option>
+                          ))}
+                        </select>
+                      </FieldGroup>
+                      <FieldGroup label="Interface Type">
+                        <div
+                          style={{
+                            ...inputStyle(),
+                            background: theme.main.tableHeaderBg,
+                            color: theme.text.secondary,
+                            cursor: 'default',
+                          }}
+                        >
+                          bridge
+                        </div>
+                      </FieldGroup>
+                    </div>
+                  )}
                 </div>
               ))}
               <button
@@ -1457,9 +1560,11 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                       <span style={{ fontSize: 13, color: theme.text.primary, marginRight: 2 }}>
                         {n.name}
                       </span>
-                      {n.network_profile && (
-                        <Badge label={n.network_profile} variant="info" />
+                      <Badge label={n.type === 'pod' ? 'pod' : 'multus'} variant={n.type === 'pod' ? 'info' : 'success'} />
+                      {n.type === 'multus' && n.network_profile && (
+                        <Badge label={n.network_profile} variant="neutral" />
                       )}
+                      <Badge label={n.type === 'pod' ? 'masquerade' : 'bridge'} variant="warning" />
                     </div>
                   ))}
                 </div>
