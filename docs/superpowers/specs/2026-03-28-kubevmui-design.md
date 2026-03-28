@@ -464,6 +464,25 @@ Storage is presented as "Disks" — operators think in terms of disk size and pe
 - Node labels and taints (relevant for VM scheduling)
 - Node detail: running VMs on this node, resource utilization charts
 
+### 5.13b Projects (Namespaces)
+
+Namespaces are presented as "Projects" — a scoping unit for VMs, templates, disks, and network profiles.
+
+- **Project list**: Name, VM count, resource usage vs quota, member count
+- **Create project**: Name, resource quotas (CPU, memory, storage, VM count), description
+- **Edit project quotas**: Adjust resource limits
+- **Project selector**: Global dropdown or sidebar filter to scope all views to a project
+- **Default project**: Configurable per-user default
+
+### 5.13c Services for VMs
+
+Expose VM ports via Kubernetes Services — presented as "VM Port Forwarding" in the UI.
+
+- **List services** attached to VMs with type (ClusterIP/NodePort/LoadBalancer), ports, external IP
+- **Create service for VM**: Select VM, port mappings (source → target), service type
+- **Edit / delete** services
+- **Quick action from VM detail**: "Expose port" button that creates the service inline
+
 ### 5.14 Monitoring & Observability
 
 Not just Prometheus graphs — operator-first observability that answers "why is this VM slow?" and "what changed yesterday?"
