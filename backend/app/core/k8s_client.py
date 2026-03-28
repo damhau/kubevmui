@@ -180,3 +180,52 @@ class KubeVirtClient:
             group=self.KUBEVIRT_API_GROUP, version=self.KUBEVIRT_API_VERSION,
             namespace=namespace, plural="virtualmachineinstancemigrations", name=name,
         )
+
+    # --- SSH Keys ---
+
+    def list_ssh_keys(self, namespace: str) -> list[dict]:
+        result = self.core_api.list_namespaced_secret(
+            namespace=namespace, label_selector="kubevmui.io/type=sshkey",
+        )
+        return [self._secret_to_dict(s) for s in result.items]
+
+    def get_ssh_key(self, namespace: str, name: str) -> dict | None:
+        try:
+            s = self.core_api.read_namespaced_secret(name=name, namespace=namespace)
+            return self._secret_to_dict(s)
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def create_ssh_key(self, namespace: str, name: str, public_key: str) -> dict:
+        import base64
+        secret = client.V1Secret(
+            metadata=client.V1ObjectMeta(
+                name=name, namespace=namespace,
+                labels={"kubevmui.io/type": "sshkey"},
+            ),
+            data={"key": base64.b64encode(public_key.encode()).decode()},
+            type="Opaque",
+        )
+        result = self.core_api.create_namespaced_secret(namespace=namespace, body=secret)
+        return self._secret_to_dict(result)
+
+    def delete_ssh_key(self, namespace: str, name: str) -> None:
+        self.core_api.delete_namespaced_secret(name=name, namespace=namespace)
+
+    @staticmethod
+    def _secret_to_dict(secret) -> dict:
+        import base64
+        data = secret.data or {}
+        public_key = ""
+        if "key" in data:
+            public_key = base64.b64decode(data["key"]).decode()
+        return {
+            "metadata": {
+                "name": secret.metadata.name,
+                "namespace": secret.metadata.namespace,
+                "creationTimestamp": secret.metadata.creation_timestamp.isoformat() if secret.metadata.creation_timestamp else None,
+            },
+            "public_key": public_key,
+        }

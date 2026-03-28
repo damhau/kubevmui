@@ -10,6 +10,7 @@ import { ConsolePage } from '@/pages/ConsolePage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
 import { NetworksPage } from '@/pages/NetworksPage'
 import { StoragePage } from '@/pages/StoragePage'
+import { SSHKeysPage } from '@/pages/SSHKeysPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +37,7 @@ function App() {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/networks" element={<NetworksPage />} />
             <Route path="/storage" element={<StoragePage />} />
+            <Route path="/ssh-keys" element={<SSHKeysPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

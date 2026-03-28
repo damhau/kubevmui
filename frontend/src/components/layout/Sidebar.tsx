@@ -6,6 +6,7 @@ import {
   Copy,
   Network,
   HardDrive,
+  KeyRound,
   ChevronDown,
   Check,
 } from 'lucide-react'
@@ -40,6 +41,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Networks', to: '/networks', icon: <Network size={16} /> },
       { label: 'Storage', to: '/storage', icon: <HardDrive size={16} /> },
+      { label: 'SSH Keys', to: '/ssh-keys', icon: <KeyRound size={16} /> },
     ],
   },
 ]
