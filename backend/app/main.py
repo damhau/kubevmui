@@ -1,28 +1,40 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes import auth
+from app.core.cluster_manager import ClusterManager
 from app.core.config import settings
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(
-        title=settings.app_name,
-        debug=settings.debug,
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.cluster_manager = ClusterManager(
+        kubeconfig_path=settings.kubeconfig_path,
+        in_cluster=settings.kubeconfig_path is None,
     )
+    yield
 
-    app.add_middleware(
+
+def create_app() -> FastAPI:
+    application = FastAPI(
+        title="kubevmui API", version="0.1.0",
+        description="KubeVirt virtualization control plane",
+        lifespan=lifespan,
+    )
+    application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
     )
 
-    @app.get("/api/v1/health")
-    async def health() -> dict[str, str]:
+    @application.get("/api/v1/health")
+    async def health():
         return {"status": "ok"}
 
-    return app
+    application.include_router(auth.router)
+    return application
 
 
 app = create_app()
