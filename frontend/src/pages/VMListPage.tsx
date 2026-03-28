@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
 import { theme } from '@/lib/theme'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { Modal } from '@/components/ui/Modal'
 import { VMCreateWizard } from '@/components/vm/VMCreateWizard'
 
 const statusColor: Record<string, string> = {
@@ -272,17 +272,17 @@ export function VMListPage() {
         </div>
       </div>
 
-      <SlideOver
+      <Modal
         open={showCreate}
         onClose={() => setShowCreate(false)}
         title="Create Virtual Machine"
-        width={540}
+        maxWidth={600}
       >
         <VMCreateWizard
           onClose={() => setShowCreate(false)}
           onSuccess={() => setShowCreate(false)}
         />
-      </SlideOver>
+      </Modal>
     </div>
   )
 }

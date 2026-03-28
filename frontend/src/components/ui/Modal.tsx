@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { theme } from '@/lib/theme'
 
 interface ModalProps {
@@ -11,7 +12,7 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, maxWidth = 480 }: ModalProps) {
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -81,6 +82,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 480 }: ModalP
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

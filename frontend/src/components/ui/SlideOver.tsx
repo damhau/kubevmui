@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { theme } from '@/lib/theme'
 
 interface SlideOverProps {
@@ -11,7 +12,7 @@ interface SlideOverProps {
 export function SlideOver({ open, onClose, title, children, width = 480 }: SlideOverProps) {
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -79,6 +80,7 @@ export function SlideOver({ open, onClose, title, children, width = 480 }: Slide
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
