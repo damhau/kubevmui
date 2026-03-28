@@ -174,7 +174,7 @@ export function TemplatesPage() {
   const { data, isLoading } = useTemplates()
   const createTemplate = useCreateTemplate()
   const deleteTemplate = useDeleteTemplate()
-  const templates: Template[] = Array.isArray(data) ? data : []
+  const templates: Template[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<TemplateForm>(defaultForm)

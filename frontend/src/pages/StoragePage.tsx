@@ -54,7 +54,7 @@ interface DiskForm {
 export function StoragePage() {
   const { data, isLoading } = useDisks()
   const createDisk = useCreateDisk()
-  const disks: Disk[] = Array.isArray(data) ? data : []
+  const disks: Disk[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<DiskForm>({

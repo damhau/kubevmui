@@ -52,7 +52,7 @@ interface NetworkForm {
 export function NetworksPage() {
   const { data, isLoading } = useNetworks()
   const createNetwork = useCreateNetwork()
-  const networks: NetworkProfile[] = Array.isArray(data) ? data : []
+  const networks: NetworkProfile[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<NetworkForm>({
