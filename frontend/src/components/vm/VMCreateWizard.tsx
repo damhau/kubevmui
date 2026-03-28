@@ -930,7 +930,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                                   style={inputStyle()}
                                 />
                               )}
-                            )}
+                            </div>
                           </FieldGroup>
                           <FieldGroup label="Bus">
                             <select
