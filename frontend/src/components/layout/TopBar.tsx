@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react'
+import { theme } from '@/lib/theme'
 
 interface TopBarProps {
   title: string
@@ -15,8 +16,8 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 24px',
-        background: '#ffffff',
-        borderBottom: '1px solid #e0e0e5',
+        background: theme.topBar.bg,
+        borderBottom: `1px solid ${theme.topBar.border}`,
         flexShrink: 0,
         gap: 16,
       }}
@@ -28,7 +29,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
             margin: 0,
             fontSize: 18,
             fontWeight: 600,
-            color: '#111113',
+            color: theme.text.heading,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -37,7 +38,7 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
           {title}
         </h1>
         {subtitle && (
-          <span style={{ fontSize: 12, color: '#8a8a8f', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 12, color: theme.text.dim, whiteSpace: 'nowrap' }}>
             {subtitle}
           </span>
         )}
@@ -51,22 +52,22 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            background: '#f0f0f3',
-            border: '1px solid #d0d0d5',
-            borderRadius: 6,
+            background: theme.topBar.searchBg,
+            border: `1px solid ${theme.topBar.searchBorder}`,
+            borderRadius: theme.radius.md,
             padding: '6px 12px',
             cursor: 'text',
           }}
         >
-          <Search size={14} style={{ color: '#8a8a8f', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: '#8a8a8f', userSelect: 'none', whiteSpace: 'nowrap' }}>
+          <Search size={14} style={{ color: theme.text.dim, flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: theme.text.dim, userSelect: 'none', whiteSpace: 'nowrap' }}>
             Search VMs...{' '}
             <kbd
               style={{
                 fontSize: 11,
-                color: '#8a8a8f',
-                background: '#ffffff',
-                border: '1px solid #d0d0d5',
+                color: theme.text.dim,
+                background: theme.main.card,
+                border: `1px solid ${theme.topBar.searchBorder}`,
                 borderRadius: 3,
                 padding: '0 4px',
                 fontFamily: 'inherit',
@@ -81,10 +82,10 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
         {action ?? (
           <button
             style={{
-              background: '#6366f1',
-              color: '#fff',
+              background: theme.button.primary,
+              color: theme.button.primaryText,
               border: 'none',
-              borderRadius: 6,
+              borderRadius: theme.radius.md,
               padding: '7px 14px',
               fontSize: 13,
               fontWeight: 500,

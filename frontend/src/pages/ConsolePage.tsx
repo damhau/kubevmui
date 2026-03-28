@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { theme } from '@/lib/theme'
 
 type ConsoleTab = 'vnc' | 'serial'
 
@@ -13,8 +14,8 @@ export function ConsolePage() {
       <div
         style={{
           padding: '14px 24px',
-          background: '#ffffff',
-          borderBottom: '1px solid #e0e0e5',
+          background: theme.console.headerBg,
+          borderBottom: `1px solid ${theme.console.headerBorder}`,
           display: 'flex',
           alignItems: 'center',
           gap: 16,
@@ -23,21 +24,21 @@ export function ConsolePage() {
       >
         <Link
           to={`/vms/${namespace}/${name}`}
-          style={{ color: '#6b6b73', textDecoration: 'none', fontSize: 13, flexShrink: 0 }}
+          style={{ color: theme.text.secondary, textDecoration: 'none', fontSize: 13, flexShrink: 0 }}
         >
           ← {name}
         </Link>
-        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#111113' }}>
+        <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: theme.text.heading }}>
           Console — {name}
         </h1>
         <span
           style={{
             marginLeft: 'auto',
             fontSize: 11,
-            color: '#6b6b73',
-            background: '#f0f0f3',
-            border: '1px solid #d0d0d5',
-            borderRadius: 4,
+            color: theme.text.secondary,
+            background: theme.main.bg,
+            border: `1px solid ${theme.main.inputBorder}`,
+            borderRadius: theme.radius.sm,
             padding: '3px 8px',
           }}
         >
@@ -49,8 +50,8 @@ export function ConsolePage() {
       <div
         style={{
           display: 'flex',
-          background: '#ffffff',
-          borderBottom: '1px solid #e0e0e5',
+          background: theme.console.headerBg,
+          borderBottom: `1px solid ${theme.console.headerBorder}`,
           padding: '0 24px',
           flexShrink: 0,
         }}
@@ -62,8 +63,8 @@ export function ConsolePage() {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === tab ? '2px solid #6366f1' : '2px solid transparent',
-              color: activeTab === tab ? '#1c1c1e' : '#6b6b73',
+              borderBottom: activeTab === tab ? `2px solid ${theme.accent}` : '2px solid transparent',
+              color: activeTab === tab ? theme.text.primary : theme.text.secondary,
               cursor: 'pointer',
               padding: '10px 16px',
               fontSize: 13,
@@ -84,9 +85,9 @@ export function ConsolePage() {
         <div
           style={{
             flex: 1,
-            background: '#000000',
-            border: '1px solid #3a3a3f',
-            borderRadius: 8,
+            background: theme.console.bg,
+            border: `1px solid ${theme.sidebar.border}`,
+            borderRadius: theme.radius.lg,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -100,9 +101,9 @@ export function ConsolePage() {
                 style={{
                   width: 56,
                   height: 56,
-                  background: '#1c1c1e',
-                  border: '1px solid #3a3a3f',
-                  borderRadius: 12,
+                  background: theme.login.bg,
+                  border: `1px solid ${theme.sidebar.border}`,
+                  borderRadius: theme.radius.xl,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -112,21 +113,21 @@ export function ConsolePage() {
               >
                 🖥
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: theme.sidebar.text, marginBottom: 8 }}>
                 VNC Console
               </div>
-              <div style={{ fontSize: 13, color: '#6b6b73' }}>
+              <div style={{ fontSize: 13, color: theme.sidebar.sectionLabel }}>
                 VNC Console — requires noVNC integration
               </div>
               <div
                 style={{
                   marginTop: 16,
                   padding: '6px 14px',
-                  background: '#1c1c1e',
-                  border: '1px solid #3a3a3f',
-                  borderRadius: 6,
+                  background: theme.login.bg,
+                  border: `1px solid ${theme.sidebar.border}`,
+                  borderRadius: theme.radius.md,
                   fontSize: 11,
-                  color: '#71717a',
+                  color: theme.sidebar.textDim,
                   display: 'inline-block',
                   fontFamily: 'monospace',
                 }}
@@ -140,9 +141,9 @@ export function ConsolePage() {
                 style={{
                   width: 56,
                   height: 56,
-                  background: '#1c1c1e',
-                  border: '1px solid #3a3a3f',
-                  borderRadius: 12,
+                  background: theme.login.bg,
+                  border: `1px solid ${theme.sidebar.border}`,
+                  borderRadius: theme.radius.xl,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -152,21 +153,21 @@ export function ConsolePage() {
               >
                 ⌨
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: theme.sidebar.text, marginBottom: 8 }}>
                 Serial Console
               </div>
-              <div style={{ fontSize: 13, color: '#6b6b73' }}>
+              <div style={{ fontSize: 13, color: theme.sidebar.sectionLabel }}>
                 Serial Console — requires xterm.js integration
               </div>
               <div
                 style={{
                   marginTop: 16,
                   padding: '6px 14px',
-                  background: '#1c1c1e',
-                  border: '1px solid #3a3a3f',
-                  borderRadius: 6,
+                  background: theme.login.bg,
+                  border: `1px solid ${theme.sidebar.border}`,
+                  borderRadius: theme.radius.md,
                   fontSize: 11,
-                  color: '#71717a',
+                  color: theme.sidebar.textDim,
                   display: 'inline-block',
                   fontFamily: 'monospace',
                 }}

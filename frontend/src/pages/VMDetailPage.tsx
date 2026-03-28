@@ -4,13 +4,14 @@ import { useQuery } from '@tanstack/react-query'
 import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
+import { theme } from '@/lib/theme'
 
 const statusColor: Record<string, string> = {
-  Running: '#22c55e',
-  Stopped: '#71717a',
-  Error: '#ef4444',
-  Migrating: '#f59e0b',
-  Provisioning: '#3b82f6',
+  Running: theme.status.running,
+  Stopped: theme.status.stopped,
+  Error: theme.status.error,
+  Migrating: theme.status.migrating,
+  Provisioning: theme.status.provisioning,
 }
 
 type Tab = 'overview' | 'events' | 'yaml'
@@ -22,12 +23,12 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
         display: 'flex',
         alignItems: 'flex-start',
         padding: '10px 0',
-        borderBottom: '1px solid #e8e8ec',
+        borderBottom: `1px solid ${theme.main.tableRowBorder}`,
         gap: 16,
       }}
     >
-      <span style={{ minWidth: 160, fontSize: 12, color: '#6b6b73', fontWeight: 500, flexShrink: 0 }}>{label}</span>
-      <span style={{ fontSize: 13, color: '#1c1c1e' }}>{value ?? '—'}</span>
+      <span style={{ minWidth: 160, fontSize: 12, color: theme.text.secondary, fontWeight: 500, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 13, color: theme.text.primary }}>{value ?? '—'}</span>
     </div>
   )
 }
@@ -79,8 +80,8 @@ export function VMDetailPage() {
       <div
         style={{
           padding: '16px 24px',
-          background: '#ffffff',
-          borderBottom: '1px solid #e0e0e5',
+          background: theme.main.card,
+          borderBottom: `1px solid ${theme.main.cardBorder}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -92,7 +93,7 @@ export function VMDetailPage() {
           <Link
             to="/vms"
             style={{
-              color: '#6b6b73',
+              color: theme.text.secondary,
               textDecoration: 'none',
               fontSize: 13,
               display: 'flex',
@@ -108,7 +109,7 @@ export function VMDetailPage() {
               margin: 0,
               fontSize: 18,
               fontWeight: 600,
-              color: '#111113',
+              color: theme.text.heading,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -123,7 +124,7 @@ export function VMDetailPage() {
                 alignItems: 'center',
                 gap: 6,
                 fontSize: 12,
-                color: statusColor[vm.status] ?? '#6b6b73',
+                color: statusColor[vm.status] ?? theme.text.secondary,
                 flexShrink: 0,
               }}
             >
@@ -132,7 +133,7 @@ export function VMDetailPage() {
                   width: 8,
                   height: 8,
                   borderRadius: '50%',
-                  background: statusColor[vm.status] ?? '#6b6b73',
+                  background: statusColor[vm.status] ?? theme.text.secondary,
                 }}
               />
               {vm.status}
@@ -152,10 +153,10 @@ export function VMDetailPage() {
               key={btn.action}
               onClick={() => handleAction(btn.action)}
               style={{
-                background: btn.danger ? 'rgba(239,68,68,0.08)' : '#ffffff',
-                color: btn.danger ? '#ef4444' : '#1c1c1e',
-                border: `1px solid ${btn.danger ? 'rgba(239,68,68,0.3)' : '#d0d0d5'}`,
-                borderRadius: 6,
+                background: btn.danger ? 'rgba(239,68,68,0.08)' : theme.main.card,
+                color: btn.danger ? theme.status.error : theme.text.primary,
+                border: `1px solid ${btn.danger ? 'rgba(239,68,68,0.3)' : theme.main.inputBorder}`,
+                borderRadius: theme.radius.md,
                 padding: '6px 12px',
                 fontSize: 12,
                 cursor: 'pointer',
@@ -174,8 +175,8 @@ export function VMDetailPage() {
         style={{
           display: 'flex',
           gap: 0,
-          background: '#ffffff',
-          borderBottom: '1px solid #e0e0e5',
+          background: theme.main.card,
+          borderBottom: `1px solid ${theme.main.cardBorder}`,
           padding: '0 24px',
           flexShrink: 0,
         }}
@@ -187,8 +188,8 @@ export function VMDetailPage() {
             style={{
               background: 'transparent',
               border: 'none',
-              borderBottom: activeTab === tab.id ? '2px solid #6366f1' : '2px solid transparent',
-              color: activeTab === tab.id ? '#1c1c1e' : '#6b6b73',
+              borderBottom: activeTab === tab.id ? `2px solid ${theme.accent}` : '2px solid transparent',
+              color: activeTab === tab.id ? theme.text.primary : theme.text.secondary,
               cursor: 'pointer',
               padding: '10px 16px',
               fontSize: 13,
@@ -206,24 +207,24 @@ export function VMDetailPage() {
       {/* Tab content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         {isLoading ? (
-          <div style={{ color: '#6b6b73', fontSize: 13 }}>Loading VM details...</div>
+          <div style={{ color: theme.text.secondary, fontSize: 13 }}>Loading VM details...</div>
         ) : !vm ? (
-          <div style={{ color: '#6b6b73', fontSize: 13 }}>VM not found.</div>
+          <div style={{ color: theme.text.secondary, fontSize: 13 }}>VM not found.</div>
         ) : (
           <>
             {/* Overview */}
             {activeTab === 'overview' && (
               <div
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e0e0e5',
-                  borderRadius: 8,
+                  background: theme.main.card,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  borderRadius: theme.radius.lg,
                   padding: '4px 20px',
                 }}
               >
                 <InfoRow label="Namespace" value={namespace} />
                 <InfoRow label="Status" value={
-                  <span style={{ color: statusColor[vm.status] ?? '#6b6b73' }}>{vm.status}</span>
+                  <span style={{ color: statusColor[vm.status] ?? theme.text.secondary }}>{vm.status}</span>
                 } />
                 <InfoRow label="CPU Cores" value={`${vm.cpu ?? '—'} vCPU`} />
                 <InfoRow label="Memory" value={vm.memory} />
@@ -245,12 +246,12 @@ export function VMDetailPage() {
                           <span
                             key={k}
                             style={{
-                              background: '#f0f0f3',
-                              border: '1px solid #d0d0d5',
-                              borderRadius: 4,
+                              background: theme.main.bg,
+                              border: `1px solid ${theme.main.inputBorder}`,
+                              borderRadius: theme.radius.sm,
                               padding: '2px 7px',
                               fontSize: 11,
-                              color: '#6b6b73',
+                              color: theme.text.secondary,
                               fontFamily: 'monospace',
                             }}
                           >
@@ -268,22 +269,22 @@ export function VMDetailPage() {
             {activeTab === 'events' && (
               <div
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e0e0e5',
-                  borderRadius: 8,
+                  background: theme.main.card,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  borderRadius: theme.radius.lg,
                 }}
               >
                 {vm.events?.length ? (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: '#f7f7f9', borderBottom: '1px solid #e8e8ec' }}>
+                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
                         {['Time', 'Type', 'Reason', 'Message'].map((col) => (
                           <th
                             key={col}
                             style={{
                               padding: '10px 16px',
                               textAlign: 'left',
-                              color: '#6b6b73',
+                              color: theme.text.secondary,
                               fontWeight: 500,
                               fontSize: 11,
                               textTransform: 'uppercase',
@@ -297,14 +298,14 @@ export function VMDetailPage() {
                     </thead>
                     <tbody>
                       {vm.events.map((evt: { timestamp: string; type: string; reason: string; message: string }, i: number) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #e8e8ec' }}>
-                          <td style={{ padding: '10px 16px', color: '#6b6b73', fontSize: 12, whiteSpace: 'nowrap' }}>
+                        <tr key={i} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                          <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
                             {evt.timestamp}
                           </td>
                           <td style={{ padding: '10px 16px' }}>
                             <span
                               style={{
-                                color: evt.type === 'Warning' ? '#f59e0b' : '#22c55e',
+                                color: evt.type === 'Warning' ? theme.status.migrating : theme.status.running,
                                 fontSize: 12,
                                 fontWeight: 500,
                               }}
@@ -312,14 +313,14 @@ export function VMDetailPage() {
                               {evt.type}
                             </span>
                           </td>
-                          <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{evt.reason}</td>
-                          <td style={{ padding: '10px 16px', color: '#1c1c1e' }}>{evt.message}</td>
+                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{evt.reason}</td>
+                          <td style={{ padding: '10px 16px', color: theme.text.primary }}>{evt.message}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: 40, textAlign: 'center', color: '#6b6b73', fontSize: 13 }}>
+                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
                     No events found for this VM.
                   </div>
                 )}
@@ -330,13 +331,13 @@ export function VMDetailPage() {
             {activeTab === 'yaml' && (
               <pre
                 style={{
-                  background: '#ffffff',
-                  border: '1px solid #e0e0e5',
-                  borderRadius: 8,
+                  background: theme.main.card,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  borderRadius: theme.radius.lg,
                   padding: 20,
                   fontSize: 12,
                   fontFamily: 'monospace',
-                  color: '#1c1c1e',
+                  color: theme.text.primary,
                   overflow: 'auto',
                   margin: 0,
                   lineHeight: 1.6,

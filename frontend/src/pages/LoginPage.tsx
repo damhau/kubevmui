@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { theme } from '@/lib/theme'
 
 export function LoginPage() {
   const [token, setToken] = useState('')
@@ -34,7 +35,7 @@ export function LoginPage() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#1c1c1e',
+        background: theme.login.bg,
         padding: 24,
       }}
     >
@@ -42,9 +43,9 @@ export function LoginPage() {
         style={{
           width: '100%',
           maxWidth: 420,
-          background: '#2a2a2e',
-          border: '1px solid #3a3a3f',
-          borderRadius: 12,
+          background: theme.login.card,
+          border: `1px solid ${theme.login.cardBorder}`,
+          borderRadius: theme.radius.xl,
           padding: 40,
         }}
       >
@@ -54,7 +55,7 @@ export function LoginPage() {
             style={{
               width: 48,
               height: 48,
-              borderRadius: 12,
+              borderRadius: theme.radius.xl,
               background: 'linear-gradient(135deg, #6366f1, #818cf8)',
               display: 'flex',
               alignItems: 'center',
@@ -73,7 +74,7 @@ export function LoginPage() {
             style={{
               fontSize: 22,
               fontWeight: 700,
-              color: '#f0f0f0',
+              color: theme.login.text,
               letterSpacing: '-0.02em',
             }}
           >
@@ -86,7 +87,7 @@ export function LoginPage() {
             margin: '0 0 24px',
             fontSize: 16,
             fontWeight: 600,
-            color: '#f0f0f0',
+            color: theme.login.text,
             textAlign: 'center',
           }}
         >
@@ -99,7 +100,7 @@ export function LoginPage() {
               style={{
                 display: 'block',
                 fontSize: 12,
-                color: '#a1a1aa',
+                color: theme.login.textMuted,
                 marginBottom: 6,
                 fontWeight: 500,
               }}
@@ -113,10 +114,10 @@ export function LoginPage() {
               rows={5}
               style={{
                 width: '100%',
-                background: '#2e2e33',
-                border: '1px solid #3a3a3f',
-                borderRadius: 6,
-                color: '#e4e4e7',
+                background: theme.login.inputBg,
+                border: `1px solid ${theme.login.inputBorder}`,
+                borderRadius: theme.radius.md,
+                color: theme.login.text,
                 fontSize: 13,
                 padding: '10px 12px',
                 fontFamily: 'monospace',
@@ -134,8 +135,8 @@ export function LoginPage() {
                 padding: '10px 12px',
                 background: 'rgba(239,68,68,0.1)',
                 border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: 6,
-                color: '#ef4444',
+                borderRadius: theme.radius.md,
+                color: theme.status.error,
                 fontSize: 13,
               }}
             >
@@ -148,10 +149,10 @@ export function LoginPage() {
             disabled={loading}
             style={{
               width: '100%',
-              background: loading ? '#4f46e5' : '#6366f1',
-              color: '#fff',
+              background: loading ? '#4f46e5' : theme.accent,
+              color: theme.button.primaryText,
               border: 'none',
-              borderRadius: 6,
+              borderRadius: theme.radius.md,
               padding: '10px 14px',
               fontSize: 14,
               fontWeight: 600,

@@ -1,22 +1,23 @@
 import { TopBar } from '@/components/layout/TopBar'
 import { useDashboard } from '@/hooks/useVMs'
 import { useNavigate } from 'react-router-dom'
+import { theme } from '@/lib/theme'
 
 const statusColor: Record<string, string> = {
-  Running: '#22c55e',
-  Stopped: '#71717a',
-  Error: '#ef4444',
-  Migrating: '#f59e0b',
-  Provisioning: '#3b82f6',
+  Running: theme.status.running,
+  Stopped: theme.status.stopped,
+  Error: theme.status.error,
+  Migrating: theme.status.migrating,
+  Provisioning: theme.status.provisioning,
 }
 
 function StatCard({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
   return (
     <div
       style={{
-        background: '#ffffff',
-        border: '1px solid #e0e0e5',
-        borderRadius: 8,
+        background: theme.main.card,
+        border: `1px solid ${theme.main.cardBorder}`,
+        borderRadius: theme.radius.lg,
         padding: 16,
         flex: 1,
         minWidth: 0,
@@ -27,7 +28,7 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
           fontSize: 11,
           textTransform: 'uppercase',
           letterSpacing: '0.08em',
-          color: '#6b6b73',
+          color: theme.text.secondary,
           fontWeight: 600,
           marginBottom: 8,
         }}
@@ -38,7 +39,7 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
         style={{
           fontSize: 28,
           fontWeight: 700,
-          color: accent ?? '#111113',
+          color: accent ?? theme.text.heading,
           lineHeight: 1,
         }}
       >
@@ -71,32 +72,32 @@ export function DashboardPage() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
         {isLoading ? (
-          <div style={{ color: '#6b6b73', fontSize: 13 }}>Loading dashboard data...</div>
+          <div style={{ color: theme.text.secondary, fontSize: 13 }}>Loading dashboard data...</div>
         ) : (
           <>
             {/* Stat cards */}
             <div style={{ display: 'flex', gap: 16, marginBottom: 28 }}>
               <StatCard label="Total VMs" value={stats.total} />
-              <StatCard label="Running VMs" value={stats.running} accent="#22c55e" />
-              <StatCard label="Stopped VMs" value={stats.stopped} accent="#6b6b73" />
-              <StatCard label="Nodes" value={stats.nodes} accent="#6366f1" />
+              <StatCard label="Running VMs" value={stats.running} accent={theme.status.running} />
+              <StatCard label="Stopped VMs" value={stats.stopped} accent={theme.text.secondary} />
+              <StatCard label="Nodes" value={stats.nodes} accent={theme.accent} />
             </div>
 
             {/* Recent VMs */}
             <div
               style={{
-                background: '#ffffff',
-                border: '1px solid #e0e0e5',
-                borderRadius: 8,
+                background: theme.main.card,
+                border: `1px solid ${theme.main.cardBorder}`,
+                borderRadius: theme.radius.lg,
               }}
             >
               <div
                 style={{
                   padding: '14px 16px',
-                  borderBottom: '1px solid #e0e0e5',
+                  borderBottom: `1px solid ${theme.main.cardBorder}`,
                   fontSize: 13,
                   fontWeight: 600,
-                  color: '#111113',
+                  color: theme.text.heading,
                 }}
               >
                 Recent Virtual Machines
@@ -107,7 +108,7 @@ export function DashboardPage() {
                   style={{
                     padding: 40,
                     textAlign: 'center',
-                    color: '#6b6b73',
+                    color: theme.text.secondary,
                     fontSize: 13,
                   }}
                 >
@@ -122,14 +123,14 @@ export function DashboardPage() {
                   }}
                 >
                   <thead>
-                    <tr style={{ background: '#f7f7f9', borderBottom: '1px solid #e8e8ec' }}>
+                    <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
                       {['Name', 'Namespace', 'Status', 'CPU', 'Memory', 'Node'].map((col) => (
                         <th
                           key={col}
                           style={{
                             padding: '10px 16px',
                             textAlign: 'left',
-                            color: '#6b6b73',
+                            color: theme.text.secondary,
                             fontWeight: 500,
                             fontSize: 11,
                             textTransform: 'uppercase',
@@ -147,14 +148,14 @@ export function DashboardPage() {
                         key={`${vm.namespace}/${vm.name}`}
                         onClick={() => navigate(`/vms/${vm.namespace}/${vm.name}`)}
                         style={{
-                          borderBottom: '1px solid #e8e8ec',
+                          borderBottom: `1px solid ${theme.main.tableRowBorder}`,
                           cursor: 'pointer',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f7f7f9')}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
                         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       >
-                        <td style={{ padding: '10px 16px', color: '#1c1c1e', fontWeight: 500 }}>{vm.name}</td>
-                        <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.namespace}</td>
+                        <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>{vm.name}</td>
+                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.namespace}</td>
                         <td style={{ padding: '10px 16px' }}>
                           <span
                             style={{
@@ -162,7 +163,7 @@ export function DashboardPage() {
                               alignItems: 'center',
                               gap: 6,
                               fontSize: 12,
-                              color: statusColor[vm.status] ?? '#6b6b73',
+                              color: statusColor[vm.status] ?? theme.text.secondary,
                             }}
                           >
                             <span
@@ -170,16 +171,16 @@ export function DashboardPage() {
                                 width: 8,
                                 height: 8,
                                 borderRadius: '50%',
-                                background: statusColor[vm.status] ?? '#6b6b73',
+                                background: statusColor[vm.status] ?? theme.text.secondary,
                                 flexShrink: 0,
                               }}
                             />
                             {vm.status}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.cpu}</td>
-                        <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.memory}</td>
-                        <td style={{ padding: '10px 16px', color: '#6b6b73' }}>{vm.node ?? '—'}</td>
+                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.cpu}</td>
+                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.memory}</td>
+                        <td style={{ padding: '10px 16px', color: theme.text.secondary }}>{vm.node ?? '—'}</td>
                       </tr>
                     ))}
                   </tbody>

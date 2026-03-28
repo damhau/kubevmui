@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { theme } from '@/lib/theme'
 
 export function AppShell() {
   return (
@@ -8,7 +9,7 @@ export function AppShell() {
         display: 'flex',
         height: '100vh',
         overflow: 'hidden',
-        background: '#1c1c1e',
+        background: theme.login.bg,
       }}
     >
       <Sidebar />
@@ -16,8 +17,8 @@ export function AppShell() {
         style={{
           flex: 1,
           overflowY: 'auto',
-          background: '#f0f0f3',
-          color: '#1c1c1e',
+          background: theme.main.bg,
+          color: theme.text.primary,
         }}
       >
         <Outlet />

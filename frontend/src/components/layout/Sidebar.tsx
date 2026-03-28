@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useUIStore } from '@/stores/ui-store'
 import { useNamespaces } from '@/hooks/useNamespaces'
+import { theme } from '@/lib/theme'
 
 const VERSION = 'v0.1.0'
 
@@ -60,8 +61,8 @@ export function Sidebar() {
       style={{
         width: 240,
         minWidth: 240,
-        background: '#2a2a2e',
-        borderRight: '1px solid #3a3a3f',
+        background: theme.sidebar.bg,
+        borderRight: `1px solid ${theme.sidebar.border}`,
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
@@ -69,7 +70,7 @@ export function Sidebar() {
       }}
     >
       {/* Logo */}
-      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #3a3a3f' }}>
+      <div style={{ padding: '20px 16px 16px', borderBottom: `1px solid ${theme.sidebar.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {/* Icon */}
           <div
@@ -91,17 +92,17 @@ export function Sidebar() {
               <rect x="9" y="9" width="5" height="4" rx="1" fill="white" fillOpacity="0.9" />
             </svg>
           </div>
-          <span style={{ color: '#f0f0f0', fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
+          <span style={{ color: theme.sidebar.text, fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
             kubevmui
           </span>
           <span
             style={{
               marginLeft: 'auto',
               fontSize: 10,
-              color: '#6366f1',
-              background: 'rgba(99,102,241,0.12)',
-              border: '1px solid rgba(99,102,241,0.25)',
-              borderRadius: 4,
+              color: theme.accent,
+              background: theme.accentLight,
+              border: `1px solid rgba(99,102,241,0.25)`,
+              borderRadius: theme.radius.sm,
               padding: '1px 5px',
               fontWeight: 500,
               letterSpacing: '0.02em',
@@ -115,7 +116,7 @@ export function Sidebar() {
       {/* Namespace selector */}
       <div style={{ padding: '12px 12px 0' }}>
         <div
-          style={{ marginBottom: 4, fontSize: 10, color: '#6b6b73', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}
+          style={{ marginBottom: 4, fontSize: 10, color: theme.sidebar.sectionLabel, textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: 4 }}
         >
           Namespace
         </div>
@@ -127,10 +128,10 @@ export function Sidebar() {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '7px 10px',
-            background: '#2e2e33',
-            border: '1px solid #3a3a3f',
-            borderRadius: 6,
-            color: '#e4e4e7',
+            background: theme.sidebar.bgHover,
+            border: `1px solid ${theme.sidebar.border}`,
+            borderRadius: theme.radius.md,
+            color: theme.sidebar.text,
             fontSize: 13,
             cursor: 'pointer',
             fontFamily: 'inherit',
@@ -142,7 +143,7 @@ export function Sidebar() {
           <ChevronDown
             size={14}
             style={{
-              color: '#71717a',
+              color: theme.sidebar.textDim,
               flexShrink: 0,
               transition: 'transform 0.15s',
               transform: nsOpen ? 'rotate(180deg)' : 'none',
@@ -154,9 +155,9 @@ export function Sidebar() {
           <div
             style={{
               marginTop: 4,
-              background: '#2e2e33',
-              border: '1px solid #3a3a3f',
-              borderRadius: 6,
+              background: theme.sidebar.bgHover,
+              border: `1px solid ${theme.sidebar.border}`,
+              borderRadius: theme.radius.md,
               overflow: 'hidden',
             }}
           >
@@ -173,9 +174,9 @@ export function Sidebar() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '7px 10px',
-                  background: ns === activeNamespace ? 'rgba(99,102,241,0.1)' : 'transparent',
+                  background: ns === activeNamespace ? theme.accentLight : 'transparent',
                   border: 'none',
-                  color: ns === activeNamespace ? '#818cf8' : '#a1a1aa',
+                  color: ns === activeNamespace ? '#818cf8' : theme.sidebar.textMuted,
                   fontSize: 13,
                   cursor: 'pointer',
                   textAlign: 'left',
@@ -183,7 +184,7 @@ export function Sidebar() {
                 }}
               >
                 {ns}
-                {ns === activeNamespace && <Check size={13} style={{ color: '#6366f1' }} />}
+                {ns === activeNamespace && <Check size={13} style={{ color: theme.accent }} />}
               </button>
             ))}
           </div>
@@ -198,7 +199,7 @@ export function Sidebar() {
               style={{
                 padding: '6px 16px 4px',
                 fontSize: 10,
-                color: '#6b6b73',
+                color: theme.sidebar.sectionLabel,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 fontWeight: 600,
@@ -219,11 +220,9 @@ export function Sidebar() {
                   textDecoration: 'none',
                   fontSize: 13,
                   fontWeight: isActive ? 500 : 400,
-                  color: isActive ? '#e4e4e7' : '#a1a1aa',
-                  background: isActive
-                    ? 'linear-gradient(90deg, rgba(99,102,241,0.12) 0%, rgba(99,102,241,0.04) 100%)'
-                    : 'transparent',
-                  borderLeft: isActive ? '2px solid #6366f1' : '2px solid transparent',
+                  color: isActive ? theme.sidebar.text : theme.sidebar.textMuted,
+                  background: isActive ? theme.sidebar.activeBg : 'transparent',
+                  borderLeft: isActive ? `2px solid ${theme.sidebar.activeBorder}` : '2px solid transparent',
                   transition: 'background 0.12s, color 0.12s',
                 })}
               >
@@ -239,7 +238,7 @@ export function Sidebar() {
       <div
         style={{
           padding: '12px 16px',
-          borderTop: '1px solid #3a3a3f',
+          borderTop: `1px solid ${theme.sidebar.border}`,
           display: 'flex',
           alignItems: 'center',
           gap: 10,
@@ -266,7 +265,7 @@ export function Sidebar() {
           <div
             style={{
               fontSize: 13,
-              color: '#e4e4e7',
+              color: theme.sidebar.text,
               fontWeight: 500,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -278,7 +277,7 @@ export function Sidebar() {
           <div
             style={{
               fontSize: 11,
-              color: '#71717a',
+              color: theme.sidebar.textDim,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
