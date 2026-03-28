@@ -4,7 +4,7 @@ from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
 from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
-from app.models.vm import VM, VMCreate, VMList
+from app.models.vm import VM, VMCreate, VMList, AddVolumeRequest, AddInterfaceRequest
 from app.services.vm_service import VMService
 
 router = APIRouter(
@@ -90,3 +90,59 @@ def vm_action(
     svc = _get_service(cluster, cm)
     svc.vm_action(ns, name, action)
     return {"status": "ok", "action": action}
+
+
+@router.post("/vms/{name}/volumes", status_code=200)
+def add_volume(
+    cluster: str,
+    ns: str,
+    name: str,
+    body: AddVolumeRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.add_volume(ns, name, body.name, body.pvc_name, body.bus)
+    return {"status": "ok"}
+
+
+@router.delete("/vms/{name}/volumes/{vol_name}", status_code=200)
+def remove_volume(
+    cluster: str,
+    ns: str,
+    name: str,
+    vol_name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.remove_volume(ns, name, vol_name)
+    return {"status": "ok"}
+
+
+@router.post("/vms/{name}/interfaces", status_code=200)
+def add_interface(
+    cluster: str,
+    ns: str,
+    name: str,
+    body: AddInterfaceRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.add_interface(ns, name, body.name, body.network_attachment_definition)
+    return {"status": "ok"}
+
+
+@router.delete("/vms/{name}/interfaces/{iface_name}", status_code=200)
+def remove_interface(
+    cluster: str,
+    ns: str,
+    name: str,
+    iface_name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.remove_interface(ns, name, iface_name)
+    return {"status": "ok"}

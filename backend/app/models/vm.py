@@ -51,6 +51,21 @@ class VMCreate(BaseModel):
     ssh_key_names: list[str] = []
     template_name: str | None = None
 
+class AddVolumeRequest(BaseModel):
+    name: str
+    pvc_name: str
+    bus: str = "scsi"
+
+class RemoveVolumeRequest(BaseModel):
+    name: str
+
+class AddInterfaceRequest(BaseModel):
+    name: str
+    network_attachment_definition: str
+
+class RemoveInterfaceRequest(BaseModel):
+    name: str
+
 class VMList(BaseModel):
     items: list[VM]
     total: int

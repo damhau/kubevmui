@@ -60,6 +60,48 @@ class KubeVirtClient:
             _return_http_data_only=True,
         )
 
+    # --- Hotplug ---
+
+    def add_volume(self, namespace: str, vm_name: str, body: dict) -> None:
+        resource_path = (
+            f"/apis/{self.SUBRESOURCE_API_GROUP}/{self.KUBEVIRT_API_VERSION}"
+            f"/namespaces/{namespace}/virtualmachines/{vm_name}/addvolume"
+        )
+        self.api_client.call_api(
+            resource_path, "PUT", body=body, response_type="object",
+            _return_http_data_only=True,
+        )
+
+    def remove_volume(self, namespace: str, vm_name: str, body: dict) -> None:
+        resource_path = (
+            f"/apis/{self.SUBRESOURCE_API_GROUP}/{self.KUBEVIRT_API_VERSION}"
+            f"/namespaces/{namespace}/virtualmachines/{vm_name}/removevolume"
+        )
+        self.api_client.call_api(
+            resource_path, "PUT", body=body, response_type="object",
+            _return_http_data_only=True,
+        )
+
+    def add_interface(self, namespace: str, vm_name: str, body: dict) -> None:
+        resource_path = (
+            f"/apis/{self.SUBRESOURCE_API_GROUP}/{self.KUBEVIRT_API_VERSION}"
+            f"/namespaces/{namespace}/virtualmachines/{vm_name}/addinterface"
+        )
+        self.api_client.call_api(
+            resource_path, "PUT", body=body, response_type="object",
+            _return_http_data_only=True,
+        )
+
+    def remove_interface(self, namespace: str, vm_name: str, body: dict) -> None:
+        resource_path = (
+            f"/apis/{self.SUBRESOURCE_API_GROUP}/{self.KUBEVIRT_API_VERSION}"
+            f"/namespaces/{namespace}/virtualmachines/{vm_name}/removeinterface"
+        )
+        self.api_client.call_api(
+            resource_path, "PUT", body=body, response_type="object",
+            _return_http_data_only=True,
+        )
+
     def get_vmi(self, namespace: str, name: str) -> dict | None:
         try:
             return self.custom_api.get_namespaced_custom_object(

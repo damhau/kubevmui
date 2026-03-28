@@ -296,3 +296,24 @@ class VMService:
 
     def vm_action(self, namespace: str, name: str, action: str) -> None:
         self.kv.vm_action(namespace, name, action)
+
+    def add_volume(self, namespace: str, vm_name: str, name: str, pvc_name: str, bus: str = "scsi") -> None:
+        body = {
+            "name": name,
+            "disk": {"disk": {"bus": bus}, "name": name},
+            "volumeSource": {"persistentVolumeClaim": {"claimName": pvc_name, "hotpluggable": True}},
+        }
+        self.kv.add_volume(namespace, vm_name, body)
+
+    def remove_volume(self, namespace: str, vm_name: str, name: str) -> None:
+        self.kv.remove_volume(namespace, vm_name, {"name": name})
+
+    def add_interface(self, namespace: str, vm_name: str, name: str, nad_name: str) -> None:
+        body = {
+            "name": name,
+            "networkAttachmentDefinitionName": nad_name,
+        }
+        self.kv.add_interface(namespace, vm_name, body)
+
+    def remove_interface(self, namespace: str, vm_name: str, name: str) -> None:
+        self.kv.remove_interface(namespace, vm_name, {"name": name})
