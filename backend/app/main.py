@@ -3,9 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth
+from app.api.routes import auth, dashboard, namespaces, networks, storage, templates, vms
 from app.core.cluster_manager import ClusterManager
 from app.core.config import settings
+from app.ws import serial_proxy, vnc_proxy
 
 
 @asynccontextmanager
@@ -34,6 +35,14 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     application.include_router(auth.router)
+    application.include_router(vms.router)
+    application.include_router(networks.router)
+    application.include_router(storage.router)
+    application.include_router(templates.router)
+    application.include_router(dashboard.router)
+    application.include_router(namespaces.router)
+    application.include_router(vnc_proxy.router)
+    application.include_router(serial_proxy.router)
     return application
 
 
