@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useNetworks } from '@/hooks/useNetworks'
+import { useNetworks, useCreateNetwork } from '@/hooks/useNetworks'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -51,6 +51,7 @@ interface NetworkForm {
 
 export function NetworksPage() {
   const { data, isLoading } = useNetworks()
+  const createNetwork = useCreateNetwork()
   const networks: NetworkProfile[] = Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<NetworkForm>({
@@ -94,7 +95,7 @@ export function NetworksPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: wire up mutation
+    createNetwork.mutate(form)
     setShowCreate(false)
     setForm({ display_name: '', name: '', type: 'bridge', vlan_id: '', dhcp: true, subnet: '', gateway: '' })
   }

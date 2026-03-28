@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useDisks } from '@/hooks/useDisks'
+import { useDisks, useCreateDisk } from '@/hooks/useDisks'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -53,6 +53,7 @@ interface DiskForm {
 
 export function StoragePage() {
   const { data, isLoading } = useDisks()
+  const createDisk = useCreateDisk()
   const disks: Disk[] = Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<DiskForm>({
@@ -84,7 +85,7 @@ export function StoragePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: wire up mutation
+    createDisk.mutate(form)
     setShowCreate(false)
     setForm({ name: '', size_gb: 20, performance_tier: '' })
   }

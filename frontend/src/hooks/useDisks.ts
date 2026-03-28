@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 
@@ -11,6 +11,23 @@ export function useDisks() {
         `/clusters/${activeCluster}/namespaces/${activeNamespace}/disks`
       )
       return data
+    },
+  })
+}
+
+export function useCreateDisk() {
+  const queryClient = useQueryClient()
+  const { activeCluster, activeNamespace } = useUIStore()
+  return useMutation({
+    mutationFn: async (disk: any) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${activeNamespace}/disks`,
+        disk,
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disks'] })
     },
   })
 }

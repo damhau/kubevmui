@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 
@@ -11,6 +11,23 @@ export function useNetworks() {
         `/clusters/${activeCluster}/namespaces/${activeNamespace}/networks`
       )
       return data
+    },
+  })
+}
+
+export function useCreateNetwork() {
+  const queryClient = useQueryClient()
+  const { activeCluster, activeNamespace } = useUIStore()
+  return useMutation({
+    mutationFn: async (network: any) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${activeNamespace}/networks`,
+        network,
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['networks'] })
     },
   })
 }

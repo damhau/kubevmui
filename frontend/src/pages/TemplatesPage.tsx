@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
-import { useTemplates } from '@/hooks/useTemplates'
+import { useTemplates, useCreateTemplate } from '@/hooks/useTemplates'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 
@@ -49,6 +49,7 @@ interface TemplateForm {
 
 export function TemplatesPage() {
   const { data, isLoading } = useTemplates()
+  const createTemplate = useCreateTemplate()
   const templates: Template[] = Array.isArray(data) ? data : []
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<TemplateForm>({
@@ -91,7 +92,7 @@ export function TemplatesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: wire up mutation
+    createTemplate.mutate(form)
     setShowCreate(false)
     setForm({ display_name: '', name: '', category: 'linux', os_type: '', cpu: 2, memory_mb: 2048 })
   }
