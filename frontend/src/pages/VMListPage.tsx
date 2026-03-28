@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
+import { useCreateSnapshot } from '@/hooks/useSnapshots'
+import { useCreateMigration } from '@/hooks/useMigrations'
 import { theme } from '@/lib/theme'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
@@ -135,8 +137,10 @@ export function VMListPage() {
   const navigate = useNavigate()
   const { data, isLoading } = useVMs()
   const vmAction = useVMAction()
+  const createSnapshot = useCreateSnapshot()
+  const createMigration = useCreateMigration()
 
-  const vms: VM[] = Array.isArray(data) ? data : []
+  const vms: VM[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const filtered = vms.filter(
     (vm) =>
       vm.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -262,8 +266,54 @@ export function VMListPage() {
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.memory}</td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.node ?? '—'}</td>
                     <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>{vm.age ?? '—'}</td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <ActionsMenu vm={vm} onAction={(action) => handleAction(vm, action)} />
+                    <td style={{ padding: '10px 16px' }} onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button
+                          onClick={() =>
+                            createSnapshot.mutate({
+                              namespace: vm.namespace,
+                              vmName: vm.name,
+                              snapshotName: `snap-${vm.name}-${Date.now()}`,
+                            })
+                          }
+                          style={{
+                            background: 'transparent',
+                            border: `1px solid ${theme.main.inputBorder}`,
+                            borderRadius: theme.radius.md,
+                            padding: '3px 8px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            color: theme.text.secondary,
+                            fontFamily: 'inherit',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title="Create snapshot"
+                        >
+                          Snapshot
+                        </button>
+                        {vm.status === 'Running' && (
+                          <button
+                            onClick={() =>
+                              createMigration.mutate({ namespace: vm.namespace, vmName: vm.name })
+                            }
+                            style={{
+                              background: 'transparent',
+                              border: `1px solid ${theme.main.inputBorder}`,
+                              borderRadius: theme.radius.md,
+                              padding: '3px 8px',
+                              fontSize: 11,
+                              cursor: 'pointer',
+                              color: theme.text.secondary,
+                              fontFamily: 'inherit',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title="Live migrate VM"
+                          >
+                            Migrate
+                          </button>
+                        )}
+                        <ActionsMenu vm={vm} onAction={(action) => handleAction(vm, action)} />
+                      </div>
                     </td>
                   </tr>
                 ))}
