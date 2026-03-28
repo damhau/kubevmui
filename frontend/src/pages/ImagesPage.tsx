@@ -431,29 +431,52 @@ export function ImagesPage() {
                     >
                       {img.source_url || '\u2014'}
                     </td>
-                    <td style={{ padding: '10px 16px' }}>
-                      {img.dv_phase ? (
-                        <Badge
-                          label={
-                            img.dv_phase === 'ImportInProgress' && img.dv_progress
-                              ? `${img.dv_phase} ${img.dv_progress}`
-                              : img.dv_progress && img.dv_phase !== 'Succeeded' && img.dv_phase !== 'Failed'
-                                ? `${img.dv_phase} ${img.dv_progress}`
-                                : img.dv_phase
-                          }
-                          color={
-                            img.dv_phase === 'Succeeded'
-                              ? theme.status.running
-                              : img.dv_phase === 'Failed'
-                                ? theme.status.error
-                                : img.dv_phase === 'ImportInProgress'
-                                  ? theme.status.provisioning
-                                  : theme.status.stopped
-                          }
-                        />
-                      ) : (
-                        <Badge label="Pending" color={theme.status.stopped} />
-                      )}
+                    <td style={{ padding: '10px 16px', minWidth: 160 }}>
+                      {(() => {
+                        const phase = img.dv_phase || 'Pending'
+                        const progress = img.dv_progress && img.dv_progress !== 'N/A' ? img.dv_progress : null
+                        const pct = progress ? parseFloat(progress.replace('%', '')) : 0
+                        const isActive = ['ImportScheduled', 'ImportInProgress', 'CloneScheduled', 'CloneInProgress', 'Pending'].includes(phase)
+                        const isDone = phase === 'Succeeded'
+                        const isFailed = phase === 'Failed'
+
+                        if (isDone) return <Badge label="Ready" color={theme.status.running} />
+                        if (isFailed) return <Badge label="Failed" color={theme.status.error} />
+
+                        return (
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <span style={{ fontSize: 11, color: theme.text.secondary }}>
+                                {phase === 'Pending' || phase === 'ImportScheduled' ? 'Scheduling...' : 'Importing...'}
+                              </span>
+                              {progress && (
+                                <span style={{ fontSize: 11, fontWeight: 600, color: theme.status.provisioning }}>
+                                  {progress}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{
+                              height: 6,
+                              background: theme.main.inputBg,
+                              borderRadius: 3,
+                              overflow: 'hidden',
+                              border: `1px solid ${theme.main.inputBorder}`,
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                width: isActive && progress ? `${Math.min(pct, 100)}%` : '0%',
+                                background: theme.status.provisioning,
+                                borderRadius: 3,
+                                transition: 'width 0.5s ease',
+                                ...(isActive && !progress ? {
+                                  width: '100%',
+                                  opacity: 0.4,
+                                } : {}),
+                              }} />
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td
                       style={{
