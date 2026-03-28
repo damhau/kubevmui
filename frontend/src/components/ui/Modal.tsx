@@ -7,9 +7,10 @@ interface ModalProps {
   title: string
   children: React.ReactNode
   maxWidth?: number
+  height?: number | string
 }
 
-export function Modal({ open, onClose, title, children, maxWidth = 480 }: ModalProps) {
+export function Modal({ open, onClose, title, children, maxWidth = 480, height }: ModalProps) {
   if (!open) return null
 
   return createPortal(
@@ -46,6 +47,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 480 }: ModalP
           display: 'flex',
           flexDirection: 'column',
           maxHeight: '85vh',
+          ...(height ? { height } : {}),
         }}
       >
         {/* Header */}
