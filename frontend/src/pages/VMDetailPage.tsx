@@ -6,6 +6,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
+import { useAddVolume, useRemoveVolume, useAddInterface, useRemoveInterface } from '@/hooks/useHotplug'
 import { theme } from '@/lib/theme'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
@@ -37,7 +38,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-type Tab = 'overview' | 'snapshots' | 'events' | 'yaml'
+type Tab = 'overview' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
 
 function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
@@ -129,6 +130,15 @@ export function VMDetailPage() {
   const createSnapshot = useCreateSnapshot()
   const deleteSnapshot = useDeleteSnapshot()
   const restoreSnapshot = useRestoreSnapshot()
+  const addVolume = useAddVolume()
+  const removeVolume = useRemoveVolume()
+  const addInterface = useAddInterface()
+  const removeInterface = useRemoveInterface()
+  const [showAddDisk, setShowAddDisk] = useState(false)
+  const [newDisk, setNewDisk] = useState({ name: '', pvc_name: '', bus: 'scsi' })
+  const [showAddNic, setShowAddNic] = useState(false)
+  const [newNic, setNewNic] = useState({ name: '', nad_name: '' })
+
   const [snapshotName, setSnapshotName] = useState('')
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
 
@@ -161,6 +171,8 @@ export function VMDetailPage() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'disks', label: 'Disks' },
+    { id: 'network', label: 'Network' },
     { id: 'snapshots', label: 'Snapshots' },
     { id: 'events', label: 'Events' },
     { id: 'yaml', label: 'YAML' },
@@ -527,6 +539,421 @@ export function VMDetailPage() {
                 )}
               </div>
               </>
+            )}
+
+            {/* Disks */}
+            {activeTab === 'disks' && (
+              <div
+                style={{
+                  background: theme.main.card,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  borderRadius: theme.radius.lg,
+                }}
+              >
+                {/* Add disk toolbar */}
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {!showAddDisk ? (
+                    <button
+                      onClick={() => setShowAddDisk(true)}
+                      style={{
+                        background: theme.accent,
+                        color: theme.button.primaryText,
+                        border: 'none',
+                        borderRadius: theme.radius.md,
+                        padding: '6px 14px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Add Disk
+                    </button>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Disk name"
+                        value={newDisk.name}
+                        onChange={(e) => setNewDisk({ ...newDisk, name: e.target.value })}
+                        style={{
+                          background: theme.main.inputBg,
+                          border: `1px solid ${theme.main.inputBorder}`,
+                          borderRadius: theme.radius.md,
+                          padding: '6px 12px',
+                          fontSize: 13,
+                          color: theme.text.primary,
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          minWidth: 140,
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="PVC name"
+                        value={newDisk.pvc_name}
+                        onChange={(e) => setNewDisk({ ...newDisk, pvc_name: e.target.value })}
+                        style={{
+                          background: theme.main.inputBg,
+                          border: `1px solid ${theme.main.inputBorder}`,
+                          borderRadius: theme.radius.md,
+                          padding: '6px 12px',
+                          fontSize: 13,
+                          color: theme.text.primary,
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          minWidth: 140,
+                        }}
+                      />
+                      <select
+                        value={newDisk.bus}
+                        onChange={(e) => setNewDisk({ ...newDisk, bus: e.target.value })}
+                        style={{
+                          background: theme.main.inputBg,
+                          border: `1px solid ${theme.main.inputBorder}`,
+                          borderRadius: theme.radius.md,
+                          padding: '6px 8px',
+                          fontSize: 13,
+                          color: theme.text.primary,
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {['scsi', 'virtio', 'sata'].map((b) => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          if (!newDisk.name.trim() || !newDisk.pvc_name.trim() || !namespace || !name) return
+                          addVolume.mutate(
+                            { namespace, vmName: name, name: newDisk.name.trim(), pvcName: newDisk.pvc_name.trim(), bus: newDisk.bus },
+                            {
+                              onSuccess: () => {
+                                setNewDisk({ name: '', pvc_name: '', bus: 'scsi' })
+                                setShowAddDisk(false)
+                              },
+                            }
+                          )
+                        }}
+                        disabled={addVolume.isPending}
+                        style={{
+                          background: theme.accent,
+                          color: theme.button.primaryText,
+                          border: 'none',
+                          borderRadius: theme.radius.md,
+                          padding: '6px 14px',
+                          fontSize: 12,
+                          cursor: addVolume.isPending ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit',
+                          fontWeight: 500,
+                          opacity: addVolume.isPending ? 0.7 : 1,
+                        }}
+                      >
+                        {addVolume.isPending ? 'Attaching...' : 'Attach'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAddDisk(false)
+                          setNewDisk({ name: '', pvc_name: '', bus: 'scsi' })
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: theme.text.secondary,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                  <span style={{ fontSize: 11, color: theme.text.dim, marginLeft: 8 }}>
+                    Hotplug is only available on running VMs
+                  </span>
+                </div>
+
+                {/* Disks table */}
+                {vm.disks?.length ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                        {['Name', 'Size', 'Bus', 'Actions'].map((col) => (
+                          <th
+                            key={col}
+                            style={{
+                              padding: '10px 16px',
+                              textAlign: 'left',
+                              color: theme.text.secondary,
+                              fontWeight: 500,
+                              fontSize: 11,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                            }}
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vm.disks.map((disk: any) => (
+                        <tr key={disk.name} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                          <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>
+                            {disk.name}
+                          </td>
+                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>
+                            {disk.size_gb ? `${disk.size_gb} GB` : '—'}
+                          </td>
+                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>
+                            {disk.bus ?? '—'}
+                          </td>
+                          <td style={{ padding: '10px 16px' }}>
+                            {vm.status === 'Running' && (
+                              <button
+                                onClick={() => {
+                                  if (!namespace || !name) return
+                                  if (!window.confirm(`Remove disk "${disk.name}" from VM "${name}"?`)) return
+                                  removeVolume.mutate({ namespace, vmName: name, volName: disk.name })
+                                }}
+                                disabled={removeVolume.isPending}
+                                style={{
+                                  background: 'rgba(239,68,68,0.08)',
+                                  color: theme.status.error,
+                                  border: `1px solid rgba(239,68,68,0.3)`,
+                                  borderRadius: theme.radius.md,
+                                  padding: '3px 8px',
+                                  fontSize: 11,
+                                  cursor: removeVolume.isPending ? 'not-allowed' : 'pointer',
+                                  fontFamily: 'inherit',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                    No disks found for this VM.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Network */}
+            {activeTab === 'network' && (
+              <div
+                style={{
+                  background: theme.main.card,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  borderRadius: theme.radius.lg,
+                }}
+              >
+                {/* Add interface toolbar */}
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {!showAddNic ? (
+                    <button
+                      onClick={() => setShowAddNic(true)}
+                      style={{
+                        background: theme.accent,
+                        color: theme.button.primaryText,
+                        border: 'none',
+                        borderRadius: theme.radius.md,
+                        padding: '6px 14px',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Add Interface
+                    </button>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Interface name"
+                        value={newNic.name}
+                        onChange={(e) => setNewNic({ ...newNic, name: e.target.value })}
+                        style={{
+                          background: theme.main.inputBg,
+                          border: `1px solid ${theme.main.inputBorder}`,
+                          borderRadius: theme.radius.md,
+                          padding: '6px 12px',
+                          fontSize: 13,
+                          color: theme.text.primary,
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          minWidth: 140,
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Network Attachment Definition"
+                        value={newNic.nad_name}
+                        onChange={(e) => setNewNic({ ...newNic, nad_name: e.target.value })}
+                        style={{
+                          background: theme.main.inputBg,
+                          border: `1px solid ${theme.main.inputBorder}`,
+                          borderRadius: theme.radius.md,
+                          padding: '6px 12px',
+                          fontSize: 13,
+                          color: theme.text.primary,
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          minWidth: 200,
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (!newNic.name.trim() || !newNic.nad_name.trim() || !namespace || !name) return
+                          addInterface.mutate(
+                            { namespace, vmName: name, name: newNic.name.trim(), nadName: newNic.nad_name.trim() },
+                            {
+                              onSuccess: () => {
+                                setNewNic({ name: '', nad_name: '' })
+                                setShowAddNic(false)
+                              },
+                            }
+                          )
+                        }}
+                        disabled={addInterface.isPending}
+                        style={{
+                          background: theme.accent,
+                          color: theme.button.primaryText,
+                          border: 'none',
+                          borderRadius: theme.radius.md,
+                          padding: '6px 14px',
+                          fontSize: 12,
+                          cursor: addInterface.isPending ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit',
+                          fontWeight: 500,
+                          opacity: addInterface.isPending ? 0.7 : 1,
+                        }}
+                      >
+                        {addInterface.isPending ? 'Attaching...' : 'Attach'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAddNic(false)
+                          setNewNic({ name: '', nad_name: '' })
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: theme.text.secondary,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                  <span style={{ fontSize: 11, color: theme.text.dim, marginLeft: 8 }}>
+                    Hotplug is only available on running VMs
+                  </span>
+                </div>
+
+                {/* Network table */}
+                {vm.networks?.length ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                        {['Name', 'Network', 'IP', 'MAC', 'Actions'].map((col) => (
+                          <th
+                            key={col}
+                            style={{
+                              padding: '10px 16px',
+                              textAlign: 'left',
+                              color: theme.text.secondary,
+                              fontWeight: 500,
+                              fontSize: 11,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                            }}
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vm.networks.map((net: any) => (
+                        <tr key={net.name} style={{ borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                          <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500 }}>
+                            {net.name}
+                          </td>
+                          <td style={{ padding: '10px 16px', color: theme.text.secondary }}>
+                            {net.network_profile ?? '—'}
+                          </td>
+                          <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                            {net.ip_address ?? '—'}
+                          </td>
+                          <td style={{ padding: '10px 16px', color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                            {net.mac_address ?? '—'}
+                          </td>
+                          <td style={{ padding: '10px 16px' }}>
+                            {vm.status === 'Running' && (
+                              <button
+                                onClick={() => {
+                                  if (!namespace || !name) return
+                                  if (!window.confirm(`Remove interface "${net.name}" from VM "${name}"?`)) return
+                                  removeInterface.mutate({ namespace, vmName: name, ifaceName: net.name })
+                                }}
+                                disabled={removeInterface.isPending}
+                                style={{
+                                  background: 'rgba(239,68,68,0.08)',
+                                  color: theme.status.error,
+                                  border: `1px solid rgba(239,68,68,0.3)`,
+                                  borderRadius: theme.radius.md,
+                                  padding: '3px 8px',
+                                  fontSize: 11,
+                                  cursor: removeInterface.isPending ? 'not-allowed' : 'pointer',
+                                  fontFamily: 'inherit',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                    No network interfaces found for this VM.
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Snapshots */}
