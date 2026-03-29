@@ -8,6 +8,7 @@ import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { toast } from '@/components/ui/Toast'
+import { YamlPreview } from '@/components/ui/YamlPreview'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Network } from 'lucide-react'
@@ -88,7 +89,7 @@ interface NetworkForm {
 
 export function NetworksPage() {
   const navigate = useNavigate()
-  const { activeNamespace } = useUIStore()
+  const { activeCluster, activeNamespace } = useUIStore()
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'interfaces' | 'networks'>('interfaces')
@@ -835,6 +836,10 @@ export function NetworksPage() {
               style={inputStyle}
             />
           </div>
+          <YamlPreview
+            endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/networks/preview`}
+            payload={netForm}
+          />
 
           {netError && (
             <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{netError}</div>

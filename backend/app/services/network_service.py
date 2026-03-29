@@ -86,12 +86,17 @@ class NetworkService:
         return [_nad_to_profile(nad) for nad in result.get("items", [])]
 
     def preview_profile(self, request: NetworkProfileCreate) -> list[dict]:
-        cni_config = {
+        cni_config: dict = {
             "cniVersion": "0.3.1",
+            "name": request.name,
             "type": request.network_type.value,
         }
+        if request.bridge_name:
+            cni_config["bridge"] = request.bridge_name
         if request.vlan_id is not None:
             cni_config["vlan"] = request.vlan_id
+        if request.dhcp_enabled:
+            cni_config["ipam"] = {"type": "dhcp"}
         annotations = {
             ANNOTATION_DISPLAY_NAME: request.display_name,
             ANNOTATION_DESCRIPTION: request.description,
