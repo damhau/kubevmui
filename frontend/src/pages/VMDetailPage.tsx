@@ -15,6 +15,7 @@ import { MetricChart } from '@/components/ui/MetricChart'
 import { TimeRangeSelector } from '@/components/ui/TimeRangeSelector'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { Modal } from '@/components/ui/Modal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
@@ -175,6 +176,7 @@ export function VMDetailPage() {
 
   const [snapshotName, setSnapshotName] = useState('')
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
+  const [deleteStorage, setDeleteStorage] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean; confirmLabel?: string } | null>(null)
   const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
 
@@ -191,20 +193,13 @@ export function VMDetailPage() {
   const handleAction = (action: string) => {
     if (!namespace || !name) return
     if (action === 'delete') {
+      setDeleteStorage(false)
       setConfirmAction({
         title: 'Delete VM',
-        message: `Delete VM "${name}"? This action cannot be undone.`,
+        message: '__DELETE_VM__',
         danger: true,
         confirmLabel: 'Delete',
-        onConfirm: () => {
-          apiClient.delete(`/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}`)
-            .then(() => {
-              toast.success('VM deleted')
-              navigate('/vms')
-            })
-            .catch(() => toast.error('Failed to delete VM'))
-          setConfirmAction(null)
-        },
+        onConfirm: () => {},
       })
       return
     }
@@ -1755,15 +1750,97 @@ export function VMDetailPage() {
       </div>
       </div>
 
-      <ConfirmModal
-        open={!!confirmAction}
-        title={confirmAction?.title ?? ''}
-        message={confirmAction?.message ?? ''}
-        danger={confirmAction?.danger}
-        confirmLabel={confirmAction?.confirmLabel ?? (confirmAction?.danger ? 'Delete' : 'Confirm')}
-        onConfirm={() => confirmAction?.onConfirm()}
-        onCancel={() => setConfirmAction(null)}
-      />
+      {confirmAction?.message === '__DELETE_VM__' ? (
+        <Modal
+          open={!!confirmAction}
+          onClose={() => setConfirmAction(null)}
+          title="Delete VM"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ margin: 0, color: theme.text.primary }}>
+              Delete VM <strong>{name}</strong>? This action cannot be undone.
+            </p>
+            {(() => {
+              const deletableDisks = (vm?.disks ?? []).filter(
+                (d: any) => d.source_type !== 'cloud_init' && d.source_type !== 'container_disk'
+              )
+              return deletableDisks.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: theme.text.primary }}>
+                    <input
+                      type="checkbox"
+                      checked={deleteStorage}
+                      onChange={e => setDeleteStorage(e.target.checked)}
+                    />
+                    Also delete associated storage volumes
+                  </label>
+                  {deleteStorage && (
+                    <ul style={{ margin: 0, paddingLeft: 20, color: theme.text.secondary, fontSize: 13 }}>
+                      {deletableDisks.map((d: any) => (
+                        <li key={d.volume_name || d.name}>
+                          {d.volume_name || d.name}{d.size_gb ? ` (${d.size_gb} GiB)` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null
+            })()}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button
+                onClick={() => setConfirmAction(null)}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: theme.radius.sm,
+                  border: `1px solid ${theme.main.inputBorder}`,
+                  background: 'transparent',
+                  color: theme.text.primary,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontFamily: 'inherit',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const url = `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}${deleteStorage ? '?delete_storage=true' : ''}`
+                  apiClient.delete(url)
+                    .then(() => {
+                      toast.success('VM deleted')
+                      navigate('/vms')
+                    })
+                    .catch(() => toast.error('Failed to delete VM'))
+                  setConfirmAction(null)
+                }}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: theme.radius.sm,
+                  border: 'none',
+                  background: '#dc2626',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  fontFamily: 'inherit',
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : (
+        <ConfirmModal
+          open={!!confirmAction}
+          title={confirmAction?.title ?? ''}
+          message={confirmAction?.message ?? ''}
+          danger={confirmAction?.danger}
+          confirmLabel={confirmAction?.confirmLabel ?? (confirmAction?.danger ? 'Delete' : 'Confirm')}
+          onConfirm={() => confirmAction?.onConfirm()}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
       <PromptModal
         open={!!promptAction}
         title={promptAction?.title ?? ''}

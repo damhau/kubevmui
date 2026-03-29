@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_cluster_manager, get_current_user
 from app.api.routes.audit import get_audit_service
@@ -84,11 +84,12 @@ def delete_vm(
     cluster: str,
     ns: str,
     name: str,
+    delete_storage: bool = Query(False),
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    svc.delete_vm(ns, name)
+    svc.delete_vm(ns, name, delete_storage=delete_storage)
     audit_svc = get_audit_service()
     audit_svc.record(
         username=_user.username,
@@ -96,6 +97,7 @@ def delete_vm(
         resource_type="VirtualMachine",
         resource_name=name,
         namespace=ns,
+        details="with storage" if delete_storage else "",
     )
 
 

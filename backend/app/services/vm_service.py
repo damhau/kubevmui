@@ -526,8 +526,45 @@ class VMService:
         raw = self.kv.create_vm(request.namespace, manifest)
         return _vm_from_raw(raw, None)
 
-    def delete_vm(self, namespace: str, name: str) -> None:
+    def delete_vm(self, namespace: str, name: str, delete_storage: bool = False) -> list[str]:
+        """Delete a VM and optionally its associated PVCs/DataVolumes."""
+        deleted_pvcs: list[str] = []
+        if delete_storage:
+            vm_raw = self.kv.get_vm(namespace, name)
+            if vm_raw:
+                spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+                volume_list = spec.get("volumes", [])
+                dv_templates = vm_raw.get("spec", {}).get("dataVolumeTemplates", [])
+                dv_names = {dv["metadata"]["name"] for dv in dv_templates if "metadata" in dv}
+
+                pvc_names = set()
+                for vol in volume_list:
+                    if "persistentVolumeClaim" in vol:
+                        pvc_names.add(vol["persistentVolumeClaim"]["claimName"])
+                    elif "dataVolume" in vol:
+                        pvc_names.add(vol["dataVolume"]["name"])
+
+                self.kv.delete_vm(namespace, name)
+
+                for pvc_name in pvc_names:
+                    try:
+                        self.kv.core_api.delete_namespaced_persistent_volume_claim(
+                            pvc_name, namespace
+                        )
+                        deleted_pvcs.append(pvc_name)
+                    except Exception:
+                        pass
+                for dv_name in dv_names - pvc_names:
+                    try:
+                        self.kv.custom_api.delete_namespaced_custom_object(
+                            "cdi.kubevirt.io", "v1beta1", namespace, "datavolumes", dv_name
+                        )
+                    except Exception:
+                        pass
+                return deleted_pvcs
+
         self.kv.delete_vm(namespace, name)
+        return deleted_pvcs
 
     def vm_action(self, namespace: str, name: str, action: str) -> None:
         self.kv.vm_action(namespace, name, action)
