@@ -19,6 +19,7 @@ import { PromptModal } from '@/components/ui/PromptModal'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
 import { YamlViewer } from '@/components/ui/YamlViewer'
+import { YamlPreview } from '@/components/ui/YamlPreview'
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { Cpu, Network, HardDrive, Tag, Monitor } from 'lucide-react'
 import { VNCConsole } from '@/components/console/VNCConsole'
@@ -1514,6 +1515,14 @@ export function VMDetailPage() {
                   </button>
                   {snapshotError && (
                     <span style={{ fontSize: 12, color: theme.status.error }}>{snapshotError}</span>
+                  )}
+                  {snapshotName.trim() && namespace && name && (
+                    <div style={{ width: '100%' }}>
+                      <YamlPreview
+                        endpoint={`/clusters/${activeCluster}/namespaces/${namespace}/snapshots/preview`}
+                        payload={{ name: snapshotName.trim(), vm_name: name }}
+                      />
+                    </div>
                   )}
                 </div>
 

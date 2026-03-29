@@ -115,6 +115,24 @@ class SnapshotService:
             return None
         return _snapshot_from_raw(raw)
 
+    def preview_snapshot(self, namespace: str, request: SnapshotCreate) -> list[dict]:
+        manifest = {
+            "apiVersion": "snapshot.kubevirt.io/v1beta1",
+            "kind": "VirtualMachineSnapshot",
+            "metadata": {
+                "name": request.name,
+                "namespace": namespace,
+            },
+            "spec": {
+                "source": {
+                    "apiGroup": "kubevirt.io",
+                    "kind": "VirtualMachine",
+                    "name": request.vm_name,
+                },
+            },
+        }
+        return [manifest]
+
     def create_snapshot(self, namespace: str, request: SnapshotCreate) -> Snapshot:
         manifest = {
             "apiVersion": "snapshot.kubevirt.io/v1beta1",

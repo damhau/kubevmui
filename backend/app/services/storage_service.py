@@ -167,6 +167,28 @@ class StorageService:
             disks.append(disk)
         return disks
 
+    def preview_disk(self, request: DiskCreate) -> list[dict]:
+        try:
+            sc_name = self._resolve_storage_class(request.performance_tier)
+        except Exception:
+            sc_name = request.performance_tier
+        labels = {**request.labels, TIER_ANNOTATION: request.performance_tier}
+        body = {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+                "name": request.name,
+                "namespace": request.namespace,
+                "labels": labels,
+            },
+            "spec": {
+                "accessModes": ["ReadWriteOnce"],
+                "storageClassName": sc_name,
+                "resources": {"requests": {"storage": f"{request.size_gb}Gi"}},
+            },
+        }
+        return [body]
+
     def create_disk(self, request: DiskCreate) -> Disk:
         sc_name = self._resolve_storage_class(request.performance_tier)
         labels = {**request.labels, TIER_ANNOTATION: request.performance_tier}

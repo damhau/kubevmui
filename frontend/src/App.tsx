@@ -17,6 +17,8 @@ import { NodesPage } from '@/pages/NodesPage'
 import { EventsPage } from '@/pages/EventsPage'
 import { TemplateDetailPage } from '@/pages/TemplateDetailPage'
 import { ImageDetailPage } from '@/pages/ImageDetailPage'
+import { InterfaceDetailPage } from '@/pages/InterfaceDetailPage'
+import { NetworkDetailPage } from '@/pages/NetworkDetailPage'
 import { StorageDetailPage } from '@/pages/StorageDetailPage'
 import { NodeDetailPage } from '@/pages/NodeDetailPage'
 import { ClusterMetricsPage } from '@/pages/ClusterMetricsPage'
@@ -51,6 +53,8 @@ function App() {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/templates/:name" element={<TemplateDetailPage />} />
             <Route path="/networks" element={<NetworksPage />} />
+            <Route path="/networks/interfaces/:name" element={<InterfaceDetailPage />} />
+            <Route path="/networks/:namespace/:name" element={<NetworkDetailPage />} />
             <Route path="/storage" element={<StoragePage />} />
             <Route path="/storage/:namespace/:name" element={<StorageDetailPage />} />
             <Route path="/nodes" element={<NodesPage />} />

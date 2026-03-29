@@ -34,6 +34,22 @@ class SSHKeyService:
             return None
         return _ssh_key_from_raw(raw)
 
+    def preview_ssh_key(self, namespace: str, request: SSHKeyCreate) -> list[dict]:
+        import base64
+
+        body = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": request.name,
+                "namespace": namespace,
+                "labels": {"kubevmui.io/type": "sshkey"},
+            },
+            "data": {"key": base64.b64encode(request.public_key.encode()).decode()},
+            "type": "Opaque",
+        }
+        return [body]
+
     def create_ssh_key(self, namespace: str, request: SSHKeyCreate) -> SSHKey:
         raw = self.kv.create_ssh_key(namespace, request.name, request.public_key)
         return _ssh_key_from_raw(raw)

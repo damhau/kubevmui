@@ -122,14 +122,14 @@ function ResourceGauge({ label, used, total, unit, color, animationDelay }: { la
       <div style={{
         height: theme.gauge.height,
         background: theme.main.inputBg,
-        borderRadius: theme.gauge.borderRadius,
+        borderRadius: 0,
         overflow: 'hidden',
       }}>
         <div style={{
           height: '100%',
           width: `${Math.min(pct, 100)}%`,
           background: pct > 80 ? theme.status.error : pct > 60 ? theme.status.migrating : color,
-          borderRadius: theme.gauge.borderRadius,
+          borderRadius: 0,
           transition: 'width 0.5s ease',
         }} />
       </div>

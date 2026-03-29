@@ -517,6 +517,10 @@ class VMService:
             vm.events = []
         return vm
 
+    def preview_vm(self, request: VMCreate) -> list[dict]:
+        manifest = _build_manifest(request, self.kv)
+        return [manifest]
+
     def create_vm(self, request: VMCreate) -> VM:
         manifest = _build_manifest(request, self.kv)
         raw = self.kv.create_vm(request.namespace, manifest)

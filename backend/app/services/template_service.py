@@ -106,6 +106,54 @@ class TemplateService:
                 continue
         return templates
 
+    def preview_template(self, request: TemplateCreate) -> list[dict]:
+        compute = request.compute.model_dump()
+        disks = [d.model_dump() for d in request.disks]
+        networks = [n.model_dump() for n in request.networks]
+        body = {
+            "apiVersion": "kubevmui.io/v1",
+            "kind": "Template",
+            "metadata": {"name": request.name, "namespace": request.namespace},
+            "spec": {
+                "displayName": request.display_name,
+                "description": request.description,
+                "category": request.category,
+                "osType": request.os_type,
+                "compute": {
+                    "cpuCores": compute.get("cpu_cores", 1),
+                    "memoryMb": compute.get("memory_mb", 512),
+                    "cpuModel": compute.get("cpu_model"),
+                    "sockets": compute.get("sockets", 1),
+                    "coresPerSocket": compute.get("cores_per_socket"),
+                    "threadsPerCore": compute.get("threads_per_core", 1),
+                },
+                "disks": [
+                    {
+                        "name": d.get("name", ""),
+                        "sizeGb": d.get("size_gb", 0),
+                        "bus": d.get("bus", "virtio"),
+                        "sourceType": d.get("source_type", ""),
+                        "image": d.get("image", ""),
+                        "cloneSource": d.get("clone_source", ""),
+                        "cloneNamespace": d.get("clone_namespace", ""),
+                        "storageClass": d.get("storage_class", ""),
+                    }
+                    for d in disks
+                ],
+                "networks": [
+                    {"name": n.get("name", ""), "networkProfile": n.get("network_profile", "")}
+                    for n in networks
+                ],
+                "cloudInit": {
+                    "userData": request.cloud_init_user_data,
+                    "networkData": request.cloud_init_network_data,
+                },
+                "autoattachPodInterface": request.autoattach_pod_interface,
+                "global": request.is_global,
+            },
+        }
+        return [body]
+
     def create_template(self, request: TemplateCreate) -> Template:
         compute = request.compute.model_dump()
         disks = [d.model_dump() for d in request.disks]

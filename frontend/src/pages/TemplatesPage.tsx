@@ -13,6 +13,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
+import { YamlPreview } from '@/components/ui/YamlPreview'
 import { Copy } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { useSortable } from '@/hooks/useSortable'
@@ -198,7 +199,7 @@ const textareaStyle: React.CSSProperties = {
 
 export function TemplatesPage() {
   const navigate = useNavigate()
-  const { activeNamespace } = useUIStore()
+  const { activeCluster, activeNamespace } = useUIStore()
   const { data, isLoading } = useTemplates()
   const { data: allNADsData } = useAllNetworks()
   const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
@@ -963,6 +964,43 @@ export function TemplatesPage() {
             />
             Global template (available across all namespaces)
           </label>
+
+          {/* YAML PREVIEW */}
+          {!editingName && (
+            <YamlPreview
+              endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/templates/preview`}
+              payload={{
+                display_name: form.display_name,
+                name: form.name,
+                category: form.category,
+                os_type: form.os_type || null,
+                compute: {
+                  cpu_cores: form.cpu,
+                  memory_mb: form.memory_mb,
+                  sockets: 1,
+                  threads_per_core: 1,
+                },
+                disks: form.disks.map((d) => ({
+                  name: d.name,
+                  size_gb: d.size_gb,
+                  bus: d.bus,
+                  source_type: d.source_type,
+                  image: d.image || undefined,
+                  clone_source: d.clone_source || undefined,
+                  clone_namespace: d.clone_namespace || undefined,
+                  storage_class: d.storage_class || undefined,
+                })),
+                networks: form.nics.map((n) => ({
+                  name: n.name,
+                  network_profile: n.network_profile,
+                })),
+                cloud_init_user_data: form.cloud_init_user_data || null,
+                cloud_init_network_data: form.cloud_init_network_data || null,
+                autoattach_pod_interface: form.autoattach_pod_interface,
+                is_global: form.is_global,
+              }}
+            />
+          )}
 
           {/* ERROR / ACTIONS */}
           {error && (

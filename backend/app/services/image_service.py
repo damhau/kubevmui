@@ -89,6 +89,45 @@ class ImageService:
             img.raw_dv_manifest = dv
         return img
 
+    def preview_image(self, namespace: str, request: ImageCreate) -> list[dict]:
+        body = {
+            "apiVersion": "kubevmui.io/v1",
+            "kind": "Image",
+            "metadata": {"name": request.name, "namespace": namespace},
+            "spec": {
+                "displayName": request.display_name,
+                "description": request.description,
+                "global": request.is_global,
+                "osType": request.os_type,
+                "source": {"type": request.source_type, "url": request.source_url},
+                "storage": {"sizeGb": request.size_gb, "storageClass": request.storage_class},
+            },
+        }
+        manifests = [body]
+        if request.source_type in ("registry", "http"):
+            if request.source_type == "registry":
+                source_spec = {"registry": {"url": request.source_url}}
+            else:
+                source_spec = {"http": {"url": request.source_url}}
+            pvc_spec: dict = {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": f"{request.size_gb}Gi"}},
+            }
+            if request.storage_class:
+                pvc_spec["storageClassName"] = request.storage_class
+            dv_manifest = {
+                "apiVersion": "cdi.kubevirt.io/v1beta1",
+                "kind": "DataVolume",
+                "metadata": {
+                    "name": request.name,
+                    "namespace": namespace,
+                    "labels": {"kubevmui.io/type": "image"},
+                },
+                "spec": {"source": source_spec, "pvc": pvc_spec},
+            }
+            manifests.append(dv_manifest)
+        return manifests
+
     def create_image(self, namespace: str, request: ImageCreate) -> Image:
         body = {
             "apiVersion": "kubevmui.io/v1",

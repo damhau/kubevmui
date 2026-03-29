@@ -1,11 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_cluster_manager, get_current_user
+from app.api.routes.audit import get_audit_service
 from app.core.cluster_manager import ClusterManager
 from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
-from app.models.vm import VM, VMCreate, VMList, AddVolumeRequest, AddInterfaceRequest, VMCloneRequest, VMPatchRequest
-from app.api.routes.audit import get_audit_service
+from app.models.vm import (
+    VM,
+    AddInterfaceRequest,
+    AddVolumeRequest,
+    VMCloneRequest,
+    VMCreate,
+    VMList,
+    VMPatchRequest,
+)
 from app.services.vm_service import VMService
 
 router = APIRouter(

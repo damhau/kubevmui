@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from kubernetes.client import ApiException
 
 from app.api.deps import get_cluster_manager, get_current_user
+from app.api.routes.audit import get_audit_service
 from app.core.cluster_manager import ClusterManager
 from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.snapshot import Restore, RestoreCreate, Snapshot, SnapshotCreate, SnapshotList
-from app.api.routes.audit import get_audit_service
 from app.services.snapshot_service import SnapshotService
 
 router = APIRouter(

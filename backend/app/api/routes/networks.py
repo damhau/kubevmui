@@ -39,14 +39,16 @@ def list_all_networks(
         metadata = nad.get("metadata", {})
         ns = metadata.get("namespace", "")
         name = metadata.get("name", "")
-        items.append({
-            "name": name,
-            "namespace": ns,
-            "full_name": f"{ns}/{name}" if ns else name,
-            "display_name": metadata.get("annotations", {}).get(
-                "kubevmui.io/display-name", name
-            ),
-        })
+        items.append(
+            {
+                "name": name,
+                "namespace": ns,
+                "full_name": f"{ns}/{name}" if ns else name,
+                "display_name": metadata.get("annotations", {}).get(
+                    "kubevmui.io/display-name", name
+                ),
+            }
+        )
     return {"items": items, "total": len(items)}
 
 
@@ -69,6 +71,23 @@ def list_networks(
     return NetworkProfileList(items=items, total=len(items))
 
 
+@router.get("/networks/{name}", response_model=NetworkProfile)
+def get_network(
+    cluster: str,
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    profile = svc.get_profile(ns, name)
+    if profile is None:
+        raise HTTPException(
+            status_code=404, detail=f"Network '{name}' not found in namespace '{ns}'"
+        )
+    return profile
+
+
 @router.post("/networks", response_model=NetworkProfile, status_code=201)
 def create_network(
     cluster: str,
@@ -78,6 +97,7 @@ def create_network(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
+    body.namespace = ns
     return svc.create_profile(body)
 
 

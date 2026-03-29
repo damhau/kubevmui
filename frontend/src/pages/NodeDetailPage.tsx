@@ -4,11 +4,12 @@ import { useNode } from '@/hooks/useNodes'
 import { useNodeMetrics } from '@/hooks/useMetrics'
 import { theme } from '@/lib/theme'
 import { TopBar } from '@/components/layout/TopBar'
-import { CardSkeleton } from '@/components/ui/Skeleton'
+import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
 import { YamlViewer } from '@/components/ui/YamlViewer'
 import { MetricChart } from '@/components/ui/MetricChart'
 import { TimeRangeSelector } from '@/components/ui/TimeRangeSelector'
+import { useNodeNetworkState } from '@/hooks/useNMState'
 
 function formatMemory(s: string): string {
   if (!s) return '—'
@@ -20,7 +21,7 @@ function formatMemory(s: string): string {
   return s
 }
 
-type Tab = 'overview' | 'vms' | 'metrics' | 'yaml'
+type Tab = 'overview' | 'vms' | 'metrics' | 'yaml' | 'network-state'
 
 const vmStatusStyles: Record<string, { bg: string; color: string }> = {
   Running:  { bg: '#ecfdf5', color: '#22c55e' },
@@ -34,12 +35,15 @@ export function NodeDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [metricsRange, setMetricsRange] = useState('1h')
   const { data: metricsData } = useNodeMetrics(name!, metricsRange)
+  const { data: nnsData, isLoading: nnsLoading } = useNodeNetworkState(name ?? '')
+  const nnsInterfaces = nnsData?.interfaces ?? []
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'vms', label: 'Virtual Machines' },
     { id: 'metrics', label: 'Metrics' },
     { id: 'yaml', label: 'YAML' },
+    { id: 'network-state', label: 'Network State' },
   ]
 
   return (
@@ -288,7 +292,7 @@ export function NodeDetailPage() {
                 <div style={{ animation: 'fadeInUp 0.35s ease-out both' }}>
                   {/* Range selector */}
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-                    <TimeRangeSelector value={metricsRange} onChange={setMetricsRange} ranges={['1h', '6h', '24h']} />
+                    <TimeRangeSelector value={metricsRange} onChange={setMetricsRange} />
                   </div>
 
                   {/* Charts */}
@@ -316,6 +320,71 @@ export function NodeDetailPage() {
                 <YamlViewer resources={[
                   { label: node.name, kind: 'Node', data: node.raw_manifest ?? node }
                 ]} />
+              )}
+
+              {/* Network State Tab */}
+              {activeTab === 'network-state' && (
+                <div className="card">
+                  <div style={{ padding: '14px 16px', borderBottom: `1px solid ${theme.main.cardBorder}`, fontSize: 14, fontWeight: 600, color: theme.text.heading }}>
+                    Node Network Interfaces
+                  </div>
+                  {nnsLoading ? (
+                    <TableSkeleton rows={5} cols={6} />
+                  ) : nnsInterfaces.length === 0 ? (
+                    <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>
+                      {nnsData === undefined ? 'NMState not installed on this cluster' : 'No interfaces found'}
+                    </div>
+                  ) : (
+                    <table className="table">
+                      <thead>
+                        <tr className="table-header">
+                          <th className="table-header-cell">Name</th>
+                          <th className="table-header-cell">Type</th>
+                          <th className="table-header-cell">State</th>
+                          <th className="table-header-cell">MAC Address</th>
+                          <th className="table-header-cell">MTU</th>
+                          <th className="table-header-cell">IPv4</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {nnsInterfaces.map((iface: any, i: number) => (
+                          <tr key={iface.name} className="table-row" style={i < 8 ? { animation: `fadeInRow 0.3s ease-out both`, animationDelay: `${0.05 + i * 0.04}s` } : undefined}>
+                            <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>{iface.name}</td>
+                            <td className="table-cell">
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: theme.radius.sm,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: iface.type === 'linux-bridge' ? theme.status.running : iface.type === 'vlan' ? theme.status.provisioning : theme.text.secondary,
+                                background: `${iface.type === 'linux-bridge' ? theme.status.running : iface.type === 'vlan' ? theme.status.provisioning : theme.text.secondary}1a`,
+                                border: `1px solid ${iface.type === 'linux-bridge' ? theme.status.running : iface.type === 'vlan' ? theme.status.provisioning : theme.text.secondary}40`,
+                              }}>
+                                {iface.type}
+                              </span>
+                            </td>
+                            <td className="table-cell">
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                fontSize: 13,
+                                color: iface.state === 'up' ? theme.status.running : theme.text.dim,
+                              }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: iface.state === 'up' ? theme.status.running : theme.text.dim }} />
+                                {iface.state}
+                              </span>
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, fontFamily: theme.typography.mono.fontFamily }}>{iface.mac_address || '—'}</td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{iface.mtu || '—'}</td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, fontFamily: theme.typography.mono.fontFamily }}>{iface.ipv4_addresses?.length > 0 ? iface.ipv4_addresses.join(', ') : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               )}
             </>
           )}

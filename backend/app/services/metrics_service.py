@@ -199,28 +199,24 @@ class MetricsService:
             values = result[0].get("values", [])
             return [{"timestamp": v[0], "value": float(v[1])} for v in values]
 
-        # Existing: VM count
-        vm_count_q = (
-            'count(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"})'
-        )
-        # New: Total VM CPU usage
-        total_cpu_q = 'sum(rate(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"}[5m]))'
-        # New: Total VM memory
-        total_memory_q = (
-            'sum(container_memory_working_set_bytes{pod=~"virt-launcher-.*",container="compute"})'
-        )
-        # New: Total network
+        # VM count
+        vm_count_q = 'count(kubevirt_vmi_cpu_usage_seconds_total) or count(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"})'
+        # Total VM CPU usage (prefer KubeVirt-native, fallback to container)
+        total_cpu_q = 'sum(rate(kubevirt_vmi_cpu_usage_seconds_total[5m])) or sum(rate(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"}[5m]))'
+        # Total VM memory usage (prefer KubeVirt-native, fallback to container)
+        total_memory_q = 'sum(kubevirt_vmi_memory_resident_bytes) or sum(container_memory_working_set_bytes{pod=~"virt-launcher-.*",container="compute"})'
+        # Total network
         total_net_rx_q = (
             'sum(rate(container_network_receive_bytes_total{pod=~"virt-launcher-.*"}[5m]))'
         )
         total_net_tx_q = (
             'sum(rate(container_network_transmit_bytes_total{pod=~"virt-launcher-.*"}[5m]))'
         )
-        # New: Average node CPU
+        # Average node CPU
         node_cpu_q = '1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))'
-        # New: Average node memory
+        # Average node memory
         node_memory_q = "1 - avg(node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)"
-        # New: Average storage utilization
+        # Average storage utilization
         storage_q = "avg(kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes)"
 
         return {

@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { TopBar } from '@/components/layout/TopBar'
 import { useSSHKeys, useCreateSSHKey, useDeleteSSHKey } from '@/hooks/useSSHKeys'
 import { theme } from '@/lib/theme'
+import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
+import { YamlPreview } from '@/components/ui/YamlPreview'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { KeyRound } from 'lucide-react'
@@ -36,6 +38,7 @@ function formatDate(iso: string | null): string {
 }
 
 export function SSHKeysPage() {
+  const { activeCluster, activeNamespace } = useUIStore()
   const { data, isLoading } = useSSHKeys()
   const createSSHKey = useCreateSSHKey()
   const deleteSSHKey = useDeleteSSHKey()
@@ -215,6 +218,10 @@ export function SSHKeysPage() {
               }}
             />
           </div>
+          <YamlPreview
+            endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/sshkeys/preview`}
+            payload={form}
+          />
           {error && (
             <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{error}</div>
           )}

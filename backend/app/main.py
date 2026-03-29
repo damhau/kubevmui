@@ -15,7 +15,9 @@ from app.api.routes import (
     migrations,
     namespaces,
     networks,
+    nmstate,
     nodes,
+    preview,
     snapshots,
     ssh_keys,
     storage,
@@ -63,6 +65,7 @@ def create_app() -> FastAPI:
     application.include_router(ssh_keys.router)
     application.include_router(vms.router)
     application.include_router(networks.router)
+    application.include_router(nmstate.router)
     application.include_router(networks_cluster_router)
     application.include_router(storage.router)
     application.include_router(storage_cluster_router)
@@ -70,6 +73,7 @@ def create_app() -> FastAPI:
     application.include_router(dashboard.router)
     application.include_router(namespaces.router)
     application.include_router(nodes.router)
+    application.include_router(preview.router)
     application.include_router(metrics.router)
     application.include_router(events.router)
     application.include_router(cluster_lists.router)

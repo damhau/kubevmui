@@ -6,6 +6,7 @@ import { useSortable } from '@/hooks/useSortable'
 import { theme } from '@/lib/theme'
 import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
+import { YamlPreview } from '@/components/ui/YamlPreview'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
@@ -62,7 +63,7 @@ interface DiskForm {
 
 export function StoragePage() {
   const navigate = useNavigate()
-  const { activeNamespace } = useUIStore()
+  const { activeCluster, activeNamespace } = useUIStore()
   const { data, isLoading } = useDisks()
   const createDisk = useCreateDisk()
   const deleteDisk = useDeleteDisk()
@@ -411,6 +412,10 @@ export function StoragePage() {
               style={inputStyle}
             />
           </div>
+          <YamlPreview
+            endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/disks/preview`}
+            payload={{ name: form.name, namespace: activeNamespace, size_gb: Number(form.size_gb), performance_tier: form.performance_tier, labels: {} }}
+          />
           {error && (
             <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{error}</div>
           )}

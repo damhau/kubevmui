@@ -6,6 +6,7 @@ import { useSortable } from '@/hooks/useSortable'
 import { theme } from '@/lib/theme'
 import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
+import { YamlPreview } from '@/components/ui/YamlPreview'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
@@ -99,7 +100,7 @@ const SUGGESTIONS = [
 
 export function ImagesPage() {
   const navigate = useNavigate()
-  const { activeNamespace } = useUIStore()
+  const { activeCluster, activeNamespace } = useUIStore()
   const { data, isLoading } = useImages()
   const createImage = useCreateImage()
   const deleteImage = useDeleteImage()
@@ -714,6 +715,12 @@ export function ImagesPage() {
               </label>
             </div>
 
+          {!editingName && (
+            <YamlPreview
+              endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/images/preview`}
+              payload={{ ...form, source_url: form.source_url.trim() }}
+            />
+          )}
           {error && (
             <div
               style={{

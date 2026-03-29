@@ -6,6 +6,7 @@ import { useAllNetworks } from '@/hooks/useNetworks'
 import { useTemplates } from '@/hooks/useTemplates'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
+import { YamlPreview } from '@/components/ui/YamlPreview'
 
 const STEPS = [
   { id: 1, label: 'Basic Information', description: 'Name, namespace, and description' },
@@ -196,7 +197,7 @@ function DiskIcon() {
 
 export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreateWizardProps) {
   const createVM = useCreateVM()
-  const { activeNamespace } = useUIStore()
+  const { activeCluster, activeNamespace } = useUIStore()
   const [quickCreate, setQuickCreate] = useState(!!initialTemplate)
   const { data: namespacesData } = useNamespaces()
   const { data: imagesData } = useImages()
@@ -1857,6 +1858,47 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                   {error}
                 </div>
               )}
+
+              <YamlPreview
+                endpoint={`/clusters/${activeCluster}/namespaces/${form.namespace}/vms/preview`}
+                payload={{
+                  name: form.name,
+                  namespace: form.namespace,
+                  description: form.description,
+                  compute: {
+                    cpu_cores: form.cpu,
+                    memory_mb: form.memory,
+                    sockets: 1,
+                    threads_per_core: 1,
+                  },
+                  disks: form.disks.map((d) => ({
+                    name: d.name,
+                    size_gb: d.size_gb,
+                    bus: d.bus,
+                    source_type: d.source_type,
+                    image: d.image,
+                    clone_source: d.clone_source,
+                    clone_namespace: d.clone_namespace,
+                    storage_class: d.storage_class,
+                  })),
+                  networks: form.nics.map((n) => ({
+                    name: n.name,
+                    network_profile: n.network_profile || 'pod',
+                  })),
+                  cloud_init_user_data: form.user_data || null,
+                  cloud_init_network_data: form.network_data || null,
+                  autoattach_pod_interface: form.autoattach_pod_interface,
+                  template_name: form.template_name || null,
+                  run_strategy: 'RerunOnFailure',
+                  labels: {},
+                  firmware_boot_mode: form.firmware === 'default' ? null : form.firmware,
+                  secure_boot: form.secure_boot,
+                  node_selector: form.node_selector
+                    ? Object.fromEntries(form.node_selector.split(',').map((kv) => kv.trim().split('=')))
+                    : {},
+                  eviction_strategy: form.eviction_strategy || null,
+                }}
+              />
             </SectionCard>
           )}
         </div>

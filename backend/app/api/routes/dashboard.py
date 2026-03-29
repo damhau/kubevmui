@@ -80,6 +80,11 @@ def get_dashboard(
             storage_by_tier[tier]["total_gb"] += disk.size_gb
             storage_by_tier[tier]["count"] += 1
 
+    # Compute reserved resources from running VMs
+    running_vm_list = [vm for vm in all_vms if vm.status == VMStatus.running]
+    reserved_cpu_cores = sum(vm.compute.cpu_cores for vm in running_vm_list)
+    reserved_memory_mb = sum(vm.compute.memory_mb for vm in running_vm_list)
+
     # Enrich nodes with VM count
     for node in nodes:
         node["vm_count"] = vm_node_count.get(node["name"], 0)
@@ -89,6 +94,8 @@ def get_dashboard(
         "running_vms": running_vms,
         "stopped_vms": stopped_vms,
         "error_vms": error_vms,
+        "reserved_cpu_cores": reserved_cpu_cores,
+        "reserved_memory_mb": reserved_memory_mb,
         "node_count": len(nodes),
         "nodes": nodes,
         "storage_total_gb": total_storage_gb,
