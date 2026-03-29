@@ -414,23 +414,51 @@ function ProvisionWizard({
             </div>
             <div
               style={{
-                padding: 12, borderRadius: theme.radius.md,
-                background: theme.main.bg, fontSize: 12,
-                display: 'flex', flexDirection: 'column', gap: 6,
+                padding: 16, borderRadius: theme.radius.md,
+                background: theme.main.bg,
+                border: `1px solid ${theme.main.cardBorder}`,
+                fontSize: 13, color: theme.text.primary,
+                display: 'flex', flexDirection: 'column', gap: 8,
               }}
             >
-              <div><strong>Distribution:</strong> {entry.display_name}</div>
-              <div><strong>Namespace:</strong> {state.namespace}</div>
-              <div><strong>Storage Class:</strong> {state.storageClass || 'Default'}</div>
-              <div><strong>Image Size:</strong> {state.imageSizeGb} GB</div>
-              <div style={{ marginTop: 8 }}>
-                <strong>Resources to create:</strong>
-                <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                  <li>1 Image: <code>{entry.name}</code></li>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: theme.text.secondary }}>Distribution</span>
+                <span style={{ fontWeight: 500 }}>{entry.display_name}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: theme.text.secondary }}>Namespace</span>
+                <span style={{ fontWeight: 500 }}>{state.namespace}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: theme.text.secondary }}>Storage Class</span>
+                <span style={{ fontWeight: 500 }}>{state.storageClass || 'Default'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: theme.text.secondary }}>Image Size</span>
+                <span style={{ fontWeight: 500 }}>{state.imageSizeGb} GB</span>
+              </div>
+              <div style={{ borderTop: `1px solid ${theme.main.cardBorder}`, paddingTop: 8, marginTop: 4 }}>
+                <div style={{ color: theme.text.secondary, marginBottom: 6 }}>Resources to create</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '1px 6px',
+                      borderRadius: theme.radius.sm, background: theme.status.provisioningBg,
+                      color: theme.status.provisioning,
+                    }}>IMAGE</span>
+                    <code style={{ fontSize: 12, fontFamily: theme.typography.mono.fontFamily }}>{entry.name}</code>
+                  </div>
                   {selectedVariants.map((v) => (
-                    <li key={v}>Template: <code>{entry.name}-{v}</code></li>
+                    <div key={v} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: '1px 6px',
+                        borderRadius: theme.radius.sm, background: theme.accentLight,
+                        color: theme.accent,
+                      }}>TEMPLATE</span>
+                      <code style={{ fontSize: 12, fontFamily: theme.typography.mono.fontFamily }}>{entry.name}-{v}</code>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
           </>
