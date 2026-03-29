@@ -518,6 +518,8 @@ class KubeVirtClient:
 
     KUBEVMUI_GROUP = "kubevmui.io"
     KUBEVMUI_VERSION = "v1"
+    CATALOG_GROUP = "catalog.kubevmui.io"
+    CATALOG_VERSION = "v1"
 
     def list_images(self, namespace: str) -> list[dict]:
         result = self.custom_api.list_namespaced_custom_object(
@@ -602,6 +604,67 @@ class KubeVirtClient:
             plural="templates",
             name=name,
         )
+
+    # ── Catalog (cluster-scoped) ──────────────────────────────────
+
+    def list_catalog_entries(self) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
+            group=self.CATALOG_GROUP,
+            version=self.CATALOG_VERSION,
+            plural="catalogentries",
+        )
+        return result.get("items", [])
+
+    def get_catalog_entry(self, name: str) -> dict | None:
+        try:
+            return self.custom_api.get_cluster_custom_object(
+                group=self.CATALOG_GROUP,
+                version=self.CATALOG_VERSION,
+                plural="catalogentries",
+                name=name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def create_catalog_entry(self, body: dict) -> dict:
+        return self.custom_api.create_cluster_custom_object(
+            group=self.CATALOG_GROUP,
+            version=self.CATALOG_VERSION,
+            plural="catalogentries",
+            body=body,
+        )
+
+    def delete_catalog_entry(self, name: str) -> None:
+        self.custom_api.delete_cluster_custom_object(
+            group=self.CATALOG_GROUP,
+            version=self.CATALOG_VERSION,
+            plural="catalogentries",
+            name=name,
+        )
+
+    # ── Label-filtered queries ────────────────────────────────────
+
+    def list_images_by_label(self, namespace: str, label_selector: str) -> list[dict]:
+        result = self.custom_api.list_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            namespace=namespace,
+            plural="images",
+            label_selector=label_selector,
+        )
+        return result.get("items", [])
+
+    def list_templates_by_label(self, namespace: str, label_selector: str) -> list[dict]:
+        result = self.custom_api.list_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            namespace=namespace,
+            plural="templates",
+            label_selector=label_selector,
+        )
+        return result.get("items", [])
 
     @staticmethod
     def _secret_to_dict(secret) -> dict:
