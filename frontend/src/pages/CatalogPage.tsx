@@ -146,6 +146,60 @@ function SizeChips({ templates }: { templates: CatalogTemplate[] }) {
 
 /* ── Provision wizard ────────────────────────────────────────── */
 
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: theme.main.inputBg,
+  border: `1px solid ${theme.main.inputBorder}`,
+  borderRadius: theme.radius.md,
+  color: theme.text.primary,
+  fontSize: 13,
+  padding: '8px 12px',
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 12,
+  color: theme.text.secondary,
+  marginBottom: 6,
+  fontWeight: 500,
+}
+
+const primaryBtnStyle: React.CSSProperties = {
+  background: theme.button.primary,
+  color: theme.button.primaryText,
+  border: 'none',
+  borderRadius: theme.radius.md,
+  padding: '7px 16px',
+  fontSize: 13,
+  fontWeight: 500,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+}
+
+const secondaryBtnStyle: React.CSSProperties = {
+  background: theme.button.secondary,
+  border: `1px solid ${theme.button.secondaryBorder}`,
+  color: theme.button.secondaryText,
+  borderRadius: theme.radius.md,
+  padding: '7px 16px',
+  fontSize: 13,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+}
+
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle,
+  minHeight: 120,
+  resize: 'vertical',
+  fontFamily: theme.typography.mono.fontFamily,
+  fontSize: 12,
+}
+
+const TOTAL_STEPS = 4
+
 interface WizardState {
   step: number
   namespace: string
@@ -153,6 +207,7 @@ interface WizardState {
   imageSizeGb: number
   selectedTemplates: Record<string, boolean>
   templateOverrides: Record<string, { cpuCores: number; memoryMb: number; diskSizeGb: number }>
+  cloudInitUserData: string
 }
 
 function ProvisionWizard({
@@ -185,6 +240,7 @@ function ProvisionWizard({
       imageSizeGb: entry.image.default_size_gb,
       selectedTemplates,
       templateOverrides,
+      cloudInitUserData: entry.cloud_init_user_data || '',
     }
   })
 
@@ -228,7 +284,7 @@ function ProvisionWizard({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Step indicator */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          {[1, 2, 3].map((s) => (
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
             <div
               key={s}
               style={{
@@ -246,41 +302,38 @@ function ProvisionWizard({
             <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
               Step 1: Image Configuration
             </div>
-            <label style={{ fontSize: 12, color: theme.text.secondary }}>
-              Target Namespace
+            <div>
+              <label style={labelStyle}>Target Namespace</label>
               <input
                 type="text"
                 value={state.namespace}
                 onChange={(e) => setState((s) => ({ ...s, namespace: e.target.value }))}
-                className="input"
-                style={{ width: '100%', marginTop: 4 }}
+                style={inputStyle}
               />
-            </label>
-            <label style={{ fontSize: 12, color: theme.text.secondary }}>
-              Storage Class
+            </div>
+            <div>
+              <label style={labelStyle}>Storage Class</label>
               <select
                 value={state.storageClass}
                 onChange={(e) => setState((s) => ({ ...s, storageClass: e.target.value }))}
-                className="input"
-                style={{ width: '100%', marginTop: 4 }}
+                style={inputStyle}
               >
                 <option value="">Default</option>
                 {scItems.map((sc) => (
                   <option key={sc.name} value={sc.name}>{sc.name}</option>
                 ))}
               </select>
-            </label>
-            <label style={{ fontSize: 12, color: theme.text.secondary }}>
-              Image Size (GB)
+            </div>
+            <div>
+              <label style={labelStyle}>Image Size (GB)</label>
               <input
                 type="number"
                 value={state.imageSizeGb}
                 onChange={(e) => setState((s) => ({ ...s, imageSizeGb: parseInt(e.target.value) || 1 }))}
-                className="input"
-                style={{ width: '100%', marginTop: 4 }}
+                style={inputStyle}
                 min={1}
               />
-            </label>
+            </div>
           </>
         )}
 
@@ -298,9 +351,9 @@ function ProvisionWizard({
                   padding: '10px 12px',
                   borderRadius: theme.radius.md,
                   border: `1px solid ${state.selectedTemplates[t.name] ? theme.accent : theme.main.cardBorder}`,
-                  background: state.selectedTemplates[t.name] ? `${theme.accent}08` : 'transparent',
+                  background: state.selectedTemplates[t.name] ? theme.accentLight : 'transparent',
                   cursor: 'pointer',
-                  transition: 'all 0.15s',
+                  transition: 'border-color 0.15s, background 0.15s',
                 }}
                 onClick={() =>
                   setState((s) => ({
@@ -332,11 +385,32 @@ function ProvisionWizard({
           </>
         )}
 
-        {/* Step 3: Confirm */}
+        {/* Step 3: Cloud-Init */}
         {state.step === 3 && (
           <>
             <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
-              Step 3: Confirm Provisioning
+              Step 3: Cloud-Init Configuration
+            </div>
+            <div style={{ fontSize: 12, color: theme.text.dim, marginBottom: 4 }}>
+              Pre-filled based on {entry.display_name}. Installs and enables the QEMU guest agent by default. You can customize or leave as-is.
+            </div>
+            <div>
+              <label style={labelStyle}>User Data (cloud-init)</label>
+              <textarea
+                value={state.cloudInitUserData}
+                onChange={(e) => setState((s) => ({ ...s, cloudInitUserData: e.target.value }))}
+                placeholder={'#cloud-config\npackages:\n  - qemu-guest-agent'}
+                style={textareaStyle}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Step 4: Confirm */}
+        {state.step === 4 && (
+          <>
+            <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
+              Step 4: Confirm Provisioning
             </div>
             <div
               style={{
@@ -366,15 +440,19 @@ function ProvisionWizard({
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           {state.step > 1 && (
             <button
-              className="btn btn-secondary"
+              style={secondaryBtnStyle}
               onClick={() => setState((s) => ({ ...s, step: s.step - 1 }))}
             >
               Back
             </button>
           )}
-          {state.step < 3 ? (
+          {state.step < TOTAL_STEPS ? (
             <button
-              className="btn btn-primary"
+              style={{
+                ...primaryBtnStyle,
+                ...(state.step === 2 && selectedVariants.length === 0
+                  ? { opacity: 0.7, cursor: 'not-allowed' } : {}),
+              }}
               onClick={() => setState((s) => ({ ...s, step: s.step + 1 }))}
               disabled={state.step === 2 && selectedVariants.length === 0}
             >
@@ -382,7 +460,11 @@ function ProvisionWizard({
             </button>
           ) : (
             <button
-              className="btn btn-primary"
+              style={{
+                ...primaryBtnStyle,
+                ...(provision.isPending || selectedVariants.length === 0
+                  ? { opacity: 0.7, cursor: 'not-allowed' } : {}),
+              }}
               onClick={handleProvision}
               disabled={provision.isPending || selectedVariants.length === 0}
             >
