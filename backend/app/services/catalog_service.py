@@ -14,7 +14,7 @@ from app.models.catalog import (
 )
 from app.models.image import ImageCreate
 from app.models.template import TemplateCreate
-from app.models.vm import VMCompute, VMDiskRef
+from app.models.vm import VMCompute, VMDiskRef, VMNetworkRef
 from app.services.catalog_defaults import DEFAULT_ENTRIES
 from app.services.image_service import ImageService
 from app.services.template_service import TemplateService
@@ -141,6 +141,9 @@ class CatalogService:
                         clone_namespace=namespace,
                         storage_class=request.storage_class,
                     )
+                ],
+                networks=[
+                    VMNetworkRef(name="default", network_profile="pod"),
                 ],
                 cloud_init_user_data=entry.cloud_init_user_data,
                 is_global=request.is_global,
