@@ -65,7 +65,7 @@ def _map_status(vm: dict, vmi: dict | None) -> VMStatus:
     return status_map.get(printable, VMStatus.unknown)
 
 
-def _map_health(vm: dict, vmi: dict | None) -> HealthStatus:
+def _map_health(vm: dict, vmi: dict | None, single_node: bool = False) -> HealthStatus:
     """Derive health from VM status and VMI conditions."""
     printable = vm.get("status", {}).get("printableStatus", "")
 
@@ -100,8 +100,8 @@ def _map_health(vm: dict, vmi: dict | None) -> HealthStatus:
     if ready.get("status") == "False":
         return HealthStatus.critical
 
-    # Degraded: not migratable or agent not connected after startup
-    if migratable.get("status") == "False":
+    # Degraded: not migratable (skip on single-node clusters where migration is impossible)
+    if migratable.get("status") == "False" and not single_node:
         return HealthStatus.degraded
 
     if agent.get("status") != "True":
@@ -194,7 +194,7 @@ def _extract_networks(vm: dict, vmi: dict | None) -> list[VMNetworkRef]:
     return networks
 
 
-def _vm_from_raw(vm: dict, vmi: dict | None) -> VM:
+def _vm_from_raw(vm: dict, vmi: dict | None, single_node: bool = False) -> VM:
     """Convert raw KubeVirt VM dict to VM model."""
     metadata = vm.get("metadata", {})
     spec = vm.get("spec", {})
@@ -207,7 +207,7 @@ def _vm_from_raw(vm: dict, vmi: dict | None) -> VM:
     memory_mb = _parse_memory(memory_str)
 
     status = _map_status(vm, vmi)
-    health = _map_health(vm, vmi)
+    health = _map_health(vm, vmi, single_node=single_node)
 
     node = None
     ip_addresses = []
@@ -427,12 +427,21 @@ class VMService:
     def __init__(self, kv: KubeVirtClient):
         self.kv = kv
 
+    def _is_single_node(self) -> bool:
+        """Check if the cluster has only one node."""
+        try:
+            return len(self.kv.list_nodes()) <= 1
+        except Exception:
+            return False
+
     def list_vms(self, namespace: str) -> list[VM]:
         vms_raw = self.kv.list_vms(namespace)
         vmis_raw = self.kv.list_vmis(namespace)
         vmi_map = {v.get("metadata", {}).get("name", ""): v for v in vmis_raw}
+        single_node = self._is_single_node()
         return [
-            _vm_from_raw(vm, vmi_map.get(vm.get("metadata", {}).get("name", ""))) for vm in vms_raw
+            _vm_from_raw(vm, vmi_map.get(vm.get("metadata", {}).get("name", "")), single_node)
+            for vm in vms_raw
         ]
 
     def get_vm(self, namespace: str, name: str) -> VM | None:
@@ -440,7 +449,7 @@ class VMService:
         if vm_raw is None:
             return None
         vmi_raw = self.kv.get_vmi(namespace, name)
-        vm = _vm_from_raw(vm_raw, vmi_raw)
+        vm = _vm_from_raw(vm_raw, vmi_raw, single_node=self._is_single_node())
         vm.raw_manifest = vm_raw
         vm.raw_vmi_manifest = vmi_raw
         # Enrich disk sizes from PVCs
@@ -753,7 +762,8 @@ class VMService:
         vmi_raw = self.kv.get_vmi(namespace, name)
 
         # Health status + reasons
-        health = _map_health(vm_raw, vmi_raw)
+        single_node = self._is_single_node()
+        health = _map_health(vm_raw, vmi_raw, single_node=single_node)
         reasons: list[str] = []
         printable = vm_raw.get("status", {}).get("printableStatus", "")
 
