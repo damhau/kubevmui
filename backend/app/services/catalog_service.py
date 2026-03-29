@@ -99,6 +99,7 @@ class CatalogService:
                 source_url=entry.image.source_url,
                 size_gb=entry.image.default_size_gb,
                 storage_class=request.storage_class,
+                is_global=request.is_global,
             )
             image_svc.create_image(namespace, image_req)
             # Add the catalog label to the image
@@ -142,6 +143,7 @@ class CatalogService:
                     )
                 ],
                 cloud_init_user_data=entry.cloud_init_user_data,
+                is_global=request.is_global,
             )
             template_svc.create_template(tpl_req)
             self._add_catalog_label(namespace, "templates", tpl_name, name)

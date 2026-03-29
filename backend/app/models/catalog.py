@@ -37,6 +37,7 @@ class ProvisionRequest(BaseModel):
     namespace: str
     storage_class: str = ""
     templates: list[str]  # variant names to provision, e.g. ["small", "medium"]
+    is_global: bool = False
 
 
 class ProvisionResponse(BaseModel):

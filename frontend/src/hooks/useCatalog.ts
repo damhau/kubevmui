@@ -85,7 +85,7 @@ export function useProvisionCatalog() {
   return useMutation({
     mutationFn: async ({ name, body }: {
       name: string
-      body: { namespace: string; storage_class: string; templates: string[] }
+      body: { namespace: string; storage_class: string; templates: string[]; is_global?: boolean }
     }) => {
       const { data } = await apiClient.post(
         `/clusters/${activeCluster}/catalog/${name}/provision`,
