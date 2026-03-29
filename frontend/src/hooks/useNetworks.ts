@@ -7,9 +7,10 @@ export function useNetworks() {
   return useQuery({
     queryKey: ['networks', activeCluster, activeNamespace],
     queryFn: async () => {
-      const { data } = await apiClient.get(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/networks`
-      )
+      const url = activeNamespace === '_all'
+        ? `/clusters/${activeCluster}/networks/all`
+        : `/clusters/${activeCluster}/namespaces/${activeNamespace}/networks`
+      const { data } = await apiClient.get(url)
       return data
     },
   })

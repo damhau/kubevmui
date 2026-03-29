@@ -28,10 +28,10 @@ const nncpTypeColor: Record<string, string> = {
 }
 
 const typeColor: Record<string, string> = {
-  Bridge: theme.status.running,
-  Masquerade: theme.status.provisioning,
-  'SR-IOV': theme.status.migrating,
-  OVS: theme.accent,
+  bridge: theme.status.running,
+  masquerade: theme.status.provisioning,
+  'sr-iov': theme.status.migrating,
+  ovs: theme.accent,
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -59,9 +59,9 @@ interface NetworkProfile {
   name: string
   namespace?: string
   display_name?: string
-  type?: string
+  network_type?: string
   vlan_id?: number | null
-  dhcp?: boolean
+  dhcp_enabled?: boolean
   subnet?: string
 }
 
@@ -138,11 +138,12 @@ export function NetworksPage() {
 
   // Available ethernet interfaces from nodes
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodeInterfaces: any[] = Array.isArray(nodeInterfacesData) ? nodeInterfacesData : []
-  const ethernetInterfaces = nodeInterfaces.filter((iface: { type?: string }) => iface.type === 'ethernet')
+  const nodeInterfaces: any[] = Array.isArray(nodeInterfacesData?.items) ? nodeInterfacesData.items : []
+  const usedPorts = new Set(nncps.filter((n: any) => n.port).map((n: any) => n.port))
+  const ethernetInterfaces = nodeInterfaces.filter((iface: { type?: string; name?: string }) => iface.type === 'ethernet' && !usedPorts.has(iface.name))
 
   // Available bridges
-  const bridges: string[] = Array.isArray(bridgesData) ? bridgesData : []
+  const bridges: Array<{ name: string; nodes: string[] }> = Array.isArray(bridgesData?.items) ? bridgesData.items : []
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -394,8 +395,8 @@ export function NetworksPage() {
                             {nncp.interface_name ?? '—'}
                           </td>
                           <td className="table-cell">
-                            {nncp.type ? (
-                              <Badge label={nncp.type} color={nncpTypeColor[nncp.type] ?? theme.text.dim} />
+                            {nncp.interface_type ? (
+                              <Badge label={nncp.interface_type} color={nncpTypeColor[nncp.interface_type] ?? theme.text.dim} />
                             ) : (
                               <span style={{ color: theme.text.dim }}>—</span>
                             )}
@@ -477,14 +478,14 @@ export function NetworksPage() {
                             Namespace{netSortConfig.column === 'namespace' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                           </th>
                         )}
-                        <th className={`table-header-cell-sortable${netSortConfig.column === 'type' ? ' active' : ''}`} onClick={() => requestNetSort('type')}>
-                          Type{netSortConfig.column === 'type' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                        <th className={`table-header-cell-sortable${netSortConfig.column === 'network_type' ? ' active' : ''}`} onClick={() => requestNetSort('network_type')}>
+                          Type{netSortConfig.column === 'network_type' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                         </th>
                         <th className={`table-header-cell-sortable${netSortConfig.column === 'vlan_id' ? ' active' : ''}`} onClick={() => requestNetSort('vlan_id')}>
                           VLAN ID{netSortConfig.column === 'vlan_id' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                         </th>
-                        <th className={`table-header-cell-sortable${netSortConfig.column === 'dhcp' ? ' active' : ''}`} onClick={() => requestNetSort('dhcp')}>
-                          DHCP{netSortConfig.column === 'dhcp' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                        <th className={`table-header-cell-sortable${netSortConfig.column === 'dhcp_enabled' ? ' active' : ''}`} onClick={() => requestNetSort('dhcp_enabled')}>
+                          DHCP{netSortConfig.column === 'dhcp_enabled' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                         </th>
                         <th className={`table-header-cell-sortable${netSortConfig.column === 'subnet' ? ' active' : ''}`} onClick={() => requestNetSort('subnet')}>
                           Subnet{netSortConfig.column === 'subnet' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
@@ -515,8 +516,8 @@ export function NetworksPage() {
                             </td>
                           )}
                           <td className="table-cell">
-                            {net.type ? (
-                              <Badge label={net.type} color={typeColor[net.type] ?? theme.text.dim} />
+                            {net.network_type ? (
+                              <Badge label={net.network_type} color={typeColor[net.network_type] ?? theme.text.dim} />
                             ) : (
                               <span style={{ color: theme.text.dim }}>—</span>
                             )}
@@ -525,8 +526,8 @@ export function NetworksPage() {
                             {net.vlan_id ?? '—'}
                           </td>
                           <td className="table-cell">
-                            <span style={{ color: net.dhcp ? theme.status.running : theme.text.secondary, fontSize: 13 }}>
-                              {net.dhcp === undefined ? '—' : net.dhcp ? 'Yes' : 'No'}
+                            <span style={{ color: net.dhcp_enabled ? theme.status.running : theme.text.secondary, fontSize: 13 }}>
+                              {net.dhcp_enabled === undefined ? '—' : net.dhcp_enabled ? 'Yes' : 'No'}
                             </span>
                           </td>
                           <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily, fontSize: 13 }}>
@@ -605,9 +606,9 @@ export function NetworksPage() {
               style={inputStyle}
             >
               <option value="">Select a port...</option>
-              {ethernetInterfaces.map((iface: { name: string; state?: string; node_count?: number }) => (
+              {ethernetInterfaces.map((iface: any) => (
                 <option key={iface.name} value={iface.name}>
-                  {iface.name} ({iface.state ?? 'unknown'}, {iface.node_count ?? 0} node{(iface.node_count ?? 0) !== 1 ? 's' : ''})
+                  {iface.name} ({iface.state ?? 'unknown'}, {iface.nodes?.length ?? 0} node{(iface.nodes?.length ?? 0) !== 1 ? 's' : ''})
                 </option>
               ))}
             </select>
@@ -786,8 +787,8 @@ export function NetworksPage() {
                   style={inputStyle}
                 >
                   <option value="">Select a bridge...</option>
-                  {bridges.map((b: string) => (
-                    <option key={b} value={b}>{b}</option>
+                  {bridges.map((b) => (
+                    <option key={b.name} value={b.name}>{b.name} ({b.nodes.length} node{b.nodes.length !== 1 ? 's' : ''})</option>
                   ))}
                 </select>
               )}
@@ -838,7 +839,16 @@ export function NetworksPage() {
           </div>
           <YamlPreview
             endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/networks/preview`}
-            payload={netForm}
+            payload={{
+              display_name: netForm.display_name,
+              name: netForm.name,
+              network_type: netForm.type,
+              bridge_name: netForm.bridge_name || undefined,
+              vlan_id: netForm.vlan_id === '' ? null : Number(netForm.vlan_id),
+              dhcp_enabled: netForm.dhcp,
+              subnet: netForm.subnet || null,
+              gateway: netForm.gateway || null,
+            }}
           />
 
           {netError && (

@@ -207,7 +207,9 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
   const { data: storageClassData } = useStorageClasses()
   const { data: allNetworksData } = useAllNetworks()
   const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
-    Array.isArray(allNetworksData?.items) ? allNetworksData.items : []
+    Array.isArray(allNetworksData?.items)
+      ? allNetworksData.items.map((n: any) => ({ ...n, full_name: `${n.namespace}/${n.name}` }))
+      : []
   const templates: Array<any> = Array.isArray(templatesData?.items) ? templatesData.items : []
   const storageClasses: Array<{ name: string; is_default: boolean }> = Array.isArray(storageClassData?.items) ? storageClassData.items : []
   const [step, setStep] = useState(1)

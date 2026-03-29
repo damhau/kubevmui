@@ -203,7 +203,9 @@ export function TemplatesPage() {
   const { data, isLoading } = useTemplates()
   const { data: allNADsData } = useAllNetworks()
   const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
-    Array.isArray(allNADsData?.items) ? allNADsData.items : []
+    Array.isArray(allNADsData?.items)
+      ? allNADsData.items.map((n: any) => ({ ...n, full_name: `${n.namespace}/${n.name}` }))
+      : []
   const { data: imagesData } = useImages()
   const registeredImages: Array<{ name: string; namespace: string; display_name: string; source_type: string; source_url: string; size_gb: number }> =
     Array.isArray(imagesData?.items) ? imagesData.items : []
