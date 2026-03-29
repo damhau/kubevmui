@@ -63,7 +63,7 @@ def provision_catalog_entry(
     try:
         return svc.provision(name, body)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
 
 @router.get("/{name}/status", response_model=CatalogStatus)

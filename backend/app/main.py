@@ -28,8 +28,8 @@ from app.api.routes import (
 from app.api.routes.networks import cluster_router as networks_cluster_router
 from app.api.routes.storage import cluster_router as storage_cluster_router
 from app.core.cluster_manager import ClusterManager
-from app.core.k8s_client import KubeVirtClient
 from app.core.config import settings
+from app.core.k8s_client import KubeVirtClient
 from app.ws import serial_proxy, vnc_proxy
 
 
