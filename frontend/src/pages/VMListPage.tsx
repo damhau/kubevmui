@@ -509,7 +509,7 @@ export function VMListPage() {
                     <td className="table-cell">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <StatusBadge status={vm.status} />
-                        {vm.health && vm.health !== 'unknown' && vm.health !== 'healthy' && (
+                        {vm.health && vm.health !== 'unknown' && (
                           <HealthBadge health={vm.health} size="dot" />
                         )}
                       </div>
