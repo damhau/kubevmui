@@ -617,6 +617,80 @@ class VMService:
         }
         return self.kv.create_clone(namespace, manifest)
 
+    def add_disk_to_spec(
+        self,
+        namespace: str,
+        vm_name: str,
+        disk_name: str,
+        bus: str = "virtio",
+        size_gb: int | None = None,
+        storage_class: str | None = None,
+        pvc_name: str | None = None,
+        source_type: str = "pvc",
+        image_name: str | None = None,
+        image_namespace: str | None = None,
+    ) -> None:
+        """Add a disk to a stopped VM's spec via JSON merge patch."""
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            return
+        spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+        disks = spec.get("domain", {}).get("devices", {}).get("disks", [])
+        volumes = spec.get("volumes", [])
+        dv_templates = vm_raw.get("spec", {}).get("dataVolumeTemplates", [])
+
+        disk_entry = {"name": disk_name, "disk": {"bus": bus}}
+        disks.append(disk_entry)
+
+        if source_type == "existing" and pvc_name:
+            volumes.append({"name": disk_name, "persistentVolumeClaim": {"claimName": pvc_name}})
+        elif source_type == "clone" and image_name:
+            dv_name = f"{vm_name}-{disk_name}-dv"
+            clone_ns = image_namespace or namespace
+            dv_template = {
+                "metadata": {"name": dv_name},
+                "spec": {
+                    "source": {"pvc": {"name": image_name, "namespace": clone_ns}},
+                    "pvc": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": f"{size_gb or 10}Gi"}},
+                    },
+                },
+            }
+            if storage_class:
+                dv_template["spec"]["pvc"]["storageClassName"] = storage_class
+            dv_templates.append(dv_template)
+            volumes.append({"name": disk_name, "dataVolume": {"name": dv_name}})
+        else:
+            dv_name = f"{vm_name}-{disk_name}-dv"
+            dv_template = {
+                "metadata": {"name": dv_name},
+                "spec": {
+                    "source": {"blank": {}},
+                    "pvc": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": f"{size_gb or 10}Gi"}},
+                    },
+                },
+            }
+            if storage_class:
+                dv_template["spec"]["pvc"]["storageClassName"] = storage_class
+            dv_templates.append(dv_template)
+            volumes.append({"name": disk_name, "dataVolume": {"name": dv_name}})
+
+        body = {
+            "spec": {
+                "dataVolumeTemplates": dv_templates,
+                "template": {
+                    "spec": {
+                        "domain": {"devices": {"disks": disks}},
+                        "volumes": volumes,
+                    }
+                },
+            }
+        }
+        self.kv.patch_vm(namespace, vm_name, body)
+
     def force_stop(self, namespace: str, name: str) -> None:
         """Force stop by patching runStrategy to Halted."""
         body = {"spec": {"runStrategy": "Halted"}}

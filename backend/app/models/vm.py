@@ -91,6 +91,17 @@ class VMCreate(BaseModel):
     autoattach_pod_interface: bool = True
 
 
+class AddDiskToSpecRequest(BaseModel):
+    name: str
+    bus: str = "virtio"
+    size_gb: int | None = None
+    storage_class: str | None = None
+    pvc_name: str | None = None
+    source_type: str = "blank"  # "blank", "existing", "clone"
+    image_name: str | None = None
+    image_namespace: str | None = None
+
+
 class AddVolumeRequest(BaseModel):
     name: str
     pvc_name: str

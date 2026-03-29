@@ -7,6 +7,7 @@ from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.vm import (
     VM,
+    AddDiskToSpecRequest,
     AddInterfaceRequest,
     AddVolumeRequest,
     VMCloneRequest,
@@ -148,6 +149,30 @@ def patch_vm(
         svc.update_run_strategy(ns, name, body.run_strategy)
     if body.cpu_cores is not None or body.memory_mb is not None:
         svc.update_compute(ns, name, body.cpu_cores, body.memory_mb)
+    return {"status": "ok"}
+
+
+@router.post("/vms/{name}/disks", status_code=200)
+def add_disk_to_spec(
+    cluster: str,
+    ns: str,
+    name: str,
+    body: AddDiskToSpecRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.add_disk_to_spec(
+        ns, name,
+        disk_name=body.name,
+        bus=body.bus,
+        size_gb=body.size_gb,
+        storage_class=body.storage_class,
+        pvc_name=body.pvc_name,
+        source_type=body.source_type,
+        image_name=body.image_name,
+        image_namespace=body.image_namespace,
+    )
     return {"status": "ok"}
 
 

@@ -6,7 +6,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
-import { useAddVolume, useRemoveVolume, useAddInterface, useRemoveInterface } from '@/hooks/useHotplug'
+import { useRemoveVolume, useAddInterface, useRemoveInterface } from '@/hooks/useHotplug'
 import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
@@ -26,6 +26,7 @@ import { Cpu, Network, HardDrive, Tag, Monitor } from 'lucide-react'
 import { VNCConsole } from '@/components/console/VNCConsole'
 import type { VNCConsoleRef, ConnectionStatus } from '@/components/console/VNCConsole'
 import { HealthBadge } from '@/components/vm/HealthBadge'
+import { AddDiskWizard } from '@/components/vm/AddDiskWizard'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -165,12 +166,10 @@ export function VMDetailPage() {
   const createSnapshot = useCreateSnapshot()
   const deleteSnapshot = useDeleteSnapshot()
   const restoreSnapshot = useRestoreSnapshot()
-  const addVolume = useAddVolume()
   const removeVolume = useRemoveVolume()
   const addInterface = useAddInterface()
   const removeInterface = useRemoveInterface()
   const [showAddDisk, setShowAddDisk] = useState(false)
-  const [newDisk, setNewDisk] = useState({ name: '', pvc_name: '', bus: 'scsi' })
   const [showAddNic, setShowAddNic] = useState(false)
   const [newNic, setNewNic] = useState({ name: '', nad_name: '' })
 
@@ -1042,127 +1041,22 @@ export function VMDetailPage() {
                     flexWrap: 'wrap',
                   }}
                 >
-                  {!showAddDisk ? (
-                    <button
-                      onClick={() => setShowAddDisk(true)}
-                      style={{
-                        background: theme.accent,
-                        color: theme.button.primaryText,
-                        border: 'none',
-                        borderRadius: theme.radius.md,
-                        padding: '6px 14px',
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Add Disk
-                    </button>
-                  ) : (
-                    <>
-                      <input
-                        type="text"
-                        placeholder="Disk name"
-                        value={newDisk.name}
-                        onChange={(e) => setNewDisk({ ...newDisk, name: e.target.value })}
-                        style={{
-                          background: theme.main.inputBg,
-                          border: `1px solid ${theme.main.inputBorder}`,
-                          borderRadius: theme.radius.md,
-                          padding: '6px 12px',
-                          fontSize: 13,
-                          color: theme.text.primary,
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                          minWidth: 140,
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="PVC name"
-                        value={newDisk.pvc_name}
-                        onChange={(e) => setNewDisk({ ...newDisk, pvc_name: e.target.value })}
-                        style={{
-                          background: theme.main.inputBg,
-                          border: `1px solid ${theme.main.inputBorder}`,
-                          borderRadius: theme.radius.md,
-                          padding: '6px 12px',
-                          fontSize: 13,
-                          color: theme.text.primary,
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                          minWidth: 140,
-                        }}
-                      />
-                      <select
-                        value={newDisk.bus}
-                        onChange={(e) => setNewDisk({ ...newDisk, bus: e.target.value })}
-                        style={{
-                          background: theme.main.inputBg,
-                          border: `1px solid ${theme.main.inputBorder}`,
-                          borderRadius: theme.radius.md,
-                          padding: '6px 8px',
-                          fontSize: 13,
-                          color: theme.text.primary,
-                          fontFamily: 'inherit',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {['scsi', 'virtio', 'sata'].map((b) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => {
-                          if (!newDisk.name.trim() || !newDisk.pvc_name.trim() || !namespace || !name) return
-                          addVolume.mutate(
-                            { namespace, vmName: name, name: newDisk.name.trim(), pvcName: newDisk.pvc_name.trim(), bus: newDisk.bus },
-                            {
-                              onSuccess: () => {
-                                setNewDisk({ name: '', pvc_name: '', bus: 'scsi' })
-                                setShowAddDisk(false)
-                              },
-                            }
-                          )
-                        }}
-                        disabled={addVolume.isPending}
-                        style={{
-                          background: theme.accent,
-                          color: theme.button.primaryText,
-                          border: 'none',
-                          borderRadius: theme.radius.md,
-                          padding: '6px 14px',
-                          fontSize: 12,
-                          cursor: addVolume.isPending ? 'not-allowed' : 'pointer',
-                          fontFamily: 'inherit',
-                          fontWeight: 500,
-                          opacity: addVolume.isPending ? 0.7 : 1,
-                        }}
-                      >
-                        {addVolume.isPending ? 'Attaching...' : 'Attach'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowAddDisk(false)
-                          setNewDisk({ name: '', pvc_name: '', bus: 'scsi' })
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: theme.text.secondary,
-                          cursor: 'pointer',
-                          fontSize: 12,
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                  <span style={{ fontSize: 11, color: theme.text.dim, marginLeft: 8 }}>
-                    Hotplug is only available on running VMs
-                  </span>
+                  <button
+                    onClick={() => setShowAddDisk(true)}
+                    style={{
+                      background: theme.accent,
+                      color: theme.button.primaryText,
+                      border: 'none',
+                      borderRadius: theme.radius.md,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Add Disk
+                  </button>
                 </div>
 
                 {/* Disks table */}
@@ -1841,6 +1735,15 @@ export function VMDetailPage() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
+      <AddDiskWizard
+        open={showAddDisk}
+        onClose={() => setShowAddDisk(false)}
+        namespace={namespace!}
+        vmName={name!}
+        vmStatus={vm?.status ?? ''}
+        existingDiskCount={vm?.disks?.length ?? 0}
+        activeCluster={activeCluster}
+      />
       <PromptModal
         open={!!promptAction}
         title={promptAction?.title ?? ''}

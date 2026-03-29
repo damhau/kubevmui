@@ -20,6 +20,28 @@ export function useAddVolume() {
   })
 }
 
+export function useAddDiskToSpec() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ namespace, vmName, disk }: {
+      namespace: string
+      vmName: string
+      disk: { name: string; bus: string; size_gb?: number; storage_class?: string; pvc_name?: string; source_type: string; image_name?: string; image_namespace?: string }
+    }) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/disks`,
+        disk
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+}
+
 export function useRemoveVolume() {
   const queryClient = useQueryClient()
   const { activeCluster } = useUIStore()
