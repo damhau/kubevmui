@@ -743,6 +743,132 @@ class VMService:
         body = {"spec": {"runStrategy": strategy}}
         self.kv.patch_vm(namespace, name, body)
 
+    def get_diagnostics(self, namespace: str, name: str) -> dict:
+        """Get detailed diagnostics for a VM."""
+        from app.models.vm import GuestFsInfo, GuestNetworkInfo, VMCondition, VMDiagnostics
+
+        vm_raw = self.kv.get_vm(namespace, name)
+        if not vm_raw:
+            return {}
+        vmi_raw = self.kv.get_vmi(namespace, name)
+
+        # Health status + reasons
+        health = _map_health(vm_raw, vmi_raw)
+        reasons: list[str] = []
+        printable = vm_raw.get("status", {}).get("printableStatus", "")
+
+        if health == HealthStatus.critical:
+            if printable in {
+                "ErrImagePull",
+                "ImagePullBackOff",
+                "CrashLoopBackOff",
+                "ErrorPvcNotFound",
+                "ErrorDataVolumeNotFound",
+                "ErrorUnschedulable",
+            }:
+                reasons.append(f"VM in error state: {printable}")
+            elif vmi_raw:
+                conds = vmi_raw.get("status", {}).get("conditions", [])
+                ready = next((c for c in conds if c.get("type") == "Ready"), None)
+                if ready and ready.get("status") == "False":
+                    reasons.append(f"VMI not ready: {ready.get('reason', 'unknown')}")
+        elif health == HealthStatus.degraded and vmi_raw:
+            conds = vmi_raw.get("status", {}).get("conditions", [])
+            migratable = next((c for c in conds if c.get("type") == "LiveMigratable"), None)
+            agent = next((c for c in conds if c.get("type") == "AgentConnected"), None)
+            if migratable and migratable.get("status") == "False":
+                reasons.append(f"Not live-migratable: {migratable.get('reason', 'unknown')}")
+            if not agent or agent.get("status") != "True":
+                reasons.append("Guest agent not connected (>5 min)")
+
+        # Conditions from VMI
+        conditions: list[VMCondition] = []
+        if vmi_raw:
+            for c in vmi_raw.get("status", {}).get("conditions", []):
+                conditions.append(
+                    VMCondition(
+                        type=c.get("type", ""),
+                        status=c.get("status", ""),
+                        reason=c.get("reason", ""),
+                        message=c.get("message", ""),
+                        last_transition_time=c.get("lastTransitionTime", ""),
+                    )
+                )
+
+        # Guest agent connected?
+        guest_connected = False
+        if vmi_raw:
+            agent_cond = next(
+                (
+                    c
+                    for c in vmi_raw.get("status", {}).get("conditions", [])
+                    if c.get("type") == "AgentConnected"
+                ),
+                None,
+            )
+            guest_connected = agent_cond is not None and agent_cond.get("status") == "True"
+
+        # Guest OS info
+        guest_os = None
+        if guest_connected:
+            info = self.kv.get_guest_os_info(namespace, name)
+            if info and any(info.values()):
+                from app.models.vm import GuestAgentInfo
+
+                guest_os = GuestAgentInfo(**info)
+
+        # Filesystem info
+        filesystems: list[GuestFsInfo] = []
+        if guest_connected:
+            fs_data = self.kv.get_guest_fs_info(namespace, name)
+            for fs in fs_data:
+                filesystems.append(
+                    GuestFsInfo(
+                        disk_name=fs.get("diskName", ""),
+                        mount_point=fs.get("mountPoint", ""),
+                        fs_type=fs.get("fileSystemType", ""),
+                        used_bytes=fs.get("usedBytes", 0),
+                        total_bytes=fs.get("totalBytes", 0),
+                    )
+                )
+
+        # Guest network info
+        guest_networks: list[GuestNetworkInfo] = []
+        if guest_connected:
+            try:
+                resource_path = (
+                    f"/apis/{self.kv.SUBRESOURCE_API_GROUP}/{self.kv.KUBEVIRT_API_VERSION}"
+                    f"/namespaces/{namespace}/virtualmachineinstances/{name}/guestosinfo"
+                )
+                result = self.kv.api_client.call_api(
+                    resource_path,
+                    "GET",
+                    response_type="object",
+                    _return_http_data_only=True,
+                )
+                for iface in result.get("networkInterfaces", []):
+                    guest_networks.append(
+                        GuestNetworkInfo(
+                            name=iface.get("interfaceName", ""),
+                            ip_addresses=[ip.get("ip", "") for ip in iface.get("ipAddresses", [])]
+                            if isinstance(iface.get("ipAddresses"), list)
+                            else [],
+                            mac=iface.get("mac", ""),
+                        )
+                    )
+            except Exception:
+                pass
+
+        return VMDiagnostics(
+            health_status=health.value,
+            health_reasons=reasons,
+            guest_agent_connected=guest_connected,
+            conditions=conditions,
+            guest_os=guest_os,
+            filesystems=filesystems,
+            guest_networks=guest_networks,
+        ).model_dump()
+
     def update_compute(
         self, namespace: str, name: str, cpu_cores: int | None, memory_mb: int | None
     ) -> None:

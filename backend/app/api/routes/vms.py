@@ -45,6 +45,21 @@ def list_vms(
     return VMList(items=items, total=len(items))
 
 
+@router.get("/vms/{name}/diagnostics")
+def get_vm_diagnostics(
+    cluster: str,
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    result = svc.get_diagnostics(ns, name)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"VM '{name}' not found")
+    return result
+
+
 @router.get("/vms/{name}", response_model=VM)
 def get_vm(
     cluster: str,
@@ -105,8 +120,12 @@ def delete_vm(
 
 @router.post("/vms/{name}/clone", status_code=201)
 def clone_vm(
-    cluster: str, ns: str, name: str, body: VMCloneRequest,
-    _user: UserInfo = Depends(get_current_user), cm: ClusterManager = Depends(get_cluster_manager),
+    cluster: str,
+    ns: str,
+    name: str,
+    body: VMCloneRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
     svc.clone_vm(ns, name, body.new_name)
@@ -124,8 +143,11 @@ def clone_vm(
 
 @router.post("/vms/{name}/force-stop", status_code=200)
 def force_stop_vm(
-    cluster: str, ns: str, name: str,
-    _user: UserInfo = Depends(get_current_user), cm: ClusterManager = Depends(get_cluster_manager),
+    cluster: str,
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
     svc.force_stop(ns, name)
@@ -142,8 +164,12 @@ def force_stop_vm(
 
 @router.patch("/vms/{name}", status_code=200)
 def patch_vm(
-    cluster: str, ns: str, name: str, body: VMPatchRequest,
-    _user: UserInfo = Depends(get_current_user), cm: ClusterManager = Depends(get_cluster_manager),
+    cluster: str,
+    ns: str,
+    name: str,
+    body: VMPatchRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
     if body.run_strategy:
@@ -164,7 +190,8 @@ def add_disk_to_spec(
 ):
     svc = _get_service(cluster, cm)
     svc.add_disk_to_spec(
-        ns, name,
+        ns,
+        name,
         disk_name=body.name,
         bus=body.bus,
         size_gb=body.size_gb,
@@ -188,7 +215,8 @@ def add_interface_to_spec(
 ):
     svc = _get_service(cluster, cm)
     svc.add_interface_to_spec(
-        ns, name,
+        ns,
+        name,
         iface_name=body.name,
         iface_type=body.type,
         nad_name=body.nad_name,

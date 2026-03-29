@@ -28,6 +28,7 @@ import type { VNCConsoleRef, ConnectionStatus } from '@/components/console/VNCCo
 import { HealthBadge } from '@/components/vm/HealthBadge'
 import { AddDiskWizard } from '@/components/vm/AddDiskWizard'
 import { AddNetworkWizard } from '@/components/vm/AddNetworkWizard'
+import { DiagnosticsTab } from '@/components/vm/DiagnosticsTab'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -58,7 +59,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-type Tab = 'overview' | 'console' | 'metrics' | 'timeline' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
+type Tab = 'overview' | 'console' | 'metrics' | 'timeline' | 'disks' | 'network' | 'snapshots' | 'diagnostics' | 'events' | 'yaml'
 
 export function VMDetailPage() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>()
@@ -231,6 +232,7 @@ export function VMDetailPage() {
     { id: 'disks', label: 'Disks' },
     { id: 'network', label: 'Network' },
     { id: 'snapshots', label: 'Snapshots' },
+    { id: 'diagnostics', label: 'Diagnostics' },
     { id: 'console', label: 'Console' },
     { id: 'events', label: 'Events' },
     { id: 'yaml', label: 'YAML' },
@@ -1541,6 +1543,11 @@ export function VMDetailPage() {
                 </div>
               )
             })()}
+
+            {/* Diagnostics */}
+            {activeTab === 'diagnostics' && namespace && name && (
+              <DiagnosticsTab namespace={namespace} vmName={name} />
+            )}
 
             {/* YAML */}
             {activeTab === 'yaml' && (

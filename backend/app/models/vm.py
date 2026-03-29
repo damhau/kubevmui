@@ -142,3 +142,36 @@ class VMPatchRequest(BaseModel):
 class VMList(BaseModel):
     items: list[VM]
     total: int
+
+
+class VMCondition(BaseModel):
+    type: str
+    status: str
+    reason: str = ""
+    message: str = ""
+    last_transition_time: str = ""
+
+
+class GuestFsInfo(BaseModel):
+    disk_name: str = ""
+    mount_point: str = ""
+    fs_type: str = ""
+    used_bytes: int = 0
+    total_bytes: int = 0
+
+
+class GuestNetworkInfo(BaseModel):
+    name: str = ""
+    ip_addresses: list[str] = []
+    mac: str = ""
+
+
+class VMDiagnostics(BaseModel):
+    health_status: str = "unknown"
+    health_reasons: list[str] = []
+    guest_agent_connected: bool = False
+    guest_agent_version: str = ""
+    conditions: list[VMCondition] = []
+    guest_os: GuestAgentInfo | None = None
+    filesystems: list[GuestFsInfo] = []
+    guest_networks: list[GuestNetworkInfo] = []
