@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Monitor } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
+import { HealthBadge } from '@/components/vm/HealthBadge'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -51,6 +52,7 @@ interface VM {
   name: string
   namespace: string
   status: string
+  health?: string
   compute?: { cpu_cores?: number; memory_mb?: number }
   node?: string
   created_at?: string
@@ -505,7 +507,12 @@ export function VMListPage() {
                       <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>{vm.namespace}</td>
                     )}
                     <td className="table-cell">
-                      <StatusBadge status={vm.status} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <StatusBadge status={vm.status} />
+                        {vm.health && vm.health !== 'unknown' && vm.health !== 'healthy' && (
+                          <HealthBadge health={vm.health} size="dot" />
+                        )}
+                      </div>
                     </td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{vm.compute?.cpu_cores ?? '—'} vCPU</td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{formatMemoryMb(vm.compute?.memory_mb)}</td>

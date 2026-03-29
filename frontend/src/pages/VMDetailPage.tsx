@@ -24,6 +24,7 @@ import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveCo
 import { Cpu, Network, HardDrive, Tag, Monitor } from 'lucide-react'
 import { VNCConsole } from '@/components/console/VNCConsole'
 import type { VNCConsoleRef, ConnectionStatus } from '@/components/console/VNCConsole'
+import { HealthBadge } from '@/components/vm/HealthBadge'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -288,6 +289,9 @@ export function VMDetailPage() {
           </h1>
           {vm?.status && (
             <StatusBadge status={vm.status} />
+          )}
+          {vm?.health && vm.health !== 'unknown' && (
+            <HealthBadge health={vm.health} />
           )}
         </div>
 
