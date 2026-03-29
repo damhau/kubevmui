@@ -158,25 +158,6 @@ export function DiagnosticsTab({ namespace, vmName }: DiagnosticsTabProps) {
         </div>
       )}
 
-      {/* Bottom 2-column grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* Guest OS */}
-        {data.guest_os && (
-          <div className="card-padded stagger-4">
-            <div className="section-title" style={{ marginBottom: 12 }}>Guest OS</div>
-            <InfoRow label="Hostname" value={data.guest_os.hostname || '—'} mono />
-            <InfoRow label="OS" value={data.guest_os.os_name ? `${data.guest_os.os_name} ${data.guest_os.os_version}`.trim() : '—'} />
-            <InfoRow label="Kernel" value={data.guest_os.kernel || '—'} mono />
-            <InfoRow label="Timezone" value={data.guest_os.timezone || '—'} />
-          </div>
-        )}
-        {!data.guest_os && data.guest_agent_connected && (
-          <div className="card-padded stagger-4">
-            <div className="section-title" style={{ marginBottom: 12 }}>Guest OS</div>
-            <div className="empty-text">No guest OS information available.</div>
-          </div>
-        )}
-      </div>
 
       {/* Filesystem Usage — full width */}
       {data.filesystems && data.filesystems.length > 0 && (
