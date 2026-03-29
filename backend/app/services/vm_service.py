@@ -787,11 +787,11 @@ class VMService:
             for c in vmi_raw.get("status", {}).get("conditions", []):
                 conditions.append(
                     VMCondition(
-                        type=c.get("type", ""),
-                        status=c.get("status", ""),
-                        reason=c.get("reason", ""),
-                        message=c.get("message", ""),
-                        last_transition_time=c.get("lastTransitionTime", ""),
+                        type=c.get("type") or "",
+                        status=c.get("status") or "",
+                        reason=c.get("reason") or "",
+                        message=c.get("message") or "",
+                        last_transition_time=c.get("lastTransitionTime") or "",
                     )
                 )
 
