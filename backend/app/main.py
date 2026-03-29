@@ -7,6 +7,7 @@ from app.api.routes import (
     analytics,
     audit,
     auth,
+    catalog,
     cluster_lists,
     dashboard,
     events,
@@ -27,16 +28,31 @@ from app.api.routes import (
 from app.api.routes.networks import cluster_router as networks_cluster_router
 from app.api.routes.storage import cluster_router as storage_cluster_router
 from app.core.cluster_manager import ClusterManager
+from app.core.k8s_client import KubeVirtClient
 from app.core.config import settings
 from app.ws import serial_proxy, vnc_proxy
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.cluster_manager = ClusterManager(
+    cm = ClusterManager(
         kubeconfig_path=settings.kubeconfig_path,
         in_cluster=settings.kubeconfig_path is None,
     )
+    app.state.cluster_manager = cm
+    # Seed default catalog entries
+    try:
+        from app.services.catalog_service import CatalogService
+        api_client = cm.get_api_client("local")
+        if api_client:
+            svc = CatalogService(KubeVirtClient(api_client))
+            count = svc.seed_defaults()
+            if count:
+                import logging
+                logging.getLogger(__name__).info("Seeded %d catalog entries", count)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("Failed to seed catalog entries", exc_info=True)
     yield
 
 
@@ -56,6 +72,7 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok"}
 
+    application.include_router(catalog.router)
     application.include_router(analytics.router)
     application.include_router(audit.router)
     application.include_router(auth.router)
