@@ -9,6 +9,7 @@ from app.models.vm import (
     VM,
     AddDiskToSpecRequest,
     AddInterfaceRequest,
+    AddInterfaceToSpecRequest,
     AddVolumeRequest,
     VMCloneRequest,
     VMCreate,
@@ -172,6 +173,27 @@ def add_disk_to_spec(
         source_type=body.source_type,
         image_name=body.image_name,
         image_namespace=body.image_namespace,
+    )
+    return {"status": "ok"}
+
+
+@router.post("/vms/{name}/nics", status_code=200)
+def add_interface_to_spec(
+    cluster: str,
+    ns: str,
+    name: str,
+    body: AddInterfaceToSpecRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.add_interface_to_spec(
+        ns, name,
+        iface_name=body.name,
+        iface_type=body.type,
+        nad_name=body.nad_name,
+        model=body.model,
+        mac_address=body.mac_address,
     )
     return {"status": "ok"}
 

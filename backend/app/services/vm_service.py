@@ -594,6 +594,49 @@ class VMService:
     def remove_interface(self, namespace: str, vm_name: str, name: str) -> None:
         self.kv.remove_interface(namespace, vm_name, {"name": name})
 
+    def add_interface_to_spec(
+        self,
+        namespace: str,
+        vm_name: str,
+        iface_name: str,
+        iface_type: str = "pod",
+        nad_name: str | None = None,
+        model: str | None = None,
+        mac_address: str | None = None,
+    ) -> None:
+        """Add a network interface to a stopped VM's spec via JSON merge patch."""
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            return
+        spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+        interfaces = spec.get("domain", {}).get("devices", {}).get("interfaces", [])
+        networks = spec.get("networks", [])
+
+        iface_entry: dict = {"name": iface_name}
+        if mac_address:
+            iface_entry["macAddress"] = mac_address
+        if iface_type == "pod":
+            iface_entry["masquerade"] = {}
+            networks.append({"name": iface_name, "pod": {}})
+        else:
+            iface_entry["bridge"] = {}
+            networks.append({"name": iface_name, "multus": {"networkName": nad_name or ""}})
+        if model:
+            iface_entry["model"] = model
+        interfaces.append(iface_entry)
+
+        body = {
+            "spec": {
+                "template": {
+                    "spec": {
+                        "domain": {"devices": {"interfaces": interfaces}},
+                        "networks": networks,
+                    }
+                }
+            }
+        }
+        self.kv.patch_vm(namespace, vm_name, body)
+
     def clone_vm(self, namespace: str, source_name: str, new_name: str) -> dict:
         manifest = {
             "apiVersion": "clone.kubevirt.io/v1beta1",

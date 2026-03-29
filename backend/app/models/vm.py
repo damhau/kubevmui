@@ -117,6 +117,14 @@ class AddInterfaceRequest(BaseModel):
     network_attachment_definition: str
 
 
+class AddInterfaceToSpecRequest(BaseModel):
+    name: str
+    type: str = "pod"  # "pod" or "multus"
+    nad_name: str | None = None
+    model: str | None = None
+    mac_address: str | None = None
+
+
 class RemoveInterfaceRequest(BaseModel):
     name: str
 

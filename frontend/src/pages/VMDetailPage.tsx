@@ -6,7 +6,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
-import { useRemoveVolume, useAddInterface, useRemoveInterface } from '@/hooks/useHotplug'
+import { useRemoveVolume, useRemoveInterface } from '@/hooks/useHotplug'
 import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
@@ -27,6 +27,7 @@ import { VNCConsole } from '@/components/console/VNCConsole'
 import type { VNCConsoleRef, ConnectionStatus } from '@/components/console/VNCConsole'
 import { HealthBadge } from '@/components/vm/HealthBadge'
 import { AddDiskWizard } from '@/components/vm/AddDiskWizard'
+import { AddNetworkWizard } from '@/components/vm/AddNetworkWizard'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -167,11 +168,9 @@ export function VMDetailPage() {
   const deleteSnapshot = useDeleteSnapshot()
   const restoreSnapshot = useRestoreSnapshot()
   const removeVolume = useRemoveVolume()
-  const addInterface = useAddInterface()
   const removeInterface = useRemoveInterface()
   const [showAddDisk, setShowAddDisk] = useState(false)
   const [showAddNic, setShowAddNic] = useState(false)
-  const [newNic, setNewNic] = useState({ name: '', nad_name: '' })
 
   const [snapshotName, setSnapshotName] = useState('')
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
@@ -1154,112 +1153,24 @@ export function VMDetailPage() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
-                    flexWrap: 'wrap',
                   }}
                 >
-                  {!showAddNic ? (
-                    <button
-                      onClick={() => setShowAddNic(true)}
-                      style={{
-                        background: theme.accent,
-                        color: theme.button.primaryText,
-                        border: 'none',
-                        borderRadius: theme.radius.md,
-                        padding: '6px 14px',
-                        fontSize: 12,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        fontWeight: 500,
-                      }}
-                    >
-                      Add Interface
-                    </button>
-                  ) : (
-                    <>
-                      <input
-                        type="text"
-                        placeholder="Interface name"
-                        value={newNic.name}
-                        onChange={(e) => setNewNic({ ...newNic, name: e.target.value })}
-                        style={{
-                          background: theme.main.inputBg,
-                          border: `1px solid ${theme.main.inputBorder}`,
-                          borderRadius: theme.radius.md,
-                          padding: '6px 12px',
-                          fontSize: 13,
-                          color: theme.text.primary,
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                          minWidth: 140,
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Network Attachment Definition"
-                        value={newNic.nad_name}
-                        onChange={(e) => setNewNic({ ...newNic, nad_name: e.target.value })}
-                        style={{
-                          background: theme.main.inputBg,
-                          border: `1px solid ${theme.main.inputBorder}`,
-                          borderRadius: theme.radius.md,
-                          padding: '6px 12px',
-                          fontSize: 13,
-                          color: theme.text.primary,
-                          fontFamily: 'inherit',
-                          outline: 'none',
-                          minWidth: 200,
-                        }}
-                      />
-                      <button
-                        onClick={() => {
-                          if (!newNic.name.trim() || !newNic.nad_name.trim() || !namespace || !name) return
-                          addInterface.mutate(
-                            { namespace, vmName: name, name: newNic.name.trim(), nadName: newNic.nad_name.trim() },
-                            {
-                              onSuccess: () => {
-                                setNewNic({ name: '', nad_name: '' })
-                                setShowAddNic(false)
-                              },
-                            }
-                          )
-                        }}
-                        disabled={addInterface.isPending}
-                        style={{
-                          background: theme.accent,
-                          color: theme.button.primaryText,
-                          border: 'none',
-                          borderRadius: theme.radius.md,
-                          padding: '6px 14px',
-                          fontSize: 12,
-                          cursor: addInterface.isPending ? 'not-allowed' : 'pointer',
-                          fontFamily: 'inherit',
-                          fontWeight: 500,
-                          opacity: addInterface.isPending ? 0.7 : 1,
-                        }}
-                      >
-                        {addInterface.isPending ? 'Attaching...' : 'Attach'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowAddNic(false)
-                          setNewNic({ name: '', nad_name: '' })
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: theme.text.secondary,
-                          cursor: 'pointer',
-                          fontSize: 12,
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                  <span style={{ fontSize: 11, color: theme.text.dim, marginLeft: 8 }}>
-                    Hotplug is only available on running VMs
-                  </span>
+                  <button
+                    onClick={() => setShowAddNic(true)}
+                    style={{
+                      background: theme.accent,
+                      color: theme.button.primaryText,
+                      border: 'none',
+                      borderRadius: theme.radius.md,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Add Interface
+                  </button>
                 </div>
 
                 {/* Network table */}
@@ -1743,6 +1654,14 @@ export function VMDetailPage() {
         vmStatus={vm?.status ?? ''}
         existingDiskCount={vm?.disks?.length ?? 0}
         activeCluster={activeCluster}
+      />
+      <AddNetworkWizard
+        open={showAddNic}
+        onClose={() => setShowAddNic(false)}
+        namespace={namespace!}
+        vmName={name!}
+        vmStatus={vm?.status ?? ''}
+        existingNicCount={vm?.networks?.length ?? 0}
       />
       <PromptModal
         open={!!promptAction}

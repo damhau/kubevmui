@@ -93,3 +93,25 @@ export function useRemoveInterface() {
     },
   })
 }
+
+export function useAddInterfaceToSpec() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ namespace, vmName, iface }: {
+      namespace: string
+      vmName: string
+      iface: { name: string; type: string; nad_name?: string; model?: string; mac_address?: string }
+    }) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/nics`,
+        iface
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+}
