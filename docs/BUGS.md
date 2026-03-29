@@ -13,7 +13,28 @@ POST
 Status Code
 500 Internal Server Error
 
+Event:
+- [X] automatic realtime refresh of event
+- [X] add global event in "MAIN"
+- [X] add event tab in details for Image (based on datavolume)
+- [X] add event tab in details for storage (based on pvc)
+
+Misc:
+- [X] Add "all namespace"
+- [X] when all namespace is selected in the namespace filter show all the item (vm, template, etc...) and add a column namespace in the view
+- [X] add console tab (use vnc by default)
+- [X] add focus when using the console, currentl you have to click inside the console to type text
 
 - [ ] allow selection of ssh key in vm creation
 
-- [ ] duplicate tempalte does not work
+- [ ] add pagination on the event in main
+
+VM:
+- [ ] allow edit of cpu and ram when vm is stopped
+
+Tempalte:
+- [ ] Add the Global: true/false in the image and tempalte overview "basic info"
+
+
+Monitoring:
+- [ ] Add "core assigned" and "mem assigned" in the node monitoring

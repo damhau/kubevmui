@@ -208,6 +208,106 @@
   word-break: break-word;
 }
 
+/* YAML Viewer */
+.yaml-viewer {
+  background: #1e1e2e;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}
+.yaml-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  font-size: 12px;
+}
+.yaml-viewer-toolbar-label {
+  color: #a6adc8;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.yaml-viewer-copy {
+  padding: 4px 10px;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  color: #cdd6f4;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.yaml-viewer-copy:hover { background: #45475a; }
+.yaml-viewer-content {
+  display: flex;
+  overflow: auto;
+  max-height: 700px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.yaml-viewer-lines {
+  padding: 16px 0;
+  text-align: right;
+  user-select: none;
+  color: #585b70;
+  background: #181825;
+  border-right: 1px solid #313244;
+  min-width: 48px;
+  flex-shrink: 0;
+}
+.yaml-viewer-lines div {
+  padding: 0 12px;
+}
+.yaml-viewer-code {
+  padding: 16px;
+  flex: 1;
+  min-width: 0;
+  white-space: pre;
+  color: #cdd6f4;
+}
+/* YAML syntax colors (Catppuccin Mocha) */
+.yaml-key { color: #89b4fa; }
+.yaml-string { color: #a6e3a1; }
+.yaml-number { color: #fab387; }
+.yaml-bool { color: #cba6f7; }
+.yaml-null { color: #f38ba8; font-style: italic; }
+.yaml-comment { color: #585b70; font-style: italic; }
+.yaml-separator { color: #585b70; }
+
+/* Resource section in YAML viewer */
+.yaml-resource-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  cursor: pointer;
+  user-select: none;
+  color: #cdd6f4;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  transition: background 0.12s;
+}
+.yaml-resource-header:hover { background: #1e1e2e; }
+.yaml-resource-kind {
+  padding: 2px 8px;
+  background: #313244;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #89b4fa;
+  font-weight: 500;
+}
+
 /* Keyframes */
 @keyframes shimmer {
   0% { background-position: 200% 0; }

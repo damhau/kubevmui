@@ -153,7 +153,7 @@ export function StoragePage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', 'Size (GB)', 'Performance Tier', 'Status', 'Attached VM', 'Actions'].map((col) => (
+                  {['Name', ...(activeNamespace === '_all' ? ['Namespace'] : []), 'Size (GB)', 'Performance Tier', 'Status', 'Attached VM', 'Actions'].map((col) => (
                     <th
                       key={col}
                       className="table-header-cell"
@@ -174,7 +174,19 @@ export function StoragePage() {
                       animationDelay: `${0.05 + i * 0.04}s`,
                     } : undefined}
                   >
-                    <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>{disk.name}</td>
+                    <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {disk.name}
+                        {disk.is_image && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: `${theme.status.provisioning}18`, color: theme.status.provisioning, border: `1px solid ${theme.status.provisioning}40`, fontFamily: 'inherit' }}>
+                            Image
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    {activeNamespace === '_all' && (
+                      <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>{(disk as any).namespace}</td>
+                    )}
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>
                       {disk.size_gb != null ? disk.size_gb : '—'}
                     </td>

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
+from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.template import Template, TemplateCreate, TemplateList
 from app.services.template_service import TemplateService
@@ -16,7 +17,7 @@ def _get_service(cluster: str, cm: ClusterManager) -> TemplateService:
     api_client = cm.get_api_client(cluster)
     if api_client is None:
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
-    return TemplateService(api_client)
+    return TemplateService(KubeVirtClient(api_client))
 
 
 @router.get("/templates", response_model=TemplateList)

@@ -65,6 +65,21 @@ class KubeVirtClient:
             _return_http_data_only=True,
         )
 
+    def get_guest_fs_info(self, namespace: str, name: str) -> list[dict]:
+        """Get filesystem usage from guest agent."""
+        try:
+            resource_path = (
+                f"/apis/{self.SUBRESOURCE_API_GROUP}/{self.KUBEVIRT_API_VERSION}"
+                f"/namespaces/{namespace}/virtualmachineinstances/{name}/guestosinfo"
+            )
+            result = self.api_client.call_api(
+                resource_path, "GET", response_type="object",
+                _return_http_data_only=True,
+            )
+            return result.get("fsInfo", {}).get("disks", [])
+        except Exception:
+            return []
+
     # --- Hotplug ---
 
     def add_volume(self, namespace: str, vm_name: str, body: dict) -> None:
@@ -129,12 +144,20 @@ class KubeVirtClient:
         result = self.core_api.list_namespace()
         return [ns.metadata.name for ns in result.items]
 
+    def list_all_events(self, field_selector: str = "") -> list[dict]:
+        result = self.core_api.list_event_for_all_namespaces(field_selector=field_selector)
+        return self._parse_events(result.items)
+
     def list_events(self, namespace: str, field_selector: str = "") -> list[dict]:
         result = self.core_api.list_namespaced_event(
             namespace=namespace, field_selector=field_selector,
         )
+        return self._parse_events(result.items)
+
+    @staticmethod
+    def _parse_events(items) -> list[dict]:
         events = []
-        for e in result.items:
+        for e in items:
             involved = e.involved_object
             events.append({
                 "timestamp": (e.last_timestamp or e.event_time or e.metadata.creation_timestamp or "").isoformat()
@@ -143,6 +166,7 @@ class KubeVirtClient:
                 "type": e.type or "",
                 "reason": e.reason or "",
                 "message": e.message or "",
+                "namespace": e.metadata.namespace or "",
                 "involved_object_name": involved.name if involved else "",
                 "involved_object_kind": involved.kind if involved else "",
             })
@@ -169,6 +193,15 @@ class KubeVirtClient:
                 "memory_allocatable": node.status.allocatable.get("memory", "0"),
             })
         return nodes
+
+    def get_node_raw(self, name: str) -> dict | None:
+        try:
+            node = self.core_api.read_node(name)
+            return self.core_api.api_client.sanitize_for_serialization(node)
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
 
     # --- DataVolumes (CDI) ---
 
@@ -263,6 +296,17 @@ class KubeVirtClient:
             namespace=namespace, plural="virtualmachinerestores", body=body,
         )
 
+    def get_restore(self, namespace: str, name: str) -> dict | None:
+        try:
+            return self.custom_api.get_namespaced_custom_object(
+                group=self.SNAPSHOT_API_GROUP, version=self.SNAPSHOT_API_VERSION,
+                namespace=namespace, plural="virtualmachinerestores", name=name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
     def list_restores(self, namespace: str) -> list[dict]:
         result = self.custom_api.list_namespaced_custom_object(
             group=self.SNAPSHOT_API_GROUP, version=self.SNAPSHOT_API_VERSION,
@@ -337,45 +381,72 @@ class KubeVirtClient:
 
     # --- Images (ConfigMap-backed registry) ---
 
+    # --- Images (kubevmui.io CRD) ---
+
+    KUBEVMUI_GROUP = "kubevmui.io"
+    KUBEVMUI_VERSION = "v1"
+
     def list_images(self, namespace: str) -> list[dict]:
-        result = self.core_api.list_namespaced_config_map(
-            namespace=namespace, label_selector="kubevmui.io/type=image",
+        result = self.custom_api.list_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+            namespace=namespace, plural="images",
         )
-        return [self._configmap_to_dict(cm) for cm in result.items]
+        return result.get("items", [])
 
     def get_image(self, namespace: str, name: str) -> dict | None:
         try:
-            cm = self.core_api.read_namespaced_config_map(name=name, namespace=namespace)
-            return self._configmap_to_dict(cm)
+            return self.custom_api.get_namespaced_custom_object(
+                group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+                namespace=namespace, plural="images", name=name,
+            )
         except ApiException as e:
             if e.status == 404:
                 return None
             raise
 
-    def create_image(self, namespace: str, name: str, data: dict) -> dict:
-        cm = client.V1ConfigMap(
-            metadata=client.V1ObjectMeta(
-                name=name, namespace=namespace,
-                labels={"kubevmui.io/type": "image"},
-            ),
-            data=data,
+    def create_image(self, namespace: str, body: dict) -> dict:
+        return self.custom_api.create_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+            namespace=namespace, plural="images", body=body,
         )
-        result = self.core_api.create_namespaced_config_map(namespace=namespace, body=cm)
-        return self._configmap_to_dict(result)
 
     def delete_image(self, namespace: str, name: str) -> None:
-        self.core_api.delete_namespaced_config_map(name=name, namespace=namespace)
+        self.custom_api.delete_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+            namespace=namespace, plural="images", name=name,
+        )
 
-    @staticmethod
-    def _configmap_to_dict(cm) -> dict:
-        return {
-            "metadata": {
-                "name": cm.metadata.name,
-                "namespace": cm.metadata.namespace,
-                "creationTimestamp": cm.metadata.creation_timestamp.isoformat() if cm.metadata.creation_timestamp else None,
-            },
-            "data": cm.data or {},
-        }
+    # --- Templates (kubevmui.io CRD) ---
+
+    def list_templates(self, namespace: str) -> list[dict]:
+        result = self.custom_api.list_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+            namespace=namespace, plural="templates",
+        )
+        return result.get("items", [])
+
+    def get_template(self, namespace: str, name: str) -> dict | None:
+        try:
+            return self.custom_api.get_namespaced_custom_object(
+                group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+                namespace=namespace, plural="templates", name=name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def create_template(self, namespace: str, body: dict) -> dict:
+        return self.custom_api.create_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+            namespace=namespace, plural="templates", body=body,
+        )
+
+    def delete_template(self, namespace: str, name: str) -> None:
+        self.custom_api.delete_namespaced_custom_object(
+            group=self.KUBEVMUI_GROUP, version=self.KUBEVMUI_VERSION,
+            namespace=namespace, plural="templates", name=name,
+        )
 
     @staticmethod
     def _secret_to_dict(secret) -> dict:

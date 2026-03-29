@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useImage } from '@/hooks/useImages'
+import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { TopBar } from '@/components/layout/TopBar'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
+import { YamlViewer } from '@/components/ui/YamlViewer'
 
-type Tab = 'overview' | 'yaml'
+type Tab = 'overview' | 'events' | 'yaml'
 
 const sourceColor: Record<string, string> = { http: '#3b82f6', registry: '#8b5cf6', pvc: '#f59e0b', upload: '#22c55e' }
 const osColor: Record<string, string> = { linux: '#22c55e', windows: '#3b82f6' }
@@ -20,10 +22,12 @@ const phaseBadge: Record<string, { bg: string; color: string; border: string }> 
 export function ImageDetailPage() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>()
   const { data, isLoading } = useImage(namespace!, name!)
+  const { data: events = [] } = useResourceEvents(namespace!, name!)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'events', label: 'Events' },
     { id: 'yaml', label: 'YAML' },
   ]
 
@@ -229,13 +233,74 @@ export function ImageDetailPage() {
                 </div>
               )}
 
+              {/* Events */}
+              {activeTab === 'events' && (
+                <div className="card">
+                  {events.length > 0 ? (
+                    <table className="table">
+                      <thead>
+                        <tr className="table-header">
+                          {['Time', 'Type', 'Source', 'Reason', 'Message'].map((col) => (
+                            <th key={col} className="table-header-cell">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {events.map((evt: any, i: number) => (
+                          <tr key={i} className="table-row">
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                              {evt.timestamp}
+                            </td>
+                            <td className="table-cell">
+                              <span
+                                style={{
+                                  color: evt.type === 'Warning' ? theme.status.migrating : theme.status.running,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {evt.type}
+                              </span>
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                              {evt.source && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  background: `${theme.accent}1a`,
+                                  color: theme.accent,
+                                  border: `1px solid ${theme.accent}40`,
+                                }}>
+                                  {evt.source}
+                                </span>
+                              )}
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary }}>{evt.reason}</td>
+                            <td className="table-cell" style={{ color: theme.text.primary }}>{evt.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="empty-text">
+                      No events found.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* YAML */}
               {activeTab === 'yaml' && (
-                <div className="card-padded">
-                  <pre className="code-block" style={{ border: 'none', boxShadow: 'none', padding: 0, borderRadius: 0, background: 'transparent', fontSize: 13, lineHeight: 1.6, wordBreak: 'break-all' }}>
-                    {JSON.stringify(data, null, 2)}
-                  </pre>
-                </div>
+                <YamlViewer resources={[
+                  ...(data.raw_manifest ? [{ label: data.name, kind: 'Image', data: data.raw_manifest }] : []),
+                  ...(data.raw_dv_manifest ? [{ label: `${data.name} (volume)`, kind: 'DataVolume', data: data.raw_dv_manifest }] : []),
+                  ...(!data.raw_manifest && !data.raw_dv_manifest ? [{ label: data.name, kind: 'Image', data }] : []),
+                ]} />
               )}
             </>
           )}

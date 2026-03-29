@@ -8,6 +8,7 @@ import {
   Disc,
   KeyRound,
   Server,
+  Activity,
 } from 'lucide-react'
 import { theme } from '@/lib/theme'
 
@@ -31,6 +32,7 @@ const navGroups: NavGroup[] = [
       { label: 'Dashboard', to: '/dashboard', icon: <LayoutDashboard size={16} /> },
       { label: 'Virtual Machines', to: '/vms', icon: <Monitor size={16} /> },
       { label: 'Templates', to: '/templates', icon: <Copy size={16} /> },
+      { label: 'Events', to: '/events', icon: <Activity size={16} /> },
     ],
   },
   {

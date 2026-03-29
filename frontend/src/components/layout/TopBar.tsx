@@ -11,9 +11,10 @@ interface TopBarProps {
   subtitle?: string
   action?: React.ReactNode
   searchPlaceholder?: string
+  hideNamespace?: boolean
 }
 
-export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...' }: TopBarProps) {
+export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...', hideNamespace }: TopBarProps) {
   const navigate = useNavigate()
   const searchRef = useRef<HTMLDivElement>(null)
   const { activeNamespace, setActiveNamespace } = useUIStore()
@@ -101,82 +102,100 @@ export function TopBar({ title, subtitle, action, searchPlaceholder = 'Search...
         )}
 
         {/* Namespace selector */}
-        <button
-          ref={nsBtnRef}
-          onClick={() => setNsOpen((v) => !v)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '5px 10px',
-            background: theme.topBar.searchBg,
-            border: `1px solid ${theme.topBar.searchBorder}`,
-            borderRadius: theme.radius.md,
-            color: theme.text.primary,
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: theme.typography.mono.fontFamily,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <span style={{ fontSize: 11, color: theme.text.secondary, fontFamily: theme.typography.heading.fontFamily }}>NS:</span>
-          {activeNamespace}
-          <ChevronDown
-            size={14}
+        {!hideNamespace && <>
+          <button
+            ref={nsBtnRef}
+            onClick={() => setNsOpen((v) => !v)}
             style={{
-              color: theme.text.dim,
-              flexShrink: 0,
-              transition: 'transform 0.15s',
-              transform: nsOpen ? 'rotate(180deg)' : 'none',
-            }}
-          />
-        </button>
-        {nsOpen && createPortal(
-          <div
-            ref={nsMenuRef}
-            style={{
-              position: 'fixed',
-              top: nsPos.top,
-              left: nsPos.left,
-              minWidth: Math.max(nsPos.width, 180),
-              background: theme.main.card,
-              border: `1px solid ${theme.main.cardBorder}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '5px 10px',
+              background: theme.topBar.searchBg,
+              border: `1px solid ${theme.topBar.searchBorder}`,
               borderRadius: theme.radius.md,
-              overflow: 'hidden',
-              zIndex: 9999,
-              maxHeight: 300,
-              overflowY: 'auto',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              color: theme.text.primary,
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: theme.typography.mono.fontFamily,
+              whiteSpace: 'nowrap',
             }}
           >
-            {namespaces.map((ns) => (
+            <span style={{ fontSize: 11, color: theme.text.secondary, fontFamily: theme.typography.heading.fontFamily }}>NS:</span>
+            {activeNamespace === '_all' ? 'All Namespaces' : activeNamespace}
+            <ChevronDown
+              size={14}
+              style={{
+                color: theme.text.dim,
+                flexShrink: 0,
+                transition: 'transform 0.15s',
+                transform: nsOpen ? 'rotate(180deg)' : 'none',
+              }}
+            />
+          </button>
+          {nsOpen && createPortal(
+            <div
+              ref={nsMenuRef}
+              style={{
+                position: 'fixed',
+                top: nsPos.top,
+                left: nsPos.left,
+                minWidth: Math.max(nsPos.width, 180),
+                background: theme.main.card,
+                border: `1px solid ${theme.main.cardBorder}`,
+                borderRadius: theme.radius.md,
+                overflow: 'hidden',
+                zIndex: 9999,
+                maxHeight: 300,
+                overflowY: 'auto',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              }}
+            >
               <button
-                key={ns}
-                onClick={() => { setActiveNamespace(ns); setNsOpen(false) }}
+                onClick={() => { setActiveNamespace('_all'); setNsOpen(false) }}
                 style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '7px 12px',
-                  background: ns === activeNamespace ? theme.accentLight : 'transparent',
-                  border: 'none',
-                  color: ns === activeNamespace ? theme.accent : theme.text.primary,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontFamily: theme.typography.mono.fontFamily,
+                  background: activeNamespace === '_all' ? theme.accentLight : 'transparent',
+                  border: 'none', borderBottom: `1px solid ${theme.main.cardBorder}`,
+                  color: activeNamespace === '_all' ? theme.accent : theme.text.primary,
+                  fontSize: 13, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                 }}
-                onMouseEnter={(e) => { if (ns !== activeNamespace) e.currentTarget.style.background = theme.main.hoverBg }}
-                onMouseLeave={(e) => { if (ns !== activeNamespace) e.currentTarget.style.background = 'transparent' }}
+                onMouseEnter={(e) => { if (activeNamespace !== '_all') e.currentTarget.style.background = theme.main.hoverBg }}
+                onMouseLeave={(e) => { if (activeNamespace !== '_all') e.currentTarget.style.background = 'transparent' }}
               >
-                {ns}
-                {ns === activeNamespace && <Check size={13} style={{ color: theme.accent }} />}
+                All Namespaces
+                {activeNamespace === '_all' && <Check size={13} style={{ color: theme.accent }} />}
               </button>
-            ))}
-          </div>,
-          document.body
-        )}
+              {namespaces.map((ns) => (
+                <button
+                  key={ns}
+                  onClick={() => { setActiveNamespace(ns); setNsOpen(false) }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '7px 12px',
+                    background: ns === activeNamespace ? theme.accentLight : 'transparent',
+                    border: 'none',
+                    color: ns === activeNamespace ? theme.accent : theme.text.primary,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontFamily: theme.typography.mono.fontFamily,
+                  }}
+                  onMouseEnter={(e) => { if (ns !== activeNamespace) e.currentTarget.style.background = theme.main.hoverBg }}
+                  onMouseLeave={(e) => { if (ns !== activeNamespace) e.currentTarget.style.background = 'transparent' }}
+                >
+                  {ns}
+                  {ns === activeNamespace && <Check size={13} style={{ color: theme.accent }} />}
+                </button>
+              ))}
+            </div>,
+            document.body
+          )}
+        </>}
       </div>
 
       {/* Right side */}

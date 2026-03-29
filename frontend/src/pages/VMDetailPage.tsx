@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from '@/lib/api-client'
@@ -7,6 +7,7 @@ import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
 import { useAddVolume, useRemoveVolume, useAddInterface, useRemoveInterface } from '@/hooks/useHotplug'
+import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
 import { useVMMetrics } from '@/hooks/useMetrics'
@@ -16,7 +17,10 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
+import { YamlViewer } from '@/components/ui/YamlViewer'
 import { Cpu, Network, HardDrive, Tag } from 'lucide-react'
+import { VNCConsole } from '@/components/console/VNCConsole'
+import type { VNCConsoleRef, ConnectionStatus } from '@/components/console/VNCConsole'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -47,7 +51,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-type Tab = 'overview' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
+type Tab = 'overview' | 'console' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
 
 function MetricChart({ title, data, color, formatValue }: { title: string; data: any[]; color: string; formatValue: (v: number) => string }) {
   return (
@@ -95,7 +99,10 @@ export function VMDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [editingRunStrategy, setEditingRunStrategy] = useState(false)
   const [metricsRange, setMetricsRange] = useState('1h')
+  const vncRef = useRef<VNCConsoleRef>(null)
+  const [consoleStatus, setConsoleStatus] = useState<ConnectionStatus>('connecting')
   const { data: metricsData, isLoading: metricsLoading } = useVMMetrics(namespace!, name!, metricsRange)
+  const { data: liveEvents } = useResourceEvents(namespace!, name!)
 
   const cloneMutation = useMutation({
     mutationFn: async (newName: string) => {
@@ -146,6 +153,31 @@ export function VMDetailPage() {
     },
     onError: () => {
       toast.error('Failed to update run strategy')
+    },
+  })
+
+  const [editingCpu, setEditingCpu] = useState(false)
+  const [editingMemory, setEditingMemory] = useState(false)
+  const [cpuValue, setCpuValue] = useState(0)
+  const [memoryValue, setMemoryValue] = useState(0)
+  const [memoryUnit, setMemoryUnit] = useState<'MB' | 'GB'>('GB')
+
+  const updateComputeMutation = useMutation({
+    mutationFn: async (patch: { cpu_cores?: number; memory_mb?: number }) => {
+      const { data } = await apiClient.patch(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}`,
+        patch,
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      setEditingCpu(false)
+      setEditingMemory(false)
+      toast.success('Compute resources updated')
+    },
+    onError: () => {
+      toast.error('Failed to update compute resources')
     },
   })
 
@@ -221,12 +253,23 @@ export function VMDetailPage() {
     )
   }
 
+  useEffect(() => {
+    if (activeTab === 'console') {
+      // Focus the VNC canvas after a short delay to ensure it's mounted
+      setTimeout(() => {
+        const canvas = document.querySelector('canvas')
+        if (canvas) canvas.focus()
+      }, 500)
+    }
+  }, [activeTab])
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'metrics', label: 'Metrics' },
     { id: 'disks', label: 'Disks' },
     { id: 'network', label: 'Network' },
     { id: 'snapshots', label: 'Snapshots' },
+    { id: 'console', label: 'Console' },
     { id: 'events', label: 'Events' },
     { id: 'yaml', label: 'YAML' },
   ]
@@ -598,8 +641,67 @@ export function VMDetailPage() {
                       Compute
                     </div>
                     <InfoRow label="Status" value={<StatusBadge status={vm.status} />} />
-                    <InfoRow label="CPU" value={`${vm.compute?.cpu_cores ?? '—'} vCPU`} />
-                    <InfoRow label="Memory" value={formatMemoryMb(vm.compute?.memory_mb)} />
+                    <InfoRow label="CPU" value={
+                      vm.status?.toLowerCase() === 'stopped' || vm.status?.toLowerCase() === 'unknown' ? (
+                        editingCpu ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input type="number" min={1} max={64} value={cpuValue}
+                              onChange={(e) => setCpuValue(parseInt(e.target.value) || 1)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') updateComputeMutation.mutate({ cpu_cores: cpuValue }); if (e.key === 'Escape') setEditingCpu(false) }}
+                              autoFocus
+                              style={{ width: 60, background: theme.main.inputBg, border: `1px solid ${theme.main.inputBorder}`, borderRadius: theme.radius.md, color: theme.text.primary, fontSize: 14, padding: '4px 8px', outline: 'none', fontFamily: 'inherit' }}
+                            />
+                            <span style={{ fontSize: 13, color: theme.text.secondary }}>vCPU</span>
+                            <button onClick={() => updateComputeMutation.mutate({ cpu_cores: cpuValue })} disabled={updateComputeMutation.isPending}
+                              style={{ fontSize: 12, color: theme.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Save</button>
+                            <button onClick={() => setEditingCpu(false)}
+                              style={{ fontSize: 12, color: theme.text.secondary, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                          </div>
+                        ) : (
+                          <span onClick={() => { setCpuValue(vm.compute?.cpu_cores ?? 1); setEditingCpu(true) }}
+                            style={{ cursor: 'pointer', borderBottom: `1px dashed ${theme.text.dim}` }}
+                            title="Click to edit">{vm.compute?.cpu_cores ?? '—'} vCPU</span>
+                        )
+                      ) : `${vm.compute?.cpu_cores ?? '—'} vCPU`
+                    } />
+                    <InfoRow label="Memory" value={
+                      vm.status?.toLowerCase() === 'stopped' || vm.status?.toLowerCase() === 'unknown' ? (
+                        editingMemory ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input type="number" min={memoryUnit === 'GB' ? 1 : 128} step={memoryUnit === 'GB' ? 1 : 256} value={memoryValue}
+                              onChange={(e) => setMemoryValue(parseFloat(e.target.value) || 1)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') updateComputeMutation.mutate({ memory_mb: memoryUnit === 'GB' ? memoryValue * 1024 : memoryValue })
+                                if (e.key === 'Escape') setEditingMemory(false)
+                              }}
+                              autoFocus
+                              style={{ width: 70, background: theme.main.inputBg, border: `1px solid ${theme.main.inputBorder}`, borderRadius: theme.radius.md, color: theme.text.primary, fontSize: 14, padding: '4px 8px', outline: 'none', fontFamily: 'inherit' }}
+                            />
+                            <select value={memoryUnit} onChange={(e) => {
+                              const newUnit = e.target.value as 'MB' | 'GB'
+                              setMemoryValue(newUnit === 'GB' ? memoryValue / 1024 : memoryValue * 1024)
+                              setMemoryUnit(newUnit)
+                            }} style={{ background: theme.main.inputBg, border: `1px solid ${theme.main.inputBorder}`, borderRadius: theme.radius.md, color: theme.text.primary, fontSize: 13, padding: '4px 6px', fontFamily: 'inherit' }}>
+                              <option value="GB">GB</option>
+                              <option value="MB">MB</option>
+                            </select>
+                            <button onClick={() => updateComputeMutation.mutate({ memory_mb: Math.round(memoryUnit === 'GB' ? memoryValue * 1024 : memoryValue) })} disabled={updateComputeMutation.isPending}
+                              style={{ fontSize: 12, color: theme.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Save</button>
+                            <button onClick={() => setEditingMemory(false)}
+                              style={{ fontSize: 12, color: theme.text.secondary, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                          </div>
+                        ) : (
+                          <span onClick={() => {
+                            const mb = vm.compute?.memory_mb ?? 512
+                            if (mb >= 1024) { setMemoryValue(mb / 1024); setMemoryUnit('GB') }
+                            else { setMemoryValue(mb); setMemoryUnit('MB') }
+                            setEditingMemory(true)
+                          }}
+                            style={{ cursor: 'pointer', borderBottom: `1px dashed ${theme.text.dim}` }}
+                            title="Click to edit">{formatMemoryMb(vm.compute?.memory_mb)}</span>
+                        )
+                      ) : formatMemoryMb(vm.compute?.memory_mb)
+                    } />
                     <InfoRow label="Run Strategy" value={
                       editingRunStrategy ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -680,23 +782,26 @@ export function VMDetailPage() {
                       <HardDrive size={13} style={{ opacity: 0.6 }} />
                       Storage
                     </div>
-                    <InfoRow label="Disks" value={`${vm.disks?.length ?? 0}`} />
-                    <InfoRow label="Total Size" value={
-                      vm.disks?.length
-                        ? vm.disks.reduce((sum: string, d: any) => {
-                            const size = d.size || d.capacity || ''
-                            const match = size.match?.(/^(\d+)\s*(Gi|Mi|Ti)?$/)
-                            if (!match) return sum
-                            const val = parseInt(match[1], 10)
-                            const unit = match[2] || 'Gi'
-                            const inGi = unit === 'Ti' ? val * 1024 : unit === 'Mi' ? val / 1024 : val
-                            const prev = parseFloat(sum) || 0
-                            return `${(prev + inGi).toFixed(inGi % 1 ? 1 : 0)} Gi`
-                          }, '')
-                        || '—'
-                        : '—'
-                    } />
-                    <InfoRow label="Boot Disk" value={vm.disks?.[0]?.name ?? '—'} />
+                    {vm.disks?.filter((d: any) => d.source_type !== 'cloud_init').map((disk: any) => (
+                      <InfoRow
+                        key={disk.name}
+                        label={disk.name}
+                        value={
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {disk.volume_name ? (
+                              <Link to={`/storage/${namespace}/${disk.volume_name}`} style={{ color: theme.accent, textDecoration: 'none' }}>
+                                {disk.volume_name}
+                              </Link>
+                            ) : disk.source_type === 'container_disk' ? disk.image || '—' : '—'}
+                            {disk.size_gb > 0 && (
+                              <span style={{ color: theme.text.secondary, fontSize: 12 }}>
+                                {disk.used_gb > 0 ? `${disk.used_gb} / ` : ''}{disk.size_gb} Gi
+                              </span>
+                            )}
+                          </span>
+                        }
+                      />
+                    ))}
                   </div>
 
                   {/* Identity card */}
@@ -708,7 +813,7 @@ export function VMDetailPage() {
                     <InfoRow label="Namespace" value={namespace} mono />
                     <InfoRow label="OS Type" value={vm.os_type ?? vm.os ?? '—'} />
                     <InfoRow label="Created" value={formatDate(vm.created_at ?? vm.creation_timestamp)} />
-                    <InfoRow label="Template" value={vm.template_name ?? '—'} />
+                    <InfoRow label="Template" value={vm.template_name ? <Link to={`/templates/${vm.template_name}`} style={{ color: theme.accent, textDecoration: 'none' }}>{vm.template_name}</Link> : '—'} />
                     <InfoRow label="Description" value={vm.description || '—'} />
                     {vm.labels && Object.keys(vm.labels).length > 0 && (
                       <InfoRow
@@ -738,6 +843,25 @@ export function VMDetailPage() {
                   </div>
                 </div>
               </>
+            )}
+
+            {/* Console */}
+            {activeTab === 'console' && (
+              <div className="card" style={{ overflow: 'hidden' }}>
+                {vm.status?.toLowerCase() !== 'running' ? (
+                  <div className="empty-text">VM must be running to access the console.</div>
+                ) : (
+                  <div style={{ height: 600, background: '#000' }}>
+                    <VNCConsole
+                      ref={vncRef}
+                      cluster={activeCluster}
+                      namespace={namespace!}
+                      vmName={name!}
+                      onStatusChange={setConsoleStatus}
+                    />
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Metrics */}
@@ -794,6 +918,21 @@ export function VMDetailPage() {
                       color={theme.status.migrating}
                       formatValue={(v) => `${v.toFixed(1)} KB/s`}
                     />
+                  </div>
+                )}
+
+                {/* Storage charts */}
+                {metricsData?.storage && Object.keys(metricsData.storage).length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: Object.keys(metricsData.storage).length === 1 ? '1fr' : '1fr 1fr', gap: 16 }}>
+                    {Object.entries(metricsData.storage).map(([pvcName, data]: [string, any]) => (
+                      <MetricChart
+                        key={pvcName}
+                        title={`Storage: ${pvcName}`}
+                        data={data.map((d: any) => ({ ...d, value: d.value * 100 }))}
+                        color="#8b5cf6"
+                        formatValue={(v) => `${v.toFixed(1)}%`}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -951,8 +1090,17 @@ export function VMDetailPage() {
                     <tbody>
                       {vm.disks.map((disk: any) => (
                         <tr key={disk.name} className="table-row">
-                          <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500 }}>
-                            {disk.name}
+                          <td className="table-cell" style={{ fontWeight: 500 }}>
+                            {disk.volume_name ? (
+                              <Link to={`/storage/${namespace}/${disk.volume_name}`} style={{ color: theme.accent, textDecoration: 'none' }}>
+                                {disk.name}
+                              </Link>
+                            ) : (
+                              <span style={{ color: theme.text.primary }}>{disk.name}</span>
+                            )}
+                            {disk.volume_name && disk.volume_name !== disk.name && (
+                              <div style={{ fontSize: 11, color: theme.text.secondary, marginTop: 1 }}>{disk.volume_name}</div>
+                            )}
                           </td>
                           <td className="table-cell" style={{ color: theme.text.secondary }}>
                             {disk.size_gb ? `${disk.size_gb} GB` : '—'}
@@ -1428,71 +1576,76 @@ export function VMDetailPage() {
             )}
 
             {/* Events */}
-            {activeTab === 'events' && (
-              <div className="card">
-                {vm.events?.length ? (
-                  <table className="table">
-                    <thead>
-                      <tr className="table-header">
-                        {['Time', 'Type', 'Source', 'Reason', 'Message'].map((col) => (
-                          <th key={col} className="table-header-cell">
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vm.events.map((evt: { timestamp: string; type: string; reason: string; message: string; source?: string; object_name?: string }, i: number) => (
-                        <tr key={i} className="table-row">
-                          <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
-                            {evt.timestamp}
-                          </td>
-                          <td className="table-cell">
-                            <span
-                              style={{
-                                color: evt.type === 'Warning' ? theme.status.migrating : theme.status.running,
-                                fontSize: 12,
-                                fontWeight: 500,
-                              }}
-                            >
-                              {evt.type}
-                            </span>
-                          </td>
-                          <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
-                            {evt.source && (
-                              <span style={{
-                                display: 'inline-block',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                fontSize: 11,
-                                fontWeight: 500,
-                                background: evt.source === 'DataVolume' ? `${theme.status.provisioning}1a` : `${theme.accent}1a`,
-                                color: evt.source === 'DataVolume' ? theme.status.provisioning : theme.accent,
-                                border: `1px solid ${evt.source === 'DataVolume' ? theme.status.provisioning : theme.accent}40`,
-                              }}>
-                                {evt.source}
-                              </span>
-                            )}
-                          </td>
-                          <td className="table-cell" style={{ color: theme.text.secondary }}>{evt.reason}</td>
-                          <td className="table-cell" style={{ color: theme.text.primary }}>{evt.message}</td>
+            {activeTab === 'events' && (() => {
+              const eventsData = liveEvents ?? vm.events ?? []
+              return (
+                <div className="card">
+                  {eventsData.length > 0 ? (
+                    <table className="table">
+                      <thead>
+                        <tr className="table-header">
+                          {['Time', 'Type', 'Source', 'Reason', 'Message'].map((col) => (
+                            <th key={col} className="table-header-cell">
+                              {col}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="empty-text">
-                    No events found for this VM.
-                  </div>
-                )}
-              </div>
-            )}
+                      </thead>
+                      <tbody>
+                        {eventsData.map((evt: any, i: number) => (
+                          <tr key={i} className="table-row">
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                              {evt.timestamp}
+                            </td>
+                            <td className="table-cell">
+                              <span
+                                style={{
+                                  color: evt.type === 'Warning' ? theme.status.migrating : theme.status.running,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {evt.type}
+                              </span>
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                              {evt.source && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  background: evt.source === 'DataVolume' ? `${theme.status.provisioning}1a` : `${theme.accent}1a`,
+                                  color: evt.source === 'DataVolume' ? theme.status.provisioning : theme.accent,
+                                  border: `1px solid ${evt.source === 'DataVolume' ? theme.status.provisioning : theme.accent}40`,
+                                }}>
+                                  {evt.source}
+                                </span>
+                              )}
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary }}>{evt.reason}</td>
+                            <td className="table-cell" style={{ color: theme.text.primary }}>{evt.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="empty-text">
+                      No events found for this VM.
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* YAML */}
             {activeTab === 'yaml' && (
-              <pre className="code-block" style={{ lineHeight: 1.6 }}>
-                {JSON.stringify(vm, null, 2)}
-              </pre>
+              <YamlViewer resources={[
+                ...(vm.raw_manifest ? [{ label: vm.name, kind: 'VirtualMachine', data: vm.raw_manifest }] : []),
+                ...(vm.raw_vmi_manifest ? [{ label: `${vm.name} (instance)`, kind: 'VirtualMachineInstance', data: vm.raw_vmi_manifest }] : []),
+                ...(!vm.raw_manifest ? [{ label: vm.name, kind: 'VM', data: vm }] : []),
+              ]} />
             )}
           </>
         )}

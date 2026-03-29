@@ -66,6 +66,7 @@ interface ImageForm {
   source_url: string
   size_gb: number
   storage_class: string
+  is_global: boolean
 }
 
 const SUGGESTIONS = [
@@ -116,6 +117,7 @@ export function ImagesPage() {
     source_url: '',
     size_gb: 20,
     storage_class: '',
+    is_global: false,
   }
   const [form, setForm] = useState<ImageForm>(defaultForm)
 
@@ -162,6 +164,7 @@ export function ImagesPage() {
       source_url: s.source_url,
       size_gb: 20,
       storage_class: '',
+      is_global: false,
     })
   }
 
@@ -210,6 +213,7 @@ export function ImagesPage() {
         source_url: img.source_url || '',
         size_gb: img.size_gb ?? 20,
         storage_class: img.storage_class || '',
+        is_global: (img as any).is_global ?? false,
       })
       setEditingName(img.name)
       setError(null)
@@ -232,6 +236,7 @@ export function ImagesPage() {
               source_url: img.source_url?.trim(),
               size_gb: img.size_gb ?? 20,
               storage_class: img.storage_class,
+              is_global: (img as any).is_global ?? false,
             },
             {
               onSuccess: () => toast.success('Image duplicated'),
@@ -260,6 +265,7 @@ export function ImagesPage() {
                   source_url: img.source_url?.trim(),
                   size_gb: img.size_gb ?? 20,
                   storage_class: img.storage_class,
+                  is_global: (img as any).is_global ?? false,
                 },
                 {
                   onSuccess: () => toast.success('Re-import started'),
@@ -351,6 +357,7 @@ export function ImagesPage() {
                 <tr className="table-header">
                   {[
                     'Name',
+                    ...(activeNamespace === '_all' ? ['Namespace'] : []),
                     'Display Name',
                     'OS Type',
                     'Source Type',
@@ -388,8 +395,16 @@ export function ImagesPage() {
                         ...theme.typography.mono,
                       }}
                     >
-                      {img.name}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {img.name}
+                        {(img as any).is_global && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: `${theme.accent}15`, color: theme.accent, border: `1px solid ${theme.accent}40` }}>Global</span>
+                        )}
+                      </span>
                     </td>
+                    {activeNamespace === '_all' && (
+                      <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>{(img as any).namespace}</td>
+                    )}
                     <td
                       className="table-cell"
                       style={{
@@ -672,6 +687,18 @@ export function ImagesPage() {
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: theme.text.primary, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_global}
+                  onChange={(e) => setForm((f) => ({ ...f, is_global: e.target.checked }))}
+                  style={{ width: 16, height: 16, accentColor: theme.accent }}
+                />
+                Global image (available across all namespaces)
+              </label>
             </div>
 
           {error && (

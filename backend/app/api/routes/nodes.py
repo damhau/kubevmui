@@ -81,4 +81,5 @@ def get_node(
 
     node["vms"] = node_vms
     node["vm_count"] = len(node_vms)
+    node["raw_manifest"] = kv.get_node_raw(name)
     return node

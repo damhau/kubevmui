@@ -5,6 +5,23 @@ from app.models.common import HealthStatus, VMStatus
 from app.models.vm import VM, VMCompute, VMCreate, VMDiskRef, VMEvent, VMNetworkRef
 
 
+def _parse_memory_to_gi(size_str: str) -> int:
+    """Parse Kubernetes storage size string to GiB integer."""
+    if not size_str:
+        return 0
+    size_str = size_str.strip()
+    if size_str.endswith("Ti"):
+        return int(float(size_str[:-2]) * 1024)
+    if size_str.endswith("Gi"):
+        return int(float(size_str[:-2]))
+    if size_str.endswith("Mi"):
+        return max(1, int(float(size_str[:-2]) / 1024))
+    try:
+        return int(size_str) // (1024 ** 3)
+    except ValueError:
+        return 0
+
+
 def _parse_memory(mem_str: str) -> int:
     """Parse Kubernetes memory string to MiB integer."""
     if not mem_str:
@@ -75,15 +92,29 @@ def _extract_disks(vm: dict) -> list[VMDiskRef]:
     for disk in disk_list:
         name = disk.get("name", "")
         vol = volume_map.get(name, {})
-        size_gb = 0
-        if "dataVolume" in vol or "persistentVolumeClaim" in vol:
-            size_gb = 0
         disk_iface = disk.get("disk", {})
+
+        volume_name = ""
+        source_type = "pvc"
+        image = ""
+        if "dataVolume" in vol:
+            volume_name = vol["dataVolume"].get("name", "")
+        elif "persistentVolumeClaim" in vol:
+            volume_name = vol["persistentVolumeClaim"].get("claimName", "")
+        elif "containerDisk" in vol:
+            source_type = "container_disk"
+            image = vol["containerDisk"].get("image", "")
+        elif "cloudInitNoCloud" in vol or "cloudInitConfigDrive" in vol:
+            source_type = "cloud_init"
+
         disks.append(VMDiskRef(
             name=name,
-            size_gb=size_gb,
+            size_gb=0,
             bus=disk_iface.get("bus", "virtio"),
             boot_order=disk.get("bootOrder"),
+            source_type=source_type,
+            image=image,
+            volume_name=volume_name,
         ))
     return disks
 
@@ -176,7 +207,7 @@ def _vm_from_raw(vm: dict, vmi: dict | None) -> VM:
     )
 
 
-def _build_manifest(request: VMCreate) -> dict:
+def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict:
     """Build a KubeVirt VirtualMachine manifest from a VMCreate request."""
     disks = []
     volumes = []
@@ -197,13 +228,22 @@ def _build_manifest(request: VMCreate) -> dict:
             })
         elif disk_ref.source_type == "datavolume_clone":
             dv_name = f"{request.name}-{disk_ref.name}-dv"
+            # Resolve clone namespace: use explicit value, or look up the image's namespace
+            clone_ns = disk_ref.clone_namespace
+            if not clone_ns and disk_ref.clone_source and kv:
+                for ns in kv.list_namespaces():
+                    img = kv.get_image(ns, disk_ref.clone_source)
+                    if img:
+                        clone_ns = ns
+                        break
+            clone_ns = clone_ns or request.namespace
             dv_template = {
                 "metadata": {"name": dv_name},
                 "spec": {
                     "source": {
                         "pvc": {
                             "name": disk_ref.clone_source,
-                            "namespace": disk_ref.clone_namespace or request.namespace,
+                            "namespace": clone_ns,
                         },
                     },
                     "pvc": {
@@ -351,6 +391,45 @@ class VMService:
             return None
         vmi_raw = self.kv.get_vmi(namespace, name)
         vm = _vm_from_raw(vm_raw, vmi_raw)
+        vm.raw_manifest = vm_raw
+        vm.raw_vmi_manifest = vmi_raw
+        # Enrich disk sizes from PVCs
+        for disk in vm.disks:
+            if disk.volume_name:
+                try:
+                    pvc = self.kv.core_api.read_namespaced_persistent_volume_claim(disk.volume_name, namespace)
+                    if pvc.spec.resources and pvc.spec.resources.requests:
+                        disk.size_gb = _parse_memory_to_gi(pvc.spec.resources.requests.get("storage", ""))
+                except Exception:
+                    pass
+
+        # Enrich disk usage from guest agent
+        if vm.status.value == "running":
+            try:
+                # Build target→disk name map from VMI volumeStatus
+                vmi_vol_status = (vmi_raw or {}).get("status", {}).get("volumeStatus", [])
+                target_to_disk: dict[str, str] = {}
+                for vs in vmi_vol_status:
+                    if vs.get("target") and vs.get("name"):
+                        target_to_disk[vs["target"]] = vs["name"]
+
+                fs_disks = self.kv.get_guest_fs_info(namespace, name)
+                # Aggregate used bytes per disk name
+                used_by_disk: dict[str, int] = {}
+                for fs in fs_disks:
+                    disk_name_raw = fs.get("diskName", "")  # e.g. "vda4"
+                    target = "".join(c for c in disk_name_raw if not c.isdigit())  # "vda"
+                    mapped_name = target_to_disk.get(target, "")
+                    if mapped_name and mapped_name not in used_by_disk:
+                        used_by_disk[mapped_name] = fs.get("usedBytes", 0)
+                    elif mapped_name:
+                        used_by_disk[mapped_name] = max(used_by_disk[mapped_name], fs.get("usedBytes", 0))
+
+                for disk in vm.disks:
+                    if disk.name in used_by_disk:
+                        disk.used_gb = round(used_by_disk[disk.name] / (1024 ** 3), 1)
+            except Exception:
+                pass
         try:
             all_events = self.kv.list_events(namespace)
             raw_events = [
@@ -374,7 +453,7 @@ class VMService:
         return vm
 
     def create_vm(self, request: VMCreate) -> VM:
-        manifest = _build_manifest(request)
+        manifest = _build_manifest(request, self.kv)
         raw = self.kv.create_vm(request.namespace, manifest)
         return _vm_from_raw(raw, None)
 
@@ -436,3 +515,13 @@ class VMService:
     def update_run_strategy(self, namespace: str, name: str, strategy: str) -> None:
         body = {"spec": {"runStrategy": strategy}}
         self.kv.patch_vm(namespace, name, body)
+
+    def update_compute(self, namespace: str, name: str, cpu_cores: int | None, memory_mb: int | None) -> None:
+        domain_patch: dict = {}
+        if cpu_cores is not None:
+            domain_patch["cpu"] = {"cores": cpu_cores}
+        if memory_mb is not None:
+            domain_patch.setdefault("resources", {})["requests"] = {"memory": f"{memory_mb}Mi"}
+        if domain_patch:
+            body = {"spec": {"template": {"spec": {"domain": domain_patch}}}}
+            self.kv.patch_vm(namespace, name, body)

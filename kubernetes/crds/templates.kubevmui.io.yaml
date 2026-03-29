@@ -1,0 +1,124 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: templates.kubevmui.io
+spec:
+  group: kubevmui.io
+  names:
+    kind: Template
+    plural: templates
+    singular: template
+    shortNames:
+      - tpl
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - displayName
+              properties:
+                displayName:
+                  type: string
+                  description: Human-readable name for the template
+                description:
+                  type: string
+                  default: ""
+                global:
+                  type: boolean
+                  default: false
+                  description: When true, this template is available across all namespaces
+                category:
+                  type: string
+                  default: custom
+                  description: Template category (OS, Application, Custom, Base)
+                osType:
+                  type: string
+                  description: Operating system type
+                compute:
+                  type: object
+                  properties:
+                    cpuCores:
+                      type: integer
+                      default: 1
+                    memoryMb:
+                      type: integer
+                      default: 512
+                    cpuModel:
+                      type: string
+                    sockets:
+                      type: integer
+                      default: 1
+                    coresPerSocket:
+                      type: integer
+                    threadsPerCore:
+                      type: integer
+                      default: 1
+                disks:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      sizeGb:
+                        type: integer
+                      bus:
+                        type: string
+                        enum: [virtio, sata, scsi]
+                      sourceType:
+                        type: string
+                      image:
+                        type: string
+                      cloneSource:
+                        type: string
+                      cloneNamespace:
+                        type: string
+                      storageClass:
+                        type: string
+                    x-kubernetes-preserve-unknown-fields: true
+                networks:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      networkProfile:
+                        type: string
+                    x-kubernetes-preserve-unknown-fields: true
+                cloudInit:
+                  type: object
+                  properties:
+                    userData:
+                      type: string
+                    networkData:
+                      type: string
+                autoattachPodInterface:
+                  type: boolean
+                  default: true
+      additionalPrinterColumns:
+        - name: Display Name
+          type: string
+          jsonPath: .spec.displayName
+        - name: Category
+          type: string
+          jsonPath: .spec.category
+        - name: CPU
+          type: integer
+          jsonPath: .spec.compute.cpuCores
+        - name: Memory (MB)
+          type: integer
+          jsonPath: .spec.compute.memoryMb
+        - name: Global
+          type: boolean
+          jsonPath: .spec.global
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

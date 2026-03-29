@@ -109,15 +109,9 @@ export function SSHKeysPage() {
         }
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 24, animation: 'fadeInUp 0.35s ease-out' }}>
-        <div style={{ maxWidth: theme.layout.contentMaxWidth, margin: '0 auto', width: '100%' }}>
-        <div
-          style={{
-            background: theme.main.card,
-            border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card,
-            borderRadius: theme.radius.lg,
-          }}
-        >
+      <div className="page-content" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+        <div className="page-container">
+        <div className="card">
           {isLoading ? (
             <TableSkeleton rows={3} cols={4} />
           ) : keys.length === 0 ? (
@@ -127,21 +121,13 @@ export function SSHKeysPage() {
               description="Add SSH keys to inject into your VMs via cloud-init."
             />
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="table">
               <thead>
-                <tr style={{ background: theme.main.tableHeaderBg, borderBottom: `1px solid ${theme.main.tableRowBorder}` }}>
+                <tr className="table-header">
                   {['Name', 'Public Key', 'Created', 'Actions'].map((col) => (
                     <th
                       key={col}
-                      style={{
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        color: theme.text.secondary,
-                        fontWeight: 600,
-                        fontSize: 11,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                      }}
+                      className="table-header-cell"
                     >
                       {col}
                     </th>
@@ -152,21 +138,18 @@ export function SSHKeysPage() {
                 {keys.map((key, i) => (
                   <tr
                     key={key.name}
-                    style={{
-                      borderBottom: `1px solid ${theme.main.tableRowBorder}`,
-                      background: 'transparent',
-                      animation: i < 8 ? `fadeInRow 0.3s ease-out both` : undefined,
-                      animationDelay: i < 8 ? `${0.05 + i * 0.04}s` : undefined,
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = theme.main.hoverBg)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    className="table-row"
+                    style={i < 8 ? {
+                      animation: `fadeInRow 0.3s ease-out both`,
+                      animationDelay: `${0.05 + i * 0.04}s`,
+                    } : undefined}
                   >
-                    <td style={{ padding: '10px 16px', color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>
+                    <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>
                       {key.name}
                     </td>
                     <td
+                      className="table-cell"
                       style={{
-                        padding: '10px 16px',
                         color: theme.text.secondary,
                         fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
                         fontSize: 12,
@@ -179,10 +162,10 @@ export function SSHKeysPage() {
                     >
                       {truncateKey(key.public_key)}
                     </td>
-                    <td style={{ padding: '10px 16px', color: theme.text.secondary, fontSize: 13 }}>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {formatDate(key.created_at)}
                     </td>
-                    <td style={{ padding: '10px 16px', position: 'relative', zIndex: 10 }}>
+                    <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
                       <DropdownMenu
                         actions={[
                           { label: 'Copy Public Key', action: 'copy' },

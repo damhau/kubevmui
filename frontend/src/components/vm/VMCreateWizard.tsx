@@ -4,6 +4,7 @@ import { useNamespaces } from '@/hooks/useNamespaces'
 import { useImages, useStorageClasses } from '@/hooks/useImages'
 import { useAllNetworks } from '@/hooks/useNetworks'
 import { useTemplates } from '@/hooks/useTemplates'
+import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 
 const STEPS = [
@@ -195,6 +196,8 @@ function DiskIcon() {
 
 export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreateWizardProps) {
   const createVM = useCreateVM()
+  const { activeNamespace } = useUIStore()
+  const [quickCreate, setQuickCreate] = useState(!!initialTemplate)
   const { data: namespacesData } = useNamespaces()
   const { data: imagesData } = useImages()
   const registeredImages: Array<{ name: string; display_name: string; source_url: string; os_type: string; source_type?: string }> =
@@ -222,7 +225,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
 
   const [form, setForm] = useState<FormData>({
     name: '',
-    namespace: 'default',
+    namespace: activeNamespace === '_all' ? 'default' : activeNamespace,
     description: '',
     cpu: 2,
     memory: 4096,
@@ -403,6 +406,104 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
     }
   }
 
+  // Quick create mode: template selected, just name + create
+  if (quickCreate && form.template_name) {
+    const selectedTpl = templates.find((t: any) => t.name === form.template_name)
+    return (
+      <div style={{ display: 'flex', height: '100%', overflow: 'hidden', justifyContent: 'center', alignItems: 'flex-start', padding: '60px 24px' }}>
+        <div className="card-padded" style={{ maxWidth: 500, width: '100%' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: theme.typography.heading.fontFamily, color: theme.text.heading, marginBottom: 4 }}>
+            Create Virtual Machine
+          </div>
+          <div style={{ fontSize: 13, color: theme.text.secondary, marginBottom: 24 }}>
+            From template: <strong style={{ color: theme.accent }}>{selectedTpl?.display_name || form.template_name}</strong>
+          </div>
+
+          <FieldGroup label="VM Name">
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => updateForm({ name: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+              placeholder="my-vm"
+              style={inputStyle()}
+              autoFocus
+            />
+          </FieldGroup>
+
+          <FieldGroup label="Namespace">
+            <div style={{ fontSize: 14, color: theme.text.primary, fontFamily: theme.typography.mono.fontFamily, padding: '8px 0' }}>
+              {form.namespace}
+            </div>
+          </FieldGroup>
+
+          {selectedTpl && (
+            <div style={{ fontSize: 12, color: theme.text.secondary, marginBottom: 20, lineHeight: 1.6 }}>
+              <span style={{ color: theme.text.dim }}>CPU:</span> {selectedTpl.compute?.cpu_cores ?? '?'} vCPU &nbsp;
+              <span style={{ color: theme.text.dim }}>Memory:</span> {selectedTpl.compute?.memory_mb ?? '?'} MB &nbsp;
+              <span style={{ color: theme.text.dim }}>Disks:</span> {selectedTpl.disks?.length ?? 0}
+            </div>
+          )}
+
+          {error && (
+            <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 12 }}>{error}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={handleSubmit}
+              disabled={!form.name.trim() || createVM.isPending}
+              style={{
+                flex: 1,
+                padding: '10px 20px',
+                background: theme.button.primary,
+                color: theme.button.primaryText,
+                border: 'none',
+                borderRadius: theme.radius.md,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: form.name.trim() && !createVM.isPending ? 'pointer' : 'not-allowed',
+                opacity: form.name.trim() && !createVM.isPending ? 1 : 0.5,
+                fontFamily: 'inherit',
+              }}
+            >
+              {createVM.isPending ? 'Creating...' : 'Create VM'}
+            </button>
+            <button
+              onClick={() => setQuickCreate(false)}
+              style={{
+                padding: '10px 20px',
+                background: theme.button.secondary,
+                color: theme.button.secondaryText,
+                border: `1px solid ${theme.button.secondaryBorder}`,
+                borderRadius: theme.radius.md,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Customize
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                padding: '10px 20px',
+                background: 'transparent',
+                color: theme.text.secondary,
+                border: 'none',
+                fontSize: 14,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Left panel */}
@@ -520,19 +621,27 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                   style={inputStyle()}
                 />
               </FieldGroup>
-              <FieldGroup label="Namespace">
-                <select
-                  value={form.namespace}
-                  onChange={(e) => updateForm({ namespace: e.target.value })}
-                  style={inputStyle()}
-                >
-                  {namespaces.map((ns) => (
-                    <option key={ns} value={ns}>
-                      {ns}
-                    </option>
-                  ))}
-                </select>
-              </FieldGroup>
+              {activeNamespace === '_all' ? (
+                <FieldGroup label="Namespace">
+                  <select
+                    value={form.namespace}
+                    onChange={(e) => updateForm({ namespace: e.target.value })}
+                    style={inputStyle()}
+                  >
+                    {namespaces.map((ns) => (
+                      <option key={ns} value={ns}>
+                        {ns}
+                      </option>
+                    ))}
+                  </select>
+                </FieldGroup>
+              ) : (
+                <FieldGroup label="Namespace">
+                  <div style={{ fontSize: 14, color: theme.text.primary, fontFamily: theme.typography.mono.fontFamily, padding: '8px 0' }}>
+                    {form.namespace}
+                  </div>
+                </FieldGroup>
+              )}
               <FieldGroup label="Description">
                 <textarea
                   value={form.description}
@@ -545,7 +654,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
               <FieldGroup label="Template (Optional)">
                 <select
                   value={form.template_name}
-                  onChange={(e) => applyTemplate(e.target.value)}
+                  onChange={(e) => { applyTemplate(e.target.value); if (e.target.value) setQuickCreate(true) }}
                   style={inputStyle()}
                 >
                   <option value="">No template — configure manually</option>

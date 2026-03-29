@@ -85,7 +85,7 @@ export function VMListPage() {
       vm.namespace?.toLowerCase().includes(search.toLowerCase()),
   )
 
-  const { activeCluster } = useUIStore()
+  const { activeCluster, activeNamespace } = useUIStore()
   const queryClient = useQueryClient()
 
   const cloneMutation = useMutation({
@@ -258,7 +258,7 @@ export function VMListPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
+                  {['Name', ...(activeNamespace === '_all' ? ['Namespace'] : []), 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
                     <th
                       key={i}
                       className="table-header-cell"
@@ -281,22 +281,14 @@ export function VMListPage() {
                     } : undefined}
                   >
                     <td className="table-cell">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: theme.text.primary, fontWeight: 600, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>
-                        <span style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: '50%',
-                          background: vm.status === 'Running' ? theme.status.running
-                            : vm.status === 'Error' ? theme.status.error
-                            : vm.status === 'Migrating' ? theme.status.migrating
-                            : vm.status === 'Provisioning' ? theme.status.provisioning
-                            : theme.status.stopped,
-                          flexShrink: 0,
-                        }} />
+                      <div style={{ color: theme.text.primary, fontWeight: 600, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>
                         {vm.name}
                       </div>
-                      <div style={{ color: theme.text.secondary, fontSize: 11, marginTop: 2, paddingLeft: 14, fontFamily: theme.typography.mono.fontFamily }}>{vm.namespace}</div>
+                      <div style={{ color: theme.text.secondary, fontSize: 11, marginTop: 2, fontFamily: theme.typography.mono.fontFamily }}>{vm.namespace}</div>
                     </td>
+                    {activeNamespace === '_all' && (
+                      <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>{vm.namespace}</td>
+                    )}
                     <td className="table-cell">
                       <StatusBadge status={vm.status} />
                     </td>

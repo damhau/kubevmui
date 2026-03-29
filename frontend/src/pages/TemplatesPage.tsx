@@ -6,6 +6,7 @@ import { useAllNetworks } from '@/hooks/useNetworks'
 import { useImages, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
 import { formatMemoryMb } from '@/lib/format'
+import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -92,6 +93,7 @@ interface TemplateForm {
   cloud_init_user_data: string
   cloud_init_network_data: string
   autoattach_pod_interface: boolean
+  is_global: boolean
 }
 
 const emptyDisk = (): TemplateDisk => ({
@@ -123,6 +125,7 @@ const defaultForm = (): TemplateForm => ({
   cloud_init_user_data: '',
   cloud_init_network_data: '',
   autoattach_pod_interface: true,
+  is_global: false,
 })
 
 /* ── Styles ── */
@@ -194,12 +197,13 @@ const textareaStyle: React.CSSProperties = {
 
 export function TemplatesPage() {
   const navigate = useNavigate()
+  const { activeNamespace } = useUIStore()
   const { data, isLoading } = useTemplates()
   const { data: allNADsData } = useAllNetworks()
   const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
     Array.isArray(allNADsData?.items) ? allNADsData.items : []
   const { data: imagesData } = useImages()
-  const registeredImages: Array<{ name: string; display_name: string; source_type: string; source_url: string }> =
+  const registeredImages: Array<{ name: string; namespace: string; display_name: string; source_type: string; source_url: string; size_gb: number }> =
     Array.isArray(imagesData?.items) ? imagesData.items : []
   const { data: storageClassData } = useStorageClasses()
   const storageClasses: Array<{ name: string; is_default: boolean }> =
@@ -246,6 +250,7 @@ export function TemplatesPage() {
         cloud_init_user_data: tpl.cloud_init_user_data || '',
         cloud_init_network_data: tpl.cloud_init_network_data || '',
         autoattach_pod_interface: tpl.autoattach_pod_interface ?? true,
+        is_global: tpl.is_global ?? false,
       })
       setEditingName(tpl.name)
       setError(null)
@@ -351,6 +356,7 @@ export function TemplatesPage() {
       cloud_init_user_data: form.cloud_init_user_data || null,
       cloud_init_network_data: form.cloud_init_network_data || null,
       autoattach_pod_interface: form.autoattach_pod_interface,
+      is_global: form.is_global,
     }
     if (editingName) {
       // Edit: delete old, then create new
@@ -438,7 +444,7 @@ export function TemplatesPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', 'Category', 'OS Type', 'CPU', 'Memory', 'Disks', 'Networks', ''].map(
+                  {['Name', ...(activeNamespace === '_all' ? ['Namespace'] : []), 'Category', 'OS Type', 'CPU', 'Memory', 'Disks', 'Networks', ''].map(
                     (col) => (
                       <th
                         key={col || '_actions'}
@@ -470,8 +476,16 @@ export function TemplatesPage() {
                         fontFamily: theme.typography.mono.fontFamily,
                       }}
                     >
-                      {tpl.display_name || tpl.name}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {tpl.display_name || tpl.name}
+                        {(tpl as any).is_global && (
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: `${theme.accent}15`, color: theme.accent, border: `1px solid ${theme.accent}40` }}>Global</span>
+                        )}
+                      </span>
                     </td>
+                    {activeNamespace === '_all' && (
+                      <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>{(tpl as any).namespace}</td>
+                    )}
                     <td className="table-cell">
                       {tpl.category ? (
                         <Badge
@@ -727,11 +741,10 @@ export function TemplatesPage() {
                         const img = registeredImages.find((i) => i.name === e.target.value)
                         updateDisk(idx, {
                           clone_source: e.target.value,
+                          clone_namespace: img?.namespace || disk.clone_namespace,
+                          size_gb: img?.size_gb || disk.size_gb || 20,
                           name: disk.name || 'rootdisk',
                         })
-                        if (img) {
-                          // auto-fill display info
-                        }
                       }}
                       style={inputStyle}
                     >
@@ -912,6 +925,28 @@ export function TemplatesPage() {
               style={{ accentColor: theme.accent }}
             />
             Attach default pod network interface
+          </label>
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 13,
+              color: theme.text.primary,
+              cursor: 'pointer',
+              marginBottom: 14,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={form.is_global}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, is_global: e.target.checked }))
+              }
+              style={{ accentColor: theme.accent }}
+            />
+            Global template (available across all namespaces)
           </label>
 
           {/* ERROR / ACTIONS */}

@@ -1,0 +1,83 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: images.kubevmui.io
+spec:
+  group: kubevmui.io
+  names:
+    kind: Image
+    plural: images
+    singular: image
+    shortNames:
+      - img
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - displayName
+                - source
+              properties:
+                displayName:
+                  type: string
+                  description: Human-readable name for the image
+                description:
+                  type: string
+                  default: ""
+                global:
+                  type: boolean
+                  default: false
+                  description: When true, this image is available across all namespaces
+                osType:
+                  type: string
+                  enum: [linux, windows]
+                  description: Operating system type
+                source:
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    type:
+                      type: string
+                      enum: [http, registry, pvc, container_disk]
+                      description: Source type for the image
+                    url:
+                      type: string
+                      description: Source URL (HTTP URL, registry path, or container image)
+                storage:
+                  type: object
+                  properties:
+                    sizeGb:
+                      type: integer
+                      default: 20
+                      description: Disk size in GiB
+                    storageClass:
+                      type: string
+                      description: Kubernetes StorageClass to use
+      additionalPrinterColumns:
+        - name: Display Name
+          type: string
+          jsonPath: .spec.displayName
+        - name: OS
+          type: string
+          jsonPath: .spec.osType
+        - name: Source
+          type: string
+          jsonPath: .spec.source.type
+        - name: URL
+          type: string
+          jsonPath: .spec.source.url
+          priority: 1
+        - name: Global
+          type: boolean
+          jsonPath: .spec.global
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

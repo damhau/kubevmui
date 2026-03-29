@@ -15,7 +15,10 @@ class Image(BaseModel):
     storage_class: str = ""
     dv_phase: str = ""  # Pending, ImportScheduled, ImportInProgress, Succeeded, Failed
     dv_progress: str = ""  # e.g. "45.5%"
+    is_global: bool = False
     created_at: datetime | None = None
+    raw_manifest: dict | None = None
+    raw_dv_manifest: dict | None = None
 
 
 class ImageCreate(BaseModel):
@@ -27,6 +30,7 @@ class ImageCreate(BaseModel):
     source_url: str = ""
     size_gb: int = 20
     storage_class: str = ""
+    is_global: bool = False
 
 
 class ImageList(BaseModel):

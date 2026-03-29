@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDisk } from '@/hooks/useDisks'
+import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { TopBar } from '@/components/layout/TopBar'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
+import { YamlViewer } from '@/components/ui/YamlViewer'
 
-type Tab = 'overview' | 'yaml'
+type Tab = 'overview' | 'events' | 'yaml'
 
 const tierColor: Record<string, string> = {
   premium: '#6366f1',
@@ -35,10 +37,12 @@ function StatusDot({ status }: { status: string }) {
 export function StorageDetailPage() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>()
   const { data, isLoading } = useDisk(namespace!, name!)
+  const { data: events = [] } = useResourceEvents(namespace!, name!)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'events', label: 'Events' },
     { id: 'yaml', label: 'YAML' },
   ]
 
@@ -126,6 +130,19 @@ export function StorageDetailPage() {
                       label="Status"
                       value={data.status ? <StatusDot status={data.status} /> : undefined}
                     />
+                    {data.is_image && (
+                      <InfoRow
+                        label="Type"
+                        value={
+                          <Link to={`/images/${data.namespace}/${data.name}`} style={{ color: theme.status.provisioning, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: `${theme.status.provisioning}18`, border: `1px solid ${theme.status.provisioning}40` }}>
+                              Image
+                            </span>
+                            View image details
+                          </Link>
+                        }
+                      />
+                    )}
                   </div>
 
                   {/* Storage Configuration */}
@@ -200,12 +217,71 @@ export function StorageDetailPage() {
                 </div>
               )}
 
-              {activeTab === 'yaml' && (
-                <div className="card-padded" style={{ animation: 'fadeInUp 0.35s ease-out both' }}>
-                  <pre className="code-block" style={{ border: 'none', boxShadow: 'none', padding: 0, borderRadius: 0, background: 'transparent', fontSize: 13, lineHeight: 1.6, wordBreak: 'break-all' }}>
-                    {JSON.stringify(data, null, 2)}
-                  </pre>
+              {/* Events */}
+              {activeTab === 'events' && (
+                <div className="card">
+                  {events.length > 0 ? (
+                    <table className="table">
+                      <thead>
+                        <tr className="table-header">
+                          {['Time', 'Type', 'Source', 'Reason', 'Message'].map((col) => (
+                            <th key={col} className="table-header-cell">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {events.map((evt: any, i: number) => (
+                          <tr key={i} className="table-row">
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                              {evt.timestamp}
+                            </td>
+                            <td className="table-cell">
+                              <span
+                                style={{
+                                  color: evt.type === 'Warning' ? theme.status.migrating : theme.status.running,
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {evt.type}
+                              </span>
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, whiteSpace: 'nowrap' }}>
+                              {evt.source && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  background: `${theme.accent}1a`,
+                                  color: theme.accent,
+                                  border: `1px solid ${theme.accent}40`,
+                                }}>
+                                  {evt.source}
+                                </span>
+                              )}
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary }}>{evt.reason}</td>
+                            <td className="table-cell" style={{ color: theme.text.primary }}>{evt.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="empty-text">
+                      No events found.
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {activeTab === 'yaml' && (
+                <YamlViewer resources={[
+                  { label: data.name, kind: 'PersistentVolumeClaim', data: data.raw_manifest ?? data }
+                ]} />
               )}
             </>
           )}

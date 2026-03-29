@@ -15,6 +15,8 @@ class Template(ResourceMeta):
     cloud_init_user_data: str | None = None
     cloud_init_network_data: str | None = None
     autoattach_pod_interface: bool = True
+    is_global: bool = False
+    raw_manifest: dict | None = None
 
 class TemplateCreate(BaseModel):
     name: str
@@ -29,6 +31,7 @@ class TemplateCreate(BaseModel):
     cloud_init_user_data: str | None = None
     cloud_init_network_data: str | None = None
     autoattach_pod_interface: bool = True
+    is_global: bool = False
 
 class TemplateList(BaseModel):
     items: list[Template]

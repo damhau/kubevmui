@@ -7,9 +7,10 @@ export function useImages() {
   return useQuery({
     queryKey: ['images', activeCluster, activeNamespace],
     queryFn: async () => {
-      const { data } = await apiClient.get(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/images`
-      )
+      const url = activeNamespace === '_all'
+        ? `/clusters/${activeCluster}/all/images`
+        : `/clusters/${activeCluster}/namespaces/${activeNamespace}/images`
+      const { data } = await apiClient.get(url)
       return data
     },
     refetchInterval: 5000,
@@ -45,6 +46,7 @@ export function useStorageClasses() {
 export function useCreateImage() {
   const queryClient = useQueryClient()
   const { activeCluster, activeNamespace } = useUIStore()
+  const ns = activeNamespace === '_all' ? 'default' : activeNamespace
   return useMutation({
     mutationFn: async (body: {
       name: string
@@ -57,7 +59,7 @@ export function useCreateImage() {
       storage_class?: string
     }) => {
       const { data } = await apiClient.post(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/images`,
+        `/clusters/${activeCluster}/namespaces/${ns}/images`,
         body
       )
       return data
@@ -71,10 +73,11 @@ export function useCreateImage() {
 export function useDeleteImage() {
   const queryClient = useQueryClient()
   const { activeCluster, activeNamespace } = useUIStore()
+  const ns = activeNamespace === '_all' ? 'default' : activeNamespace
   return useMutation({
     mutationFn: async (name: string) => {
       await apiClient.delete(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/images/${name}`
+        `/clusters/${activeCluster}/namespaces/${ns}/images/${name}`
       )
     },
     onSuccess: () => {

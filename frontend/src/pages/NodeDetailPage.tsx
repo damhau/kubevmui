@@ -6,6 +6,7 @@ import { theme } from '@/lib/theme'
 import { TopBar } from '@/components/layout/TopBar'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
+import { YamlViewer } from '@/components/ui/YamlViewer'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 function formatMemory(s: string): string {
@@ -39,7 +40,7 @@ function MetricChart({ title, data, color, formatValue }: { title: string; data:
   )
 }
 
-type Tab = 'overview' | 'vms' | 'metrics'
+type Tab = 'overview' | 'vms' | 'metrics' | 'yaml'
 
 const vmStatusStyles: Record<string, { bg: string; color: string }> = {
   Running:  { bg: '#ecfdf5', color: '#22c55e' },
@@ -58,6 +59,7 @@ export function NodeDetailPage() {
     { id: 'overview', label: 'Overview' },
     { id: 'vms', label: 'Virtual Machines' },
     { id: 'metrics', label: 'Metrics' },
+    { id: 'yaml', label: 'YAML' },
   ]
 
   return (
@@ -344,6 +346,13 @@ export function NodeDetailPage() {
                     />
                   </div>
                 </div>
+              )}
+
+              {/* YAML Tab */}
+              {activeTab === 'yaml' && (
+                <YamlViewer resources={[
+                  { label: node.name, kind: 'Node', data: node.raw_manifest ?? node }
+                ]} />
               )}
             </>
           )}

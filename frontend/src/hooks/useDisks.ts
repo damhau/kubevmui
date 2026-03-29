@@ -7,9 +7,10 @@ export function useDisks() {
   return useQuery({
     queryKey: ['disks', activeCluster, activeNamespace],
     queryFn: async () => {
-      const { data } = await apiClient.get(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/disks`
-      )
+      const url = activeNamespace === '_all'
+        ? `/clusters/${activeCluster}/all/disks`
+        : `/clusters/${activeCluster}/namespaces/${activeNamespace}/disks`
+      const { data } = await apiClient.get(url)
       return data
     },
   })
@@ -32,10 +33,11 @@ export function useDisk(namespace: string, name: string) {
 export function useCreateDisk() {
   const queryClient = useQueryClient()
   const { activeCluster, activeNamespace } = useUIStore()
+  const ns = activeNamespace === '_all' ? 'default' : activeNamespace
   return useMutation({
     mutationFn: async (disk: any) => {
       const { data } = await apiClient.post(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/disks`,
+        `/clusters/${activeCluster}/namespaces/${ns}/disks`,
         disk,
       )
       return data
@@ -49,10 +51,11 @@ export function useCreateDisk() {
 export function useDeleteDisk() {
   const queryClient = useQueryClient()
   const { activeCluster, activeNamespace } = useUIStore()
+  const ns = activeNamespace === '_all' ? 'default' : activeNamespace
   return useMutation({
     mutationFn: async (name: string) => {
       const { data } = await apiClient.delete(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/disks/${name}`,
+        `/clusters/${activeCluster}/namespaces/${ns}/disks/${name}`,
       )
       return data
     },

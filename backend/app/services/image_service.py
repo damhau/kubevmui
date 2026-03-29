@@ -8,7 +8,9 @@ from app.models.image import Image, ImageCreate
 
 def _image_from_raw(raw: dict) -> Image:
     metadata = raw.get("metadata", {})
-    data = raw.get("data", {})
+    spec = raw.get("spec", {})
+    source = spec.get("source", {})
+    storage = spec.get("storage", {})
     created_at = None
     ts = metadata.get("creationTimestamp")
     if ts:
@@ -23,13 +25,14 @@ def _image_from_raw(raw: dict) -> Image:
     return Image(
         name=metadata.get("name", ""),
         namespace=metadata.get("namespace", ""),
-        display_name=data.get("display_name", metadata.get("name", "")),
-        description=data.get("description", ""),
-        os_type=data.get("os_type", ""),
-        source_type=data.get("source_type", ""),
-        source_url=data.get("source_url", ""),
-        size_gb=int(data.get("size_gb", 20)),
-        storage_class=data.get("storage_class", ""),
+        display_name=spec.get("displayName", metadata.get("name", "")),
+        description=spec.get("description", ""),
+        os_type=spec.get("osType", ""),
+        source_type=source.get("type", ""),
+        source_url=source.get("url", ""),
+        size_gb=int(storage.get("sizeGb", 20)),
+        storage_class=storage.get("storageClass", ""),
+        is_global=spec.get("global", False),
         created_at=created_at,
     )
 
@@ -53,6 +56,21 @@ class ImageService:
 
     def list_images(self, namespace: str) -> list[Image]:
         images = [_image_from_raw(i) for i in self.kv.list_images(namespace)]
+        # Merge global images from other namespaces
+        seen = {img.name for img in images}
+        for ns in self.kv.list_namespaces():
+            if ns == namespace:
+                continue
+            try:
+                for raw in self.kv.list_images(ns):
+                    spec = raw.get("spec", {})
+                    if spec.get("global", False):
+                        img = _image_from_raw(raw)
+                        if img.name not in seen:
+                            images.append(img)
+                            seen.add(img.name)
+            except Exception:
+                continue
         for img in images:
             _merge_dv_status(img, self.kv)
         return images
@@ -62,20 +80,36 @@ class ImageService:
         if raw is None:
             return None
         img = _image_from_raw(raw)
-        _merge_dv_status(img, self.kv)
+        img.raw_manifest = raw
+        dv = self.kv.get_datavolume(img.namespace, img.name)
+        if dv:
+            status = dv.get("status", {})
+            img.dv_phase = status.get("phase", "")
+            img.dv_progress = status.get("progress", "")
+            img.raw_dv_manifest = dv
         return img
 
     def create_image(self, namespace: str, request: ImageCreate) -> Image:
-        data = {
-            "display_name": request.display_name,
-            "description": request.description,
-            "os_type": request.os_type,
-            "source_type": request.source_type,
-            "source_url": request.source_url,
-            "size_gb": str(request.size_gb),
-            "storage_class": request.storage_class,
+        body = {
+            "apiVersion": "kubevmui.io/v1",
+            "kind": "Image",
+            "metadata": {"name": request.name, "namespace": namespace},
+            "spec": {
+                "displayName": request.display_name,
+                "description": request.description,
+                "global": request.is_global,
+                "osType": request.os_type,
+                "source": {
+                    "type": request.source_type,
+                    "url": request.source_url,
+                },
+                "storage": {
+                    "sizeGb": request.size_gb,
+                    "storageClass": request.storage_class,
+                },
+            },
         }
-        raw = self.kv.create_image(namespace, request.name, data)
+        raw = self.kv.create_image(namespace, body)
 
         # Create a DataVolume for registry / http sources
         if request.source_type in ("registry", "http"):

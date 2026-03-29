@@ -1,120 +1,166 @@
-import json
 from datetime import UTC, datetime
 
-from kubernetes import client
-
+from app.core.k8s_client import KubeVirtClient
 from app.models.template import Template, TemplateCreate
 from app.models.vm import VMCompute
 
-TEMPLATE_LABEL = "kubevmui.io/type"
-TEMPLATE_LABEL_VALUE = "template"
-CM_PREFIX = "tpl-"
 
-
-def _cm_to_template(cm) -> Template:
-    """Deserialize a ConfigMap to our Template model."""
-    metadata = cm.metadata
-    data = cm.data or {}
-
-    spec_str = data.get("spec", "{}")
-    try:
-        spec = json.loads(spec_str)
-    except (json.JSONDecodeError, TypeError):
-        spec = {}
+def _cr_to_template(raw: dict) -> Template:
+    """Deserialize a kubevmui.io/v1 Template CR to our Template model."""
+    metadata = raw.get("metadata", {})
+    spec = raw.get("spec", {})
 
     created_at = None
-    if metadata.creation_timestamp:
-        ts = metadata.creation_timestamp
-        if hasattr(ts, "isoformat"):
-            created_at = ts.replace(tzinfo=UTC) if ts.tzinfo is None else ts
-        else:
-            try:
-                created_at = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-            except ValueError:
-                created_at = datetime.now(tz=UTC)
-
-    labels = metadata.labels or {}
-    annotations = metadata.annotations or {}
+    ts = metadata.get("creationTimestamp")
+    if ts:
+        try:
+            created_at = (
+                datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                if isinstance(ts, str)
+                else ts
+            )
+        except (ValueError, TypeError):
+            created_at = datetime.now(tz=UTC)
 
     compute_data = spec.get("compute", {})
     compute = VMCompute(
-        cpu_cores=compute_data.get("cpu_cores", 1),
-        memory_mb=compute_data.get("memory_mb", 512),
-        cpu_model=compute_data.get("cpu_model"),
+        cpu_cores=compute_data.get("cpuCores", 1),
+        memory_mb=compute_data.get("memoryMb", 512),
+        cpu_model=compute_data.get("cpuModel"),
         sockets=compute_data.get("sockets", 1),
-        cores_per_socket=compute_data.get("cores_per_socket"),
-        threads_per_core=compute_data.get("threads_per_core", 1),
+        cores_per_socket=compute_data.get("coresPerSocket"),
+        threads_per_core=compute_data.get("threadsPerCore", 1),
     )
 
-    name = metadata.name
-    if name.startswith(CM_PREFIX):
-        name = name[len(CM_PREFIX):]
+    cloud_init = spec.get("cloudInit", {})
+
+    # Map CRD disk fields (camelCase) to our model (snake_case)
+    disks = []
+    for d in spec.get("disks", []):
+        disks.append({
+            "name": d.get("name", ""),
+            "size_gb": d.get("sizeGb", 0),
+            "bus": d.get("bus", "virtio"),
+            "source_type": d.get("sourceType", ""),
+            "image": d.get("image", ""),
+            "clone_source": d.get("cloneSource", ""),
+            "clone_namespace": d.get("cloneNamespace", ""),
+            "storage_class": d.get("storageClass", ""),
+        })
+
+    networks = []
+    for n in spec.get("networks", []):
+        networks.append({
+            "name": n.get("name", ""),
+            "network_profile": n.get("networkProfile", ""),
+        })
 
     return Template(
-        name=name,
-        namespace=metadata.namespace,
+        name=metadata.get("name", ""),
+        namespace=metadata.get("namespace", ""),
         created_at=created_at,
-        labels=labels,
-        annotations=annotations,
-        display_name=spec.get("display_name", name),
+        labels=metadata.get("labels", {}),
+        annotations=metadata.get("annotations", {}),
+        display_name=spec.get("displayName", metadata.get("name", "")),
         description=spec.get("description", ""),
         category=spec.get("category", "custom"),
-        os_type=spec.get("os_type"),
+        os_type=spec.get("osType"),
         compute=compute,
-        disks=spec.get("disks", []),
-        networks=spec.get("networks", []),
-        cloud_init_user_data=spec.get("cloud_init_user_data"),
-        cloud_init_network_data=spec.get("cloud_init_network_data"),
-        autoattach_pod_interface=spec.get("autoattach_pod_interface", True),
+        disks=disks,
+        networks=networks,
+        cloud_init_user_data=cloud_init.get("userData"),
+        cloud_init_network_data=cloud_init.get("networkData"),
+        autoattach_pod_interface=spec.get("autoattachPodInterface", True),
+        is_global=spec.get("global", False),
     )
 
 
 class TemplateService:
-    def __init__(self, api_client: client.ApiClient):
-        self.core_api = client.CoreV1Api(api_client)
+    def __init__(self, kv: KubeVirtClient):
+        self.kv = kv
 
     def get_template(self, namespace: str, name: str) -> Template | None:
-        try:
-            cm = self.core_api.read_namespaced_config_map(f"{CM_PREFIX}{name}", namespace)
-            return _cm_to_template(cm)
-        except client.ApiException as e:
-            if e.status == 404:
-                return None
-            raise
+        raw = self.kv.get_template(namespace, name)
+        if raw is None:
+            return None
+        tpl = _cr_to_template(raw)
+        tpl.raw_manifest = raw
+        return tpl
 
     def list_templates(self, namespace: str) -> list[Template]:
-        label_selector = f"{TEMPLATE_LABEL}={TEMPLATE_LABEL_VALUE}"
-        result = self.core_api.list_namespaced_config_map(
-            namespace, label_selector=label_selector,
-        )
-        return [_cm_to_template(cm) for cm in result.items]
+        templates = [_cr_to_template(item) for item in self.kv.list_templates(namespace)]
+        # Merge global templates from other namespaces
+        seen = {t.name for t in templates}
+        for ns in self.kv.list_namespaces():
+            if ns == namespace:
+                continue
+            try:
+                for raw in self.kv.list_templates(ns):
+                    spec = raw.get("spec", {})
+                    if spec.get("global", False):
+                        tpl = _cr_to_template(raw)
+                        if tpl.name not in seen:
+                            templates.append(tpl)
+                            seen.add(tpl.name)
+            except Exception:
+                continue
+        return templates
 
     def create_template(self, request: TemplateCreate) -> Template:
-        spec = {
-            "display_name": request.display_name,
-            "description": request.description,
-            "category": request.category,
-            "os_type": request.os_type,
-            "compute": request.compute.model_dump(),
-            "disks": [d.model_dump() for d in request.disks],
-            "networks": [n.model_dump() for n in request.networks],
-            "cloud_init_user_data": request.cloud_init_user_data,
-            "cloud_init_network_data": request.cloud_init_network_data,
-            "autoattach_pod_interface": request.autoattach_pod_interface,
-        }
+        compute = request.compute.model_dump()
+        disks = [d.model_dump() for d in request.disks]
+        networks = [n.model_dump() for n in request.networks]
 
-        cm = client.V1ConfigMap(
-            api_version="v1",
-            kind="ConfigMap",
-            metadata=client.V1ObjectMeta(
-                name=f"{CM_PREFIX}{request.name}",
-                namespace=request.namespace,
-                labels={TEMPLATE_LABEL: TEMPLATE_LABEL_VALUE},
-            ),
-            data={"spec": json.dumps(spec)},
-        )
-        created = self.core_api.create_namespaced_config_map(request.namespace, cm)
-        return _cm_to_template(created)
+        body = {
+            "apiVersion": "kubevmui.io/v1",
+            "kind": "Template",
+            "metadata": {
+                "name": request.name,
+                "namespace": request.namespace,
+            },
+            "spec": {
+                "displayName": request.display_name,
+                "description": request.description,
+                "category": request.category,
+                "osType": request.os_type,
+                "compute": {
+                    "cpuCores": compute.get("cpu_cores", 1),
+                    "memoryMb": compute.get("memory_mb", 512),
+                    "cpuModel": compute.get("cpu_model"),
+                    "sockets": compute.get("sockets", 1),
+                    "coresPerSocket": compute.get("cores_per_socket"),
+                    "threadsPerCore": compute.get("threads_per_core", 1),
+                },
+                "disks": [
+                    {
+                        "name": d.get("name", ""),
+                        "sizeGb": d.get("size_gb", 0),
+                        "bus": d.get("bus", "virtio"),
+                        "sourceType": d.get("source_type", ""),
+                        "image": d.get("image", ""),
+                        "cloneSource": d.get("clone_source", ""),
+                        "cloneNamespace": d.get("clone_namespace", ""),
+                        "storageClass": d.get("storage_class", ""),
+                    }
+                    for d in disks
+                ],
+                "networks": [
+                    {
+                        "name": n.get("name", ""),
+                        "networkProfile": n.get("network_profile", ""),
+                    }
+                    for n in networks
+                ],
+                "cloudInit": {
+                    "userData": request.cloud_init_user_data,
+                    "networkData": request.cloud_init_network_data,
+                },
+                "autoattachPodInterface": request.autoattach_pod_interface,
+                "global": request.is_global,
+            },
+        }
+        raw = self.kv.create_template(request.namespace, body)
+        return _cr_to_template(raw)
 
     def delete_template(self, namespace: str, name: str) -> None:
-        self.core_api.delete_namespaced_config_map(f"{CM_PREFIX}{name}", namespace)
+        self.kv.delete_template(namespace, name)

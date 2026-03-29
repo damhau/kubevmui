@@ -6,6 +6,7 @@ import { formatMemoryMb } from '@/lib/format'
 import { TopBar } from '@/components/layout/TopBar'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
+import { YamlViewer } from '@/components/ui/YamlViewer'
 
 const categoryColor: Record<string, string> = {
   OS: theme.status.provisioning,
@@ -149,7 +150,7 @@ export function TemplateDetailPage() {
                           <th className="table-header-cell">Source Type</th>
                           <th className="table-header-cell">Bus</th>
                           <th className="table-header-cell">Size (GB)</th>
-                          <th className="table-header-cell">Image</th>
+                          <th className="table-header-cell">Clone Source</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -159,7 +160,11 @@ export function TemplateDetailPage() {
                             <td className="table-cell">{disk.source_type ?? '\u2014'}</td>
                             <td className="table-cell">{disk.bus ?? '\u2014'}</td>
                             <td className="table-cell">{disk.size_gb ?? '\u2014'}</td>
-                            <td className="table-cell" style={{ fontFamily: theme.typography.mono.fontFamily, fontSize: 12 }}>{disk.image ?? '\u2014'}</td>
+                            <td className="table-cell" style={{ fontFamily: theme.typography.mono.fontFamily, fontSize: 12 }}>
+                              {disk.clone_source ? (
+                                <Link to={`/images/${data.namespace}/${disk.clone_source}`} style={{ color: theme.accent, textDecoration: 'none' }}>{disk.clone_source}</Link>
+                              ) : disk.image || '\u2014'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -221,11 +226,9 @@ export function TemplateDetailPage() {
 
             {/* YAML Tab */}
             {activeTab === 'yaml' && (
-              <div className="card-padded">
-                <pre className="code-block" style={{ border: 'none', boxShadow: 'none', padding: 0, borderRadius: 0, background: 'transparent' }}>
-                  {JSON.stringify(data, null, 2)}
-                </pre>
-              </div>
+              <YamlViewer resources={[
+                { label: data.name, kind: 'Template', data: data.raw_manifest ?? data }
+              ]} />
             )}
           </>
         )}

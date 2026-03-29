@@ -7,9 +7,10 @@ export function useVMs() {
   return useQuery({
     queryKey: ['vms', activeCluster, activeNamespace],
     queryFn: async () => {
-      const { data } = await apiClient.get(
-        `/clusters/${activeCluster}/namespaces/${activeNamespace}/vms`
-      )
+      const url = activeNamespace === '_all'
+        ? `/clusters/${activeCluster}/all/vms`
+        : `/clusters/${activeCluster}/namespaces/${activeNamespace}/vms`
+      const { data } = await apiClient.get(url)
       return data
     },
     refetchInterval: 5000,

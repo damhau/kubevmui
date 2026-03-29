@@ -89,10 +89,18 @@ class MetricsService:
         net_rx_query = f'rate(container_network_receive_bytes_total{{{pod_selector}}}[5m])'
         net_tx_query = f'rate(container_network_transmit_bytes_total{{{pod_selector}}}[5m])'
 
+        # Storage: usage percentage per PVC attached to this VM's virt-launcher pod
+        # We find PVCs by matching the pod name pattern
+        storage_used_query = (
+            f'kubelet_volume_stats_used_bytes{{namespace="{namespace}"}}'
+            f' / kubelet_volume_stats_capacity_bytes{{namespace="{namespace}"}}'
+        )
+
         cpu_data = self.query_range(cpu_query, start, end, step)
         memory_data = self.query_range(memory_query, start, end, step)
         net_rx_data = self.query_range(net_rx_query, start, end, step)
         net_tx_data = self.query_range(net_tx_query, start, end, step)
+        storage_data = self.query_range(storage_used_query, start, end, step)
 
         def extract_values(result: list[dict]) -> list[dict]:
             if not result:
@@ -100,11 +108,20 @@ class MetricsService:
             values = result[0].get("values", [])
             return [{"timestamp": v[0], "value": float(v[1])} for v in values]
 
+        # Filter storage results to PVCs belonging to this VM
+        storage_by_pvc: dict[str, list[dict]] = {}
+        for series in storage_data:
+            pvc_name = series.get("metric", {}).get("persistentvolumeclaim", "")
+            if pvc_name.startswith(f"{vm_name}-"):
+                values = [{"timestamp": v[0], "value": float(v[1])} for v in series.get("values", [])]
+                storage_by_pvc[pvc_name] = values
+
         return {
             "cpu": extract_values(cpu_data),
             "memory": extract_values(memory_data),
             "network_rx": extract_values(net_rx_data),
             "network_tx": extract_values(net_tx_data),
+            "storage": storage_by_pvc,
         }
 
     def get_node_metrics(self, node_name: str, start: str, end: str, step: str = "60s") -> dict:

@@ -14,6 +14,7 @@ import { StoragePage } from '@/pages/StoragePage'
 import { SSHKeysPage } from '@/pages/SSHKeysPage'
 import { ImagesPage } from '@/pages/ImagesPage'
 import { NodesPage } from '@/pages/NodesPage'
+import { EventsPage } from '@/pages/EventsPage'
 import { TemplateDetailPage } from '@/pages/TemplateDetailPage'
 import { ImageDetailPage } from '@/pages/ImageDetailPage'
 import { StorageDetailPage } from '@/pages/StorageDetailPage'
@@ -52,6 +53,7 @@ function App() {
             <Route path="/nodes" element={<NodesPage />} />
             <Route path="/nodes/:name" element={<NodeDetailPage />} />
             <Route path="/ssh-keys" element={<SSHKeysPage />} />
+            <Route path="/events" element={<EventsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

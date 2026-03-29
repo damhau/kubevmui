@@ -13,6 +13,8 @@ class VMDiskRef(BaseModel):
     clone_source: str = ""  # name of the source DataVolume/PVC to clone from
     clone_namespace: str = ""  # namespace of the source (defaults to VM namespace)
     storage_class: str = ""  # storage class for the cloned DV
+    volume_name: str = ""  # actual PVC/DataVolume name backing this disk
+    used_gb: float = 0  # used storage from guest agent
 
 class VMNetworkRef(BaseModel):
     name: str
@@ -49,6 +51,8 @@ class VM(ResourceMeta):
     description: str = ""
     template_name: str | None = None
     events: list[VMEvent] = []
+    raw_manifest: dict | None = None
+    raw_vmi_manifest: dict | None = None
 
 class VMCreate(BaseModel):
     name: str
@@ -91,6 +95,8 @@ class VMCloneRequest(BaseModel):
 
 class VMPatchRequest(BaseModel):
     run_strategy: str | None = None
+    cpu_cores: int | None = None
+    memory_mb: int | None = None
 
 class VMList(BaseModel):
     items: list[VM]

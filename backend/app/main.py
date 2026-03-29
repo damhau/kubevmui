@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, dashboard, images, metrics, migrations, namespaces, networks, nodes, snapshots, ssh_keys, storage, templates, vms
+from app.api.routes import auth, cluster_lists, dashboard, events, images, metrics, migrations, namespaces, networks, nodes, snapshots, ssh_keys, storage, templates, vms
 from app.api.routes.networks import cluster_router as networks_cluster_router
 from app.api.routes.storage import cluster_router as storage_cluster_router
 from app.core.cluster_manager import ClusterManager
@@ -51,6 +51,8 @@ def create_app() -> FastAPI:
     application.include_router(namespaces.router)
     application.include_router(nodes.router)
     application.include_router(metrics.router)
+    application.include_router(events.router)
+    application.include_router(cluster_lists.router)
     application.include_router(vnc_proxy.router)
     application.include_router(serial_proxy.router)
     return application

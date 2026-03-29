@@ -101,6 +101,8 @@ def patch_vm(
     svc = _get_service(cluster, cm)
     if body.run_strategy:
         svc.update_run_strategy(ns, name, body.run_strategy)
+    if body.cpu_cores is not None or body.memory_mb is not None:
+        svc.update_compute(ns, name, body.cpu_cores, body.memory_mb)
     return {"status": "ok"}
 
 

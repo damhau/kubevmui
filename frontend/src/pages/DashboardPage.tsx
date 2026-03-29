@@ -169,8 +169,9 @@ export function DashboardPage() {
     const ki = parseInt(raw.replace(/Ki$/i, ''), 10)
     return sum + (isNaN(ki) ? 0 : ki / (1024 * 1024))
   }, 0)
-  const totalCpuAllocated = recentVMs.reduce((sum, vm) => sum + (vm.cpu || 0), 0)
-  const totalMemAllocated = recentVMs.reduce((sum, vm) => {
+  const runningVMs = recentVMs.filter((vm) => vm.status?.toLowerCase() === 'running')
+  const totalCpuAllocated = runningVMs.reduce((sum, vm) => sum + (vm.cpu || 0), 0)
+  const totalMemAllocated = runningVMs.reduce((sum, vm) => {
     const raw = vm.memory || '0'
     const match = raw.match(/^(\d+(?:\.\d+)?)\s*(Gi|Mi|G|M)?$/i)
     if (!match) return sum
@@ -185,6 +186,7 @@ export function DashboardPage() {
       <TopBar
         title="Dashboard"
         subtitle="Overview of your virtual infrastructure"
+        hideNamespace
       />
 
       <div className="page-content">

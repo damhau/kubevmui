@@ -11,7 +11,9 @@ class Disk(ResourceMeta):
     volume_mode: str = "Filesystem"
     status: str = "Available"
     attached_vm: str | None = None
+    is_image: bool = False
     backend_info: str | None = None
+    raw_manifest: dict | None = None
 
 class DiskCreate(BaseModel):
     name: str

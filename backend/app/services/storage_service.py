@@ -73,13 +73,34 @@ def _pvc_to_disk(pvc) -> Disk:
         volume_mode=volume_mode,
         status=disk_status,
         attached_vm=attached_vm,
+        is_image=labels.get("kubevmui.io/type") == "image",
     )
+
+
+def _find_attached_vm(custom_api, namespace: str, pvc_name: str) -> str | None:
+    """Find which VM references this PVC via dataVolume or persistentVolumeClaim."""
+    try:
+        result = custom_api.list_namespaced_custom_object(
+            group="kubevirt.io", version="v1",
+            namespace=namespace, plural="virtualmachines",
+        )
+        for vm in result.get("items", []):
+            volumes = vm.get("spec", {}).get("template", {}).get("spec", {}).get("volumes", [])
+            for vol in volumes:
+                dv = vol.get("dataVolume", {})
+                pvc = vol.get("persistentVolumeClaim", {})
+                if dv.get("name") == pvc_name or pvc.get("claimName") == pvc_name:
+                    return vm.get("metadata", {}).get("name")
+    except Exception:
+        pass
+    return None
 
 
 class StorageService:
     def __init__(self, api_client: client.ApiClient):
         self.core_api = client.CoreV1Api(api_client)
         self.storage_api = client.StorageV1Api(api_client)
+        self.custom_api = client.CustomObjectsApi(api_client)
 
     def _get_storage_class_tier(self, sc_name: str) -> str:
         """Fetch performance tier from StorageClass annotations."""
@@ -96,6 +117,8 @@ class StorageService:
             disk = _pvc_to_disk(pvc)
             if disk.storage_class and disk.performance_tier == disk.storage_class:
                 disk.performance_tier = self._get_storage_class_tier(disk.storage_class)
+            disk.attached_vm = _find_attached_vm(self.custom_api, namespace, name)
+            disk.raw_manifest = self.core_api.api_client.sanitize_for_serialization(pvc)
             return disk
         except client.ApiException as e:
             if e.status == 404:
@@ -104,11 +127,39 @@ class StorageService:
 
     def list_disks(self, namespace: str) -> list[Disk]:
         result = self.core_api.list_namespaced_persistent_volume_claim(namespace)
+        # Build VM→PVC mapping once for the whole namespace
+        vm_pvc_map: dict[str, str] = {}
+        try:
+            vms = self.custom_api.list_namespaced_custom_object(
+                group="kubevirt.io", version="v1",
+                namespace=namespace, plural="virtualmachines",
+            )
+            for vm in vms.get("items", []):
+                vm_name = vm.get("metadata", {}).get("name", "")
+                volumes = vm.get("spec", {}).get("template", {}).get("spec", {}).get("volumes", [])
+                for vol in volumes:
+                    dv_name = vol.get("dataVolume", {}).get("name")
+                    pvc_name = vol.get("persistentVolumeClaim", {}).get("claimName")
+                    if dv_name:
+                        vm_pvc_map[dv_name] = vm_name
+                    if pvc_name:
+                        vm_pvc_map[pvc_name] = vm_name
+        except Exception:
+            pass
         disks = []
         for pvc in result.items:
+            labels = pvc.metadata.labels or {}
+            name = pvc.metadata.name
+            # Only show VM-related PVCs: CDI-managed, kubevmui images, or referenced by a VM
+            is_cdi = labels.get("app.kubernetes.io/managed-by") == "cdi-controller"
+            is_image = labels.get("kubevmui.io/type") == "image"
+            is_vm_disk = name in vm_pvc_map
+            if not (is_cdi or is_image or is_vm_disk):
+                continue
             disk = _pvc_to_disk(pvc)
             if disk.storage_class and disk.performance_tier == disk.storage_class:
                 disk.performance_tier = self._get_storage_class_tier(disk.storage_class)
+            disk.attached_vm = vm_pvc_map.get(disk.name)
             disks.append(disk)
         return disks
 
