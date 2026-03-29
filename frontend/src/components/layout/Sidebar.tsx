@@ -12,6 +12,7 @@ import {
   BarChart3,
   TrendingUp,
   FileText,
+  Package,
 } from 'lucide-react'
 import { theme } from '@/lib/theme'
 
@@ -34,6 +35,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Dashboard', to: '/dashboard', icon: <LayoutDashboard size={16} /> },
       { label: 'Virtual Machines', to: '/vms', icon: <Monitor size={16} /> },
+      { label: 'Catalog', to: '/catalog', icon: <Package size={16} /> },
       { label: 'Templates', to: '/templates', icon: <Copy size={16} /> },
       { label: 'Events', to: '/events', icon: <Activity size={16} /> },
     ],

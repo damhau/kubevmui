@@ -24,6 +24,7 @@ import { NodeDetailPage } from '@/pages/NodeDetailPage'
 import { ClusterMetricsPage } from '@/pages/ClusterMetricsPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { AuditLogPage } from '@/pages/AuditLogPage'
+import { CatalogPage } from '@/pages/CatalogPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +51,7 @@ function App() {
             <Route path="/vms/:namespace/:name" element={<VMDetailPage />} />
             <Route path="/images" element={<ImagesPage />} />
             <Route path="/images/:namespace/:name" element={<ImageDetailPage />} />
+            <Route path="/catalog" element={<CatalogPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/templates/:name" element={<TemplateDetailPage />} />
             <Route path="/networks" element={<NetworksPage />} />
