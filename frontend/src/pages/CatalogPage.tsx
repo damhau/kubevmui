@@ -5,7 +5,7 @@ import {
   useCatalogStatus,
   useProvisionCatalog,
 } from '@/hooks/useCatalog'
-import type { CatalogEntry, CatalogTemplate } from '@/hooks/useCatalog'
+import type { CatalogEntry } from '@/hooks/useCatalog'
 import { useStorageClasses } from '@/hooks/useImages'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
@@ -15,20 +15,41 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Package, Download, CheckCircle, Loader, AlertCircle } from 'lucide-react'
 
+import ubuntuLogo from '@/assets/distros/ubuntu.svg'
+import debianLogo from '@/assets/distros/debian.svg'
+import fedoraLogo from '@/assets/distros/fedora.svg'
+import centosLogo from '@/assets/distros/centos.svg'
+import rockyLogo from '@/assets/distros/rocky.svg'
+import almalinuxLogo from '@/assets/distros/almalinux.svg'
+import alpineLogo from '@/assets/distros/alpine.svg'
+
 /* ── Distro icon map ─────────────────────────────────────────── */
 
-const DISTRO_COLORS: Record<string, string> = {
-  ubuntu: '#E95420',
-  debian: '#A80030',
-  fedora: '#51A2DA',
-  centos: '#932279',
-  rocky: '#10B981',
-  almalinux: '#0F4266',
-  alpine: '#0D597F',
+const DISTRO_LOGOS: Record<string, string> = {
+  ubuntu: ubuntuLogo,
+  debian: debianLogo,
+  fedora: fedoraLogo,
+  centos: centosLogo,
+  rocky: rockyLogo,
+  almalinux: almalinuxLogo,
+  alpine: alpineLogo,
 }
 
-function DistroIcon({ icon, size = 40 }: { icon: string; size?: number }) {
-  const color = DISTRO_COLORS[icon] || theme.accent
+function DistroIcon({ icon, size = 36 }: { icon: string; size?: number }) {
+  const logo = DISTRO_LOGOS[icon]
+  if (logo) {
+    return (
+      <img
+        src={logo}
+        alt={icon}
+        style={{
+          width: size,
+          height: size,
+          flexShrink: 0,
+        }}
+      />
+    )
+  }
   const letter = icon ? icon[0].toUpperCase() : '?'
   return (
     <div
@@ -36,12 +57,11 @@ function DistroIcon({ icon, size = 40 }: { icon: string; size?: number }) {
         width: size,
         height: size,
         borderRadius: theme.radius.md,
-        background: `${color}20`,
-        border: `1px solid ${color}40`,
+        background: theme.accentLight,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color,
+        color: theme.accent,
         fontSize: size * 0.45,
         fontWeight: 700,
         flexShrink: 0,
@@ -117,32 +137,7 @@ function StatusBadge({ entryName, namespace }: { entryName: string; namespace: s
   )
 }
 
-/* ── Size chip ───────────────────────────────────────────────── */
-
-function SizeChips({ templates }: { templates: CatalogTemplate[] }) {
-  return (
-    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-      {templates.map((t) => (
-        <span
-          key={t.name}
-          title={t.display_name}
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            padding: '1px 6px',
-            borderRadius: theme.radius.sm,
-            background: theme.accentLight,
-            color: theme.accent,
-            border: `1px solid rgba(99,102,241,0.2)`,
-            textTransform: 'uppercase',
-          }}
-        >
-          {t.name[0].toUpperCase()}
-        </span>
-      ))}
-    </div>
-  )
-}
+/* ── Size chip (removed — templates shown in wizard step 2) ─── */
 
 /* ── Provision wizard ────────────────────────────────────────── */
 
@@ -644,7 +639,9 @@ export function CatalogPage() {
 
                 {/* Footer */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <SizeChips templates={entry.templates} />
+                  <span style={{ fontSize: 11, color: theme.text.dim }}>
+                    {entry.templates.length} size{entry.templates.length !== 1 ? 's' : ''}
+                  </span>
                   <StatusBadge entryName={entry.name} namespace={ns} />
                 </div>
               </div>
