@@ -1,0 +1,35 @@
+apiVersion: catalog.kubevmui.io/v1
+kind: CatalogEntry
+metadata:
+  name: centos-stream-9
+spec:
+  displayName: "CentOS Stream 9"
+  description: "Continuously delivered Linux distribution tracking ahead of RHEL"
+  category: os
+  osType: linux
+  icon: centos
+  maintainer: kubevmui
+  image:
+    sourceType: http
+    sourceUrl: https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2
+    defaultSizeGb: 20
+  cloudInit:
+    userData: |
+      #cloud-config
+      package_update: true
+      packages: [qemu-guest-agent]
+      runcmd:
+        - systemctl enable --now qemu-guest-agent
+  templates:
+    - name: small
+      displayName: "Small (1 vCPU / 1 GB)"
+      cpuCores: 1
+      memoryMb: 1024
+    - name: medium
+      displayName: "Medium (2 vCPU / 4 GB)"
+      cpuCores: 2
+      memoryMb: 4096
+    - name: large
+      displayName: "Large (4 vCPU / 8 GB)"
+      cpuCores: 4
+      memoryMb: 8192

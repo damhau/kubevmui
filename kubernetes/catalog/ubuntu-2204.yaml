@@ -1,0 +1,35 @@
+apiVersion: catalog.kubevmui.io/v1
+kind: CatalogEntry
+metadata:
+  name: ubuntu-2204
+spec:
+  displayName: "Ubuntu 22.04 LTS (Jammy Jellyfish)"
+  description: "Previous LTS release with extended security maintenance"
+  category: os
+  osType: linux
+  icon: ubuntu
+  maintainer: kubevmui
+  image:
+    sourceType: http
+    sourceUrl: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
+    defaultSizeGb: 20
+  cloudInit:
+    userData: |
+      #cloud-config
+      package_update: true
+      packages: [qemu-guest-agent]
+      runcmd:
+        - systemctl enable --now qemu-guest-agent
+  templates:
+    - name: small
+      displayName: "Small (1 vCPU / 1 GB)"
+      cpuCores: 1
+      memoryMb: 1024
+    - name: medium
+      displayName: "Medium (2 vCPU / 4 GB)"
+      cpuCores: 2
+      memoryMb: 4096
+    - name: large
+      displayName: "Large (4 vCPU / 8 GB)"
+      cpuCores: 4
+      memoryMb: 8192

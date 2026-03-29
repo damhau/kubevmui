@@ -1,0 +1,35 @@
+apiVersion: catalog.kubevmui.io/v1
+kind: CatalogEntry
+metadata:
+  name: ubuntu-2404
+spec:
+  displayName: "Ubuntu 24.04 LTS (Noble Numbat)"
+  description: "General-purpose Linux server distribution with long-term support"
+  category: os
+  osType: linux
+  icon: ubuntu
+  maintainer: kubevmui
+  image:
+    sourceType: http
+    sourceUrl: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+    defaultSizeGb: 20
+  cloudInit:
+    userData: |
+      #cloud-config
+      package_update: true
+      packages: [qemu-guest-agent]
+      runcmd:
+        - systemctl enable --now qemu-guest-agent
+  templates:
+    - name: small
+      displayName: "Small (1 vCPU / 1 GB)"
+      cpuCores: 1
+      memoryMb: 1024
+    - name: medium
+      displayName: "Medium (2 vCPU / 4 GB)"
+      cpuCores: 2
+      memoryMb: 4096
+    - name: large
+      displayName: "Large (4 vCPU / 8 GB)"
+      cpuCores: 4
+      memoryMb: 8192

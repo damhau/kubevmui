@@ -1,0 +1,35 @@
+apiVersion: catalog.kubevmui.io/v1
+kind: CatalogEntry
+metadata:
+  name: debian-11
+spec:
+  displayName: "Debian 11 (Bullseye)"
+  description: "Previous stable release with long-term support"
+  category: os
+  osType: linux
+  icon: debian
+  maintainer: kubevmui
+  image:
+    sourceType: http
+    sourceUrl: https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2
+    defaultSizeGb: 10
+  cloudInit:
+    userData: |
+      #cloud-config
+      package_update: true
+      packages: [qemu-guest-agent]
+      runcmd:
+        - systemctl enable --now qemu-guest-agent
+  templates:
+    - name: small
+      displayName: "Small (1 vCPU / 1 GB)"
+      cpuCores: 1
+      memoryMb: 1024
+    - name: medium
+      displayName: "Medium (2 vCPU / 4 GB)"
+      cpuCores: 2
+      memoryMb: 4096
+    - name: large
+      displayName: "Large (4 vCPU / 8 GB)"
+      cpuCores: 4
+      memoryMb: 8192

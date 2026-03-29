@@ -1,0 +1,41 @@
+apiVersion: catalog.kubevmui.io/v1
+kind: CatalogEntry
+metadata:
+  name: alpine-320
+spec:
+  displayName: "Alpine Linux 3.20"
+  description: "Lightweight security-oriented Linux distribution"
+  category: os
+  osType: linux
+  icon: alpine
+  maintainer: kubevmui
+  image:
+    sourceType: http
+    sourceUrl: https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/cloud/nocloud_alpine-3.20.6-x86_64-bios-cloudinit-r0.qcow2
+    defaultSizeGb: 5
+  cloudInit:
+    userData: |
+      #cloud-config
+      apk_repos:
+        - main
+        - community
+      packages: [qemu-guest-agent]
+      runcmd:
+        - rc-update add qemu-guest-agent
+        - service qemu-guest-agent start
+  templates:
+    - name: small
+      displayName: "Small (1 vCPU / 256 MB)"
+      cpuCores: 1
+      memoryMb: 256
+      diskSizeGb: 5
+    - name: medium
+      displayName: "Medium (1 vCPU / 512 MB)"
+      cpuCores: 1
+      memoryMb: 512
+      diskSizeGb: 10
+    - name: large
+      displayName: "Large (2 vCPU / 1 GB)"
+      cpuCores: 2
+      memoryMb: 1024
+      diskSizeGb: 20
