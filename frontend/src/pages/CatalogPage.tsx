@@ -4,9 +4,8 @@ import {
   useCatalogEntries,
   useCatalogStatus,
   useProvisionCatalog,
-  CatalogEntry,
-  CatalogTemplate,
 } from '@/hooks/useCatalog'
+import type { CatalogEntry, CatalogTemplate } from '@/hooks/useCatalog'
 import { useStorageClasses } from '@/hooks/useImages'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
@@ -69,7 +68,7 @@ function StatusBadge({ entryName, namespace }: { entryName: string; namespace: s
       <span
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 11, color: theme.text.tertiary,
+          fontSize: 11, color: theme.text.dim,
         }}
       >
         <Download size={12} /> Not provisioned
@@ -221,9 +220,10 @@ function ProvisionWizard({
 
   return (
     <Modal
+      open={true}
       title={`Provision ${entry.display_name}`}
       onClose={onClose}
-      width={540}
+      maxWidth={540}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Step indicator */}
@@ -233,7 +233,7 @@ function ProvisionWizard({
               key={s}
               style={{
                 flex: 1, height: 3, borderRadius: 2,
-                background: s <= state.step ? theme.accent : theme.border,
+                background: s <= state.step ? theme.accent : theme.main.cardBorder,
                 transition: 'background 0.2s',
               }}
             />
@@ -297,7 +297,7 @@ function ProvisionWizard({
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 12px',
                   borderRadius: theme.radius.md,
-                  border: `1px solid ${state.selectedTemplates[t.name] ? theme.accent : theme.border}`,
+                  border: `1px solid ${state.selectedTemplates[t.name] ? theme.accent : theme.main.cardBorder}`,
                   background: state.selectedTemplates[t.name] ? `${theme.accent}08` : 'transparent',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
@@ -322,7 +322,7 @@ function ProvisionWizard({
                   <div style={{ fontSize: 13, fontWeight: 500, color: theme.text.primary }}>
                     {t.display_name}
                   </div>
-                  <div style={{ fontSize: 11, color: theme.text.tertiary }}>
+                  <div style={{ fontSize: 11, color: theme.text.dim }}>
                     {t.cpu_cores} vCPU / {t.memory_mb >= 1024 ? `${t.memory_mb / 1024} GB` : `${t.memory_mb} MB`} RAM
                     / {t.disk_size_gb || entry.image.default_size_gb} GB disk
                   </div>
@@ -341,7 +341,7 @@ function ProvisionWizard({
             <div
               style={{
                 padding: 12, borderRadius: theme.radius.md,
-                background: theme.bg.secondary, fontSize: 12,
+                background: theme.main.bg, fontSize: 12,
                 display: 'flex', flexDirection: 'column', gap: 6,
               }}
             >
@@ -461,8 +461,8 @@ export function CatalogPage() {
                 style={{
                   padding: 16,
                   borderRadius: theme.radius.lg,
-                  border: `1px solid ${theme.border}`,
-                  background: theme.bg.primary,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  background: theme.main.card,
                   cursor: 'pointer',
                   transition: 'border-color 0.15s, box-shadow 0.15s',
                   display: 'flex',
@@ -474,7 +474,7 @@ export function CatalogPage() {
                   e.currentTarget.style.boxShadow = `0 0 0 1px ${theme.accent}40`
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = theme.border
+                  e.currentTarget.style.borderColor = theme.main.cardBorder
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               >
@@ -492,7 +492,7 @@ export function CatalogPage() {
                     </div>
                     <div
                       style={{
-                        fontSize: 12, color: theme.text.tertiary, marginTop: 2,
+                        fontSize: 12, color: theme.text.dim, marginTop: 2,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}
                     >
