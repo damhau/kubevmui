@@ -1,0 +1,109 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: catalogentries.catalog.kubevmui.io
+spec:
+  group: catalog.kubevmui.io
+  names:
+    kind: CatalogEntry
+    plural: catalogentries
+    singular: catalogentry
+    shortNames:
+      - ce
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - displayName
+                - category
+                - osType
+                - image
+                - templates
+              properties:
+                displayName:
+                  type: string
+                  description: Human-readable name for this distribution
+                description:
+                  type: string
+                  default: ""
+                category:
+                  type: string
+                  enum: [os, application]
+                  default: os
+                osType:
+                  type: string
+                  enum: [linux, windows]
+                icon:
+                  type: string
+                  description: Icon key for frontend display
+                maintainer:
+                  type: string
+                  default: kubevmui
+                image:
+                  type: object
+                  required:
+                    - sourceType
+                    - sourceUrl
+                  properties:
+                    sourceType:
+                      type: string
+                      enum: [http, registry, container_disk]
+                    sourceUrl:
+                      type: string
+                    defaultSizeGb:
+                      type: integer
+                      default: 20
+                cloudInit:
+                  type: object
+                  properties:
+                    userData:
+                      type: string
+                templates:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - displayName
+                      - cpuCores
+                      - memoryMb
+                    properties:
+                      name:
+                        type: string
+                      displayName:
+                        type: string
+                      cpuCores:
+                        type: integer
+                      memoryMb:
+                        type: integer
+                      diskSizeGb:
+                        type: integer
+      additionalPrinterColumns:
+        - name: Display Name
+          type: string
+          jsonPath: .spec.displayName
+        - name: Category
+          type: string
+          jsonPath: .spec.category
+        - name: OS
+          type: string
+          jsonPath: .spec.osType
+        - name: Source
+          type: string
+          jsonPath: .spec.image.sourceType
+        - name: Templates
+          type: integer
+          jsonPath: .spec.templates[*].name
+          priority: 1
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
