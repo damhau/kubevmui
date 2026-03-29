@@ -6,6 +6,7 @@ import { theme } from '@/lib/theme'
 import { Server, Monitor } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
+import { useSortable } from '@/hooks/useSortable'
 
 interface NodeItem {
   name: string
@@ -74,6 +75,7 @@ export function NodesPage() {
       n.name.toLowerCase().includes(search.toLowerCase()) ||
       n.roles?.some((r: string) => r.toLowerCase().includes(search.toLowerCase())),
   )
+  const { sorted: sortedNodes, sortConfig, requestSort } = useSortable(filtered, { column: 'name', direction: 'asc' })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -116,18 +118,26 @@ export function NodesPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', 'Status', 'Roles', 'CPU', 'Memory', 'VMs'].map((col, i) => (
-                    <th
-                      key={i}
-                      className="table-header-cell"
-                    >
-                      {col}
-                    </th>
-                  ))}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>
+                    Name{sortConfig.column === 'name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'status' ? ' active' : ''}`} onClick={() => requestSort('status')}>
+                    Status{sortConfig.column === 'status' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className="table-header-cell">Roles</th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'cpu_capacity' ? ' active' : ''}`} onClick={() => requestSort('cpu_capacity')}>
+                    CPU{sortConfig.column === 'cpu_capacity' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'memory_capacity' ? ' active' : ''}`} onClick={() => requestSort('memory_capacity')}>
+                    Memory{sortConfig.column === 'memory_capacity' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'vm_count' ? ' active' : ''}`} onClick={() => requestSort('vm_count')}>
+                    VMs{sortConfig.column === 'vm_count' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((node, i) => (
+                {sortedNodes.map((node, i) => (
                       <tr
                         key={node.name}
                         className="table-row-clickable"

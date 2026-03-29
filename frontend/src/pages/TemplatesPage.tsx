@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Copy } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
+import { useSortable } from '@/hooks/useSortable'
 
 const categoryColor: Record<string, string> = {
   OS: theme.status.provisioning,
@@ -211,6 +212,7 @@ export function TemplatesPage() {
   const createTemplate = useCreateTemplate()
   const deleteTemplate = useDeleteTemplate()
   const templates: Template[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
+  const { sorted: sortedTemplates, sortConfig, requestSort } = useSortable(templates, { column: 'display_name', direction: 'asc' })
   const [showCreate, setShowCreate] = useState(false)
   const [editingName, setEditingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -444,20 +446,33 @@ export function TemplatesPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', ...(activeNamespace === '_all' ? ['Namespace'] : []), 'Category', 'OS Type', 'CPU', 'Memory', 'Disks', 'Networks', ''].map(
-                    (col) => (
-                      <th
-                        key={col || '_actions'}
-                        className="table-header-cell"
-                      >
-                        {col}
-                      </th>
-                    ),
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'display_name' ? ' active' : ''}`} onClick={() => requestSort('display_name')}>
+                    Name{sortConfig.column === 'display_name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  {activeNamespace === '_all' && (
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestSort('namespace')}>
+                      Namespace{sortConfig.column === 'namespace' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
                   )}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'category' ? ' active' : ''}`} onClick={() => requestSort('category')}>
+                    Category{sortConfig.column === 'category' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'os_type' ? ' active' : ''}`} onClick={() => requestSort('os_type')}>
+                    OS Type{sortConfig.column === 'os_type' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'compute.cpu_cores' ? ' active' : ''}`} onClick={() => requestSort('compute.cpu_cores')}>
+                    CPU{sortConfig.column === 'compute.cpu_cores' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'compute.memory_mb' ? ' active' : ''}`} onClick={() => requestSort('compute.memory_mb')}>
+                    Memory{sortConfig.column === 'compute.memory_mb' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className="table-header-cell">Disks</th>
+                  <th className="table-header-cell">Networks</th>
+                  <th className="table-header-cell"></th>
                 </tr>
               </thead>
               <tbody>
-                {templates.map((tpl, i) => (
+                {sortedTemplates.map((tpl, i) => (
                   <tr
                     key={tpl.name}
                     className="table-row-clickable"

@@ -16,11 +16,13 @@ class VMDiskRef(BaseModel):
     volume_name: str = ""  # actual PVC/DataVolume name backing this disk
     used_gb: float = 0  # used storage from guest agent
 
+
 class VMNetworkRef(BaseModel):
     name: str
     network_profile: str
     ip_address: str | None = None
     mac_address: str | None = None
+
 
 class VMCompute(BaseModel):
     cpu_cores: int
@@ -30,6 +32,16 @@ class VMCompute(BaseModel):
     cores_per_socket: int | None = None
     threads_per_core: int = 1
 
+
+class GuestAgentInfo(BaseModel):
+    hostname: str = ""
+    os_name: str = ""
+    os_version: str = ""
+    os_id: str = ""
+    kernel: str = ""
+    timezone: str = ""
+
+
 class VMEvent(BaseModel):
     timestamp: str = ""
     type: str = ""  # Normal, Warning
@@ -37,6 +49,7 @@ class VMEvent(BaseModel):
     message: str = ""
     source: str = ""  # VirtualMachine, VirtualMachineInstance, DataVolume
     object_name: str = ""
+
 
 class VM(ResourceMeta):
     status: VMStatus = VMStatus.unknown
@@ -51,8 +64,10 @@ class VM(ResourceMeta):
     description: str = ""
     template_name: str | None = None
     events: list[VMEvent] = []
+    guest_agent_info: GuestAgentInfo | None = None
     raw_manifest: dict | None = None
     raw_vmi_manifest: dict | None = None
+
 
 class VMCreate(BaseModel):
     name: str
@@ -75,28 +90,35 @@ class VMCreate(BaseModel):
     eviction_strategy: str | None = None  # "LiveMigrate" or None
     autoattach_pod_interface: bool = True
 
+
 class AddVolumeRequest(BaseModel):
     name: str
     pvc_name: str
     bus: str = "scsi"
 
+
 class RemoveVolumeRequest(BaseModel):
     name: str
+
 
 class AddInterfaceRequest(BaseModel):
     name: str
     network_attachment_definition: str
 
+
 class RemoveInterfaceRequest(BaseModel):
     name: str
 
+
 class VMCloneRequest(BaseModel):
     new_name: str
+
 
 class VMPatchRequest(BaseModel):
     run_strategy: str | None = None
     cpu_cores: int | None = None
     memory_mb: int | None = None
+
 
 class VMList(BaseModel):
     items: list[VM]

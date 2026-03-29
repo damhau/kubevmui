@@ -21,7 +21,7 @@ def _parse_size(size_str: str) -> int:
     if size_str.endswith("Ki"):
         return max(1, int(float(size_str[:-2]) // (1024 * 1024)))
     try:
-        return int(size_str) // (1024 ** 3)
+        return int(size_str) // (1024**3)
     except ValueError:
         return 0
 
@@ -81,8 +81,10 @@ def _find_attached_vm(custom_api, namespace: str, pvc_name: str) -> str | None:
     """Find which VM references this PVC via dataVolume or persistentVolumeClaim."""
     try:
         result = custom_api.list_namespaced_custom_object(
-            group="kubevirt.io", version="v1",
-            namespace=namespace, plural="virtualmachines",
+            group="kubevirt.io",
+            version="v1",
+            namespace=namespace,
+            plural="virtualmachines",
         )
         for vm in result.get("items", []):
             volumes = vm.get("spec", {}).get("template", {}).get("spec", {}).get("volumes", [])
@@ -131,8 +133,10 @@ class StorageService:
         vm_pvc_map: dict[str, str] = {}
         try:
             vms = self.custom_api.list_namespaced_custom_object(
-                group="kubevirt.io", version="v1",
-                namespace=namespace, plural="virtualmachines",
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachines",
             )
             for vm in vms.get("items", []):
                 vm_name = vm.get("metadata", {}).get("name", "")
@@ -184,7 +188,8 @@ class StorageService:
             ),
         )
         created = self.core_api.create_namespaced_persistent_volume_claim(
-            request.namespace, pvc,
+            request.namespace,
+            pvc,
         )
         return _pvc_to_disk(created)
 
@@ -199,6 +204,24 @@ class StorageService:
         except Exception:
             pass
         return performance_tier
+
+    def resize_disk(self, namespace: str, name: str, new_size_gb: int) -> Disk | None:
+        """Resize a PVC to the new size. Only expansion is allowed."""
+        try:
+            self.core_api.read_namespaced_persistent_volume_claim(name, namespace)
+        except client.ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+        # Patch the PVC with new size
+        body = {"spec": {"resources": {"requests": {"storage": f"{new_size_gb}Gi"}}}}
+        patched = self.core_api.patch_namespaced_persistent_volume_claim(name, namespace, body)
+        disk = _pvc_to_disk(patched)
+        if disk.storage_class and disk.performance_tier == disk.storage_class:
+            disk.performance_tier = self._get_storage_class_tier(disk.storage_class)
+        disk.attached_vm = _find_attached_vm(self.custom_api, namespace, name)
+        return disk
 
     def delete_disk(self, namespace: str, name: str) -> None:
         self.core_api.delete_namespaced_persistent_volume_claim(name, namespace)

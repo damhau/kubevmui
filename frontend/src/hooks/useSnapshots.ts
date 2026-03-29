@@ -53,7 +53,9 @@ export function useRestoreSnapshot() {
   return useMutation({
     mutationFn: async ({ namespace, vmName, snapshotName }: { namespace: string; vmName: string; snapshotName: string }) => {
       const { data } = await apiClient.post(
-        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/snapshots/${snapshotName}/restore`
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/snapshots/${snapshotName}/restore`,
+        {},
+        { timeout: 300_000 }, // 5 min — backend stops VM, restores, restarts
       )
       return data
     },

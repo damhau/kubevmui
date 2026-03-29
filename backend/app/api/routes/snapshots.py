@@ -8,6 +8,7 @@ from app.core.cluster_manager import ClusterManager
 from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.snapshot import Restore, RestoreCreate, Snapshot, SnapshotCreate, SnapshotList
+from app.api.routes.audit import get_audit_service
 from app.services.snapshot_service import SnapshotService
 
 router = APIRouter(
@@ -62,13 +63,22 @@ def create_snapshot(
 ):
     svc = _get_service(cluster, cm)
     try:
-        return svc.create_snapshot(ns, body)
+        result = svc.create_snapshot(ns, body)
     except ApiException as e:
         try:
             detail = json.loads(e.body).get("message", str(e))
         except (json.JSONDecodeError, TypeError):
             detail = str(e)
         raise HTTPException(status_code=e.status, detail=detail)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="create_snapshot",
+        resource_type="Snapshot",
+        resource_name=body.name,
+        namespace=ns,
+    )
+    return result
 
 
 @router.delete("/snapshots/{name}", status_code=204)
@@ -81,6 +91,14 @@ def delete_snapshot(
 ):
     svc = _get_service(cluster, cm)
     svc.delete_snapshot(ns, name)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="delete_snapshot",
+        resource_type="Snapshot",
+        resource_name=name,
+        namespace=ns,
+    )
 
 
 @router.post("/vms/{vm_name}/snapshots/{snapshot_name}/restore", response_model=Restore, status_code=201)
@@ -95,10 +113,22 @@ def restore_snapshot(
     svc = _get_service(cluster, cm)
     request = RestoreCreate(snapshot_name=snapshot_name)
     try:
-        return svc.restore_snapshot(ns, vm_name, request)
+        result = svc.restore_snapshot(ns, vm_name, request)
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=str(e))
     except ApiException as e:
         try:
             detail = json.loads(e.body).get("message", str(e))
         except (json.JSONDecodeError, TypeError):
             detail = str(e)
         raise HTTPException(status_code=e.status, detail=detail)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="restore_snapshot",
+        resource_type="Snapshot",
+        resource_name=snapshot_name,
+        namespace=ns,
+        details=f"Restored VM {vm_name}",
+    )
+    return result

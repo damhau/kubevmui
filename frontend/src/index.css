@@ -377,6 +377,26 @@
   background-size: 20px 20px;
 }
 
+/* Sortable table headers */
+.table-header-cell-sortable {
+  padding: 10px 16px;
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+.table-header-cell-sortable:hover {
+  color: var(--text-primary);
+}
+.table-header-cell-sortable.active {
+  color: var(--accent);
+}
+
 body {
   margin: 0;
   font-size: 14px;

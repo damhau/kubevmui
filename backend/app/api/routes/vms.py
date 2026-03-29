@@ -5,6 +5,7 @@ from app.core.cluster_manager import ClusterManager
 from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.vm import VM, VMCreate, VMList, AddVolumeRequest, AddInterfaceRequest, VMCloneRequest, VMPatchRequest
+from app.api.routes.audit import get_audit_service
 from app.services.vm_service import VMService
 
 router = APIRouter(
@@ -58,7 +59,16 @@ def create_vm(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    return svc.create_vm(body)
+    result = svc.create_vm(body)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="create_vm",
+        resource_type="VirtualMachine",
+        resource_name=body.name,
+        namespace=ns,
+    )
+    return result
 
 
 @router.delete("/vms/{name}", status_code=204)
@@ -71,6 +81,14 @@ def delete_vm(
 ):
     svc = _get_service(cluster, cm)
     svc.delete_vm(ns, name)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="delete_vm",
+        resource_type="VirtualMachine",
+        resource_name=name,
+        namespace=ns,
+    )
 
 
 @router.post("/vms/{name}/clone", status_code=201)
@@ -80,6 +98,15 @@ def clone_vm(
 ):
     svc = _get_service(cluster, cm)
     svc.clone_vm(ns, name, body.new_name)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="clone_vm",
+        resource_type="VirtualMachine",
+        resource_name=name,
+        namespace=ns,
+        details=f"Cloned to {body.new_name}",
+    )
     return {"status": "ok", "new_name": body.new_name}
 
 
@@ -90,6 +117,14 @@ def force_stop_vm(
 ):
     svc = _get_service(cluster, cm)
     svc.force_stop(ns, name)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="force_stop_vm",
+        resource_type="VirtualMachine",
+        resource_name=name,
+        namespace=ns,
+    )
     return {"status": "ok"}
 
 
@@ -122,6 +157,14 @@ def vm_action(
         )
     svc = _get_service(cluster, cm)
     svc.vm_action(ns, name, action)
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action=f"{action}_vm",
+        resource_type="VirtualMachine",
+        resource_name=name,
+        namespace=ns,
+    )
     return {"status": "ok", "action": action}
 
 

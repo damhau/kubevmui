@@ -1,3 +1,4 @@
+import time
 from datetime import UTC, datetime
 
 from app.core.k8s_client import KubeVirtClient
@@ -9,6 +10,10 @@ from app.models.snapshot import (
     SnapshotList,
     SnapshotPhase,
 )
+
+STOP_TIMEOUT = 120
+RESTORE_TIMEOUT = 120
+POLL_INTERVAL = 2
 
 
 def _snapshot_from_raw(raw: dict) -> Snapshot:
@@ -133,6 +138,18 @@ class SnapshotService:
         self.kv.delete_snapshot(namespace, name)
 
     def restore_snapshot(self, namespace: str, vm_name: str, request: RestoreCreate) -> Restore:
+        # Check if VM is currently running
+        was_running = self.kv.get_vmi(namespace, vm_name) is not None
+
+        # Stop the VM if running — restore requires the VM to be off
+        if was_running:
+            self.kv.vm_action(namespace, vm_name, "stop")
+            self._wait_for_vm_stopped(namespace, vm_name)
+
+        # Clean up any existing restores targeting this VM (stale or incomplete)
+        self._cleanup_restores(namespace, vm_name)
+
+        # Create the VirtualMachineRestore CR
         restore_name = f"restore-{request.snapshot_name}-{int(datetime.now(tz=UTC).timestamp())}"
         manifest = {
             "apiVersion": "snapshot.kubevirt.io/v1beta1",
@@ -150,5 +167,47 @@ class SnapshotService:
                 "virtualMachineSnapshotName": request.snapshot_name,
             },
         }
-        raw = self.kv.create_restore(namespace, manifest)
-        return _restore_from_raw(raw)
+        try:
+            self.kv.create_restore(namespace, manifest)
+            restore = self._wait_for_restore_complete(namespace, restore_name)
+        except Exception:
+            # Best-effort restart if restore fails and VM was running
+            if was_running:
+                try:
+                    self.kv.vm_action(namespace, vm_name, "start")
+                except Exception:
+                    pass
+            raise
+
+        # Restart VM if it was running before
+        if was_running:
+            self.kv.vm_action(namespace, vm_name, "start")
+
+        return restore
+
+    def _cleanup_restores(self, namespace: str, vm_name: str) -> None:
+        for r in self.kv.list_restores(namespace):
+            target = r.get("spec", {}).get("target", {}).get("name")
+            if target == vm_name:
+                name = r.get("metadata", {}).get("name", "")
+                try:
+                    self.kv.delete_restore(namespace, name)
+                except Exception:
+                    pass
+
+    def _wait_for_vm_stopped(self, namespace: str, vm_name: str) -> None:
+        deadline = time.monotonic() + STOP_TIMEOUT
+        while time.monotonic() < deadline:
+            if self.kv.get_vmi(namespace, vm_name) is None:
+                return
+            time.sleep(POLL_INTERVAL)
+        raise TimeoutError(f"VM '{vm_name}' did not stop within {STOP_TIMEOUT}s")
+
+    def _wait_for_restore_complete(self, namespace: str, restore_name: str) -> Restore:
+        deadline = time.monotonic() + RESTORE_TIMEOUT
+        while time.monotonic() < deadline:
+            raw = self.kv.get_restore(namespace, restore_name)
+            if raw and raw.get("status", {}).get("complete"):
+                return _restore_from_raw(raw)
+            time.sleep(POLL_INTERVAL)
+        raise TimeoutError(f"Restore '{restore_name}' did not complete within {RESTORE_TIMEOUT}s")

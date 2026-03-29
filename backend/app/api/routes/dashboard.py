@@ -55,6 +55,31 @@ def get_dashboard(
             if vm.node:
                 vm_node_count[vm.node] = vm_node_count.get(vm.node, 0) + 1
 
+    # Storage overview
+    from app.services.storage_service import StorageService
+
+    storage_svc = StorageService(api_client)
+    total_storage_gb = 0
+    used_disks = 0
+    total_disks = 0
+    storage_by_tier: dict[str, dict] = {}
+
+    for ns in namespaces:
+        try:
+            disks = storage_svc.list_disks(ns)
+        except Exception:
+            continue
+        for disk in disks:
+            total_disks += 1
+            total_storage_gb += disk.size_gb
+            if disk.attached_vm:
+                used_disks += 1
+            tier = disk.performance_tier or "Unknown"
+            if tier not in storage_by_tier:
+                storage_by_tier[tier] = {"total_gb": 0, "count": 0}
+            storage_by_tier[tier]["total_gb"] += disk.size_gb
+            storage_by_tier[tier]["count"] += 1
+
     # Enrich nodes with VM count
     for node in nodes:
         node["vm_count"] = vm_node_count.get(node["name"], 0)
@@ -66,6 +91,13 @@ def get_dashboard(
         "error_vms": error_vms,
         "node_count": len(nodes),
         "nodes": nodes,
+        "storage_total_gb": total_storage_gb,
+        "storage_total_disks": total_disks,
+        "storage_attached_disks": used_disks,
+        "storage_by_tier": [
+            {"tier": tier, "total_gb": info["total_gb"], "count": info["count"]}
+            for tier, info in storage_by_tier.items()
+        ],
         "recent_vms": [
             {
                 "name": vm.name,

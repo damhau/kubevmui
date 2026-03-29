@@ -4,7 +4,7 @@ from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
 from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
-from app.models.disk import Disk, DiskCreate, DiskList
+from app.models.disk import Disk, DiskCreate, DiskList, DiskResize
 from app.services.storage_service import StorageService
 
 router = APIRouter(
@@ -59,6 +59,22 @@ def create_disk(
 ):
     svc = _get_service(cluster, cm)
     return svc.create_disk(body)
+
+
+@router.patch("/namespaces/{ns}/disks/{name}", response_model=Disk)
+def resize_disk(
+    cluster: str,
+    ns: str,
+    name: str,
+    body: DiskResize,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    disk = svc.resize_disk(ns, name, body.size_gb)
+    if disk is None:
+        raise HTTPException(status_code=404, detail=f"Disk '{name}' not found")
+    return disk
 
 
 @router.delete("/namespaces/{ns}/disks/{name}", status_code=204)

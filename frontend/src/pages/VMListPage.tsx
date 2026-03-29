@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useSortable } from '@/hooks/useSortable'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
@@ -69,13 +70,14 @@ const vmActions = [
 
 export function VMListPage() {
   const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const navigate = useNavigate()
   const { data, isLoading } = useVMs()
   const vmAction = useVMAction()
   const createSnapshot = useCreateSnapshot()
   const createMigration = useCreateMigration()
 
-  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean; confirmLabel?: string } | null>(null)
   const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
 
   const vms: VM[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
@@ -84,6 +86,72 @@ export function VMListPage() {
       vm.name.toLowerCase().includes(search.toLowerCase()) ||
       vm.namespace?.toLowerCase().includes(search.toLowerCase()),
   )
+  const { sorted, sortConfig, requestSort } = useSortable(filtered, { column: 'name', direction: 'asc' })
+
+  const vmKey = (vm: VM) => `${vm.namespace}/${vm.name}`
+  const allSelected = filtered.length > 0 && filtered.every((vm) => selected.has(vmKey(vm)))
+  const someSelected = selected.size > 0
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map(vmKey)))
+    }
+  }
+
+  const toggleOne = (vm: VM) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      const k = vmKey(vm)
+      if (next.has(k)) next.delete(k)
+      else next.add(k)
+      return next
+    })
+  }
+
+  const selectedVMs = vms.filter((vm) => selected.has(vmKey(vm)))
+
+  const handleBulkAction = (action: string) => {
+    if (selectedVMs.length === 0) return
+    const names = selectedVMs.map((vm) => vm.name).join(', ')
+    if (action === 'delete') {
+      setConfirmAction({
+        title: `Delete ${selectedVMs.length} VMs`,
+        message: `Delete the following VMs? This action cannot be undone.\n\n${names}`,
+        danger: true,
+        confirmLabel: 'Delete All',
+        onConfirm: () => {
+          selectedVMs.forEach((vm) => {
+            apiClient.delete(`/clusters/${activeCluster}/namespaces/${vm.namespace}/vms/${vm.name}`)
+              .then(() => toast.success(`VM ${vm.name} deleted`))
+              .catch(() => toast.error(`Failed to delete ${vm.name}`))
+          })
+          queryClient.invalidateQueries({ queryKey: ['vms'] })
+          setSelected(new Set())
+          setConfirmAction(null)
+        },
+      })
+    } else {
+      setConfirmAction({
+        title: `${action.charAt(0).toUpperCase() + action.slice(1)} ${selectedVMs.length} VMs`,
+        message: `${action.charAt(0).toUpperCase() + action.slice(1)} the following VMs?\n\n${names}`,
+        onConfirm: () => {
+          selectedVMs.forEach((vm) => {
+            vmAction.mutate(
+              { namespace: vm.namespace, name: vm.name, action },
+              {
+                onSuccess: () => toast.success(`VM ${vm.name} ${action} requested`),
+                onError: () => toast.error(`Failed to ${action} ${vm.name}`),
+              },
+            )
+          })
+          setSelected(new Set())
+          setConfirmAction(null)
+        },
+      })
+    }
+  }
 
   const { activeCluster, activeNamespace } = useUIStore()
   const queryClient = useQueryClient()
@@ -225,8 +293,8 @@ export function VMListPage() {
 
       <div className="page-content" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
         <div className="page-container">
-        {/* Search */}
-        <div style={{ marginBottom: 16 }}>
+        {/* Search + Bulk Actions */}
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
           <input
             type="text"
             placeholder="Search virtual machines..."
@@ -235,6 +303,101 @@ export function VMListPage() {
             className="input"
             style={{ width: 280 }}
           />
+          {someSelected && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 12px',
+              background: theme.main.card,
+              border: `1px solid ${theme.main.cardBorder}`,
+              borderRadius: theme.radius.md,
+              animation: 'fadeInScale 0.2s ease-out both',
+            }}>
+              <span style={{ fontSize: 12, color: theme.text.secondary, fontWeight: 500 }}>
+                {selected.size} selected
+              </span>
+              <button
+                onClick={() => handleBulkAction('start')}
+                style={{
+                  background: theme.status.runningBg,
+                  border: `1px solid ${theme.status.running}40`,
+                  color: theme.status.running,
+                  borderRadius: theme.radius.sm,
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                }}
+              >
+                Start
+              </button>
+              <button
+                onClick={() => handleBulkAction('stop')}
+                style={{
+                  background: theme.main.tableHeaderBg,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  color: theme.text.secondary,
+                  borderRadius: theme.radius.sm,
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                }}
+              >
+                Stop
+              </button>
+              <button
+                onClick={() => handleBulkAction('restart')}
+                style={{
+                  background: theme.main.tableHeaderBg,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  color: theme.text.secondary,
+                  borderRadius: theme.radius.sm,
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                }}
+              >
+                Restart
+              </button>
+              <button
+                onClick={() => handleBulkAction('delete')}
+                style={{
+                  background: theme.status.errorBg,
+                  border: `1px solid ${theme.status.error}40`,
+                  color: theme.status.error,
+                  borderRadius: theme.radius.sm,
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: 500,
+                }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setSelected(new Set())}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: theme.text.dim,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  padding: '2px 4px',
+                  fontFamily: 'inherit',
+                }}
+                title="Clear selection"
+              >
+                x
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Table */}
@@ -258,19 +421,63 @@ export function VMListPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', ...(activeNamespace === '_all' ? ['Namespace'] : []), 'Status', 'CPU', 'Memory', 'Node', 'Age', ''].map((col, i) => (
+                  <th className="table-header-cell" style={{ width: 36, padding: '10px 12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      style={{ cursor: 'pointer', accentColor: theme.accent }}
+                    />
+                  </th>
+                  <th
+                    className={`table-header-cell-sortable${sortConfig.column === 'name' ? ' active' : ''}`}
+                    onClick={() => requestSort('name')}
+                  >
+                    Name{sortConfig.column === 'name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  {activeNamespace === '_all' && (
                     <th
-                      key={i}
-                      className="table-header-cell"
-                      style={col === '' ? { width: 48 } : undefined}
+                      className={`table-header-cell-sortable${sortConfig.column === 'namespace' ? ' active' : ''}`}
+                      onClick={() => requestSort('namespace')}
                     >
-                      {col}
+                      Namespace{sortConfig.column === 'namespace' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                     </th>
-                  ))}
+                  )}
+                  <th
+                    className={`table-header-cell-sortable${sortConfig.column === 'status' ? ' active' : ''}`}
+                    onClick={() => requestSort('status')}
+                  >
+                    Status{sortConfig.column === 'status' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th
+                    className={`table-header-cell-sortable${sortConfig.column === 'compute.cpu_cores' ? ' active' : ''}`}
+                    onClick={() => requestSort('compute.cpu_cores')}
+                  >
+                    CPU{sortConfig.column === 'compute.cpu_cores' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th
+                    className={`table-header-cell-sortable${sortConfig.column === 'compute.memory_mb' ? ' active' : ''}`}
+                    onClick={() => requestSort('compute.memory_mb')}
+                  >
+                    Memory{sortConfig.column === 'compute.memory_mb' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th
+                    className={`table-header-cell-sortable${sortConfig.column === 'node' ? ' active' : ''}`}
+                    onClick={() => requestSort('node')}
+                  >
+                    Node{sortConfig.column === 'node' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th
+                    className={`table-header-cell-sortable${sortConfig.column === 'created_at' ? ' active' : ''}`}
+                    onClick={() => requestSort('created_at')}
+                  >
+                    Age{sortConfig.column === 'created_at' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className="table-header-cell" style={{ width: 48 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((vm, i) => (
+                {sorted.map((vm, i) => (
                   <tr
                     key={`${vm.namespace}/${vm.name}`}
                     className="table-row-clickable"
@@ -280,6 +487,14 @@ export function VMListPage() {
                       animationDelay: `${0.05 + i * 0.04}s`,
                     } : undefined}
                   >
+                    <td className="table-cell" style={{ padding: '10px 12px' }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(vmKey(vm))}
+                        onChange={() => toggleOne(vm)}
+                        style={{ cursor: 'pointer', accentColor: theme.accent }}
+                      />
+                    </td>
                     <td className="table-cell">
                       <div style={{ color: theme.text.primary, fontWeight: 600, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>
                         {vm.name}
@@ -313,7 +528,7 @@ export function VMListPage() {
         title={confirmAction?.title ?? ''}
         message={confirmAction?.message ?? ''}
         danger={confirmAction?.danger}
-        confirmLabel={confirmAction?.danger ? 'Delete' : 'Confirm'}
+        confirmLabel={confirmAction?.confirmLabel ?? (confirmAction?.danger ? 'Delete' : 'Confirm')}
         onConfirm={() => confirmAction?.onConfirm()}
         onCancel={() => setConfirmAction(null)}
       />

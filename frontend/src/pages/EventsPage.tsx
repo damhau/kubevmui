@@ -7,6 +7,7 @@ import { theme } from '@/lib/theme'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Activity } from 'lucide-react'
+import { useSortable } from '@/hooks/useSortable'
 
 interface Event {
   timestamp: string
@@ -57,19 +58,47 @@ function Badge({ label, color }: { label: string; color: string }) {
   )
 }
 
+const TIME_RANGES: { label: string; value: string }[] = [
+  { label: 'All', value: '' },
+  { label: '1h', value: '1h' },
+  { label: '6h', value: '6h' },
+  { label: '24h', value: '24h' },
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+]
+
+function getTimeSince(range: string): string | undefined {
+  if (!range) return undefined
+  const now = new Date()
+  const map: Record<string, number> = {
+    '1h': 3600000,
+    '6h': 6 * 3600000,
+    '24h': 24 * 3600000,
+    '7d': 7 * 24 * 3600000,
+    '30d': 30 * 24 * 3600000,
+  }
+  const ms = map[range]
+  if (!ms) return undefined
+  return new Date(now.getTime() - ms).toISOString()
+}
+
 export function EventsPage() {
   const { activeCluster, activeNamespace } = useUIStore()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<'All' | 'Warning'>('All')
+  const [timeRange, setTimeRange] = useState('')
+
+  const since = getTimeSince(timeRange)
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['events', activeCluster, activeNamespace],
+    queryKey: ['events', activeCluster, activeNamespace, since],
     queryFn: async () => {
       const url =
         activeNamespace === '_all'
           ? `/clusters/${activeCluster}/events`
           : `/clusters/${activeCluster}/namespaces/${activeNamespace}/events`
-      const res = await apiClient.get(url)
+      const params = since ? `?since=${encodeURIComponent(since)}` : ''
+      const res = await apiClient.get(`${url}${params}`)
       return res.data as { items: Event[]; total: number }
     },
     refetchInterval: 5000,
@@ -89,6 +118,8 @@ export function EventsPage() {
     }
     return true
   })
+
+  const { sorted: sortedEvents, sortConfig, requestSort } = useSortable(filtered, { column: 'timestamp', direction: 'desc' })
 
   const showNamespace = activeNamespace === '_all'
 
@@ -182,6 +213,16 @@ export function EventsPage() {
             >
               Warning
             </button>
+            <span style={{ width: 1, height: 20, background: theme.main.cardBorder, flexShrink: 0 }} />
+            {TIME_RANGES.map((tr) => (
+              <button
+                key={tr.value}
+                onClick={() => setTimeRange(tr.value)}
+                style={filterBtnStyle(timeRange === tr.value)}
+              >
+                {tr.label}
+              </button>
+            ))}
           </div>
 
           {/* Events table */}
@@ -202,15 +243,31 @@ export function EventsPage() {
               <table className="table">
                 <thead>
                   <tr className="table-header">
-                    {columns.map((col) => (
-                      <th key={col} className="table-header-cell">
-                        {col}
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'timestamp' ? ' active' : ''}`} onClick={() => requestSort('timestamp')}>
+                      Time{sortConfig.column === 'timestamp' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'type' ? ' active' : ''}`} onClick={() => requestSort('type')}>
+                      Type{sortConfig.column === 'type' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                    {showNamespace && (
+                      <th className={`table-header-cell-sortable${sortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestSort('namespace')}>
+                        Namespace{sortConfig.column === 'namespace' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                       </th>
-                    ))}
+                    )}
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'involved_object_kind' ? ' active' : ''}`} onClick={() => requestSort('involved_object_kind')}>
+                      Kind{sortConfig.column === 'involved_object_kind' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'involved_object_name' ? ' active' : ''}`} onClick={() => requestSort('involved_object_name')}>
+                      Object{sortConfig.column === 'involved_object_name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'reason' ? ' active' : ''}`} onClick={() => requestSort('reason')}>
+                      Reason{sortConfig.column === 'reason' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                    <th className="table-header-cell">Message</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((ev, i) => (
+                  {sortedEvents.map((ev, i) => (
                     <tr
                       key={`${ev.timestamp}-${ev.involved_object_name}-${ev.reason}-${i}`}
                       className="table-row"

@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
-import { useDisks, useCreateDisk, useDeleteDisk } from '@/hooks/useDisks'
+import { useDisks, useCreateDisk, useDeleteDisk, useResizeDisk } from '@/hooks/useDisks'
+import { useSortable } from '@/hooks/useSortable'
 import { theme } from '@/lib/theme'
 import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
+import { toast } from '@/components/ui/Toast'
 import { HardDrive } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 
@@ -64,6 +67,7 @@ export function StoragePage() {
   const createDisk = useCreateDisk()
   const deleteDisk = useDeleteDisk()
   const disks: Disk[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
+  const { sorted: sortedDisks, sortConfig, requestSort } = useSortable(disks, { column: 'name', direction: 'asc' })
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<DiskForm>({
@@ -93,9 +97,48 @@ export function StoragePage() {
     fontWeight: 500,
   }
 
-  const handleDelete = (name: string) => {
-    if (!confirm(`Delete disk "${name}"?`)) return
-    deleteDisk.mutate(name)
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean; confirmLabel?: string } | null>(null)
+  const [resizeTarget, setResizeTarget] = useState<{ name: string; currentSize: number } | null>(null)
+  const [resizeSize, setResizeSize] = useState(0)
+  const resizeDisk = useResizeDisk()
+
+  const handleDelete = (disk: Disk) => {
+    const warning = disk.attached_vm
+      ? `This disk is currently attached to VM "${disk.attached_vm}". Deleting it may cause the VM to fail.`
+      : ''
+    setConfirmAction({
+      title: 'Delete Disk',
+      message: `Delete disk "${disk.name}"?${warning ? `\n\n${warning}` : ''} This action cannot be undone.`,
+      danger: true,
+      confirmLabel: 'Delete',
+      onConfirm: () => {
+        deleteDisk.mutate(disk.name, {
+          onSuccess: () => toast.success('Disk deleted'),
+          onError: () => toast.error('Failed to delete disk'),
+        })
+        setConfirmAction(null)
+      },
+    })
+  }
+
+  const handleResize = (disk: Disk) => {
+    setResizeTarget({ name: disk.name, currentSize: disk.size_gb ?? 0 })
+    setResizeSize((disk.size_gb ?? 0) + 10)
+  }
+
+  const submitResize = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resizeTarget) return
+    resizeDisk.mutate(
+      { name: resizeTarget.name, size_gb: resizeSize },
+      {
+        onSuccess: () => {
+          toast.success('Disk resize requested')
+          setResizeTarget(null)
+        },
+        onError: () => toast.error('Failed to resize disk'),
+      },
+    )
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -153,18 +196,31 @@ export function StoragePage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', ...(activeNamespace === '_all' ? ['Namespace'] : []), 'Size (GB)', 'Performance Tier', 'Status', 'Attached VM', 'Actions'].map((col) => (
-                    <th
-                      key={col}
-                      className="table-header-cell"
-                    >
-                      {col}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>
+                    Name {sortConfig.column === 'name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  {activeNamespace === '_all' && (
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestSort('namespace')}>
+                      Namespace {sortConfig.column === 'namespace' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                     </th>
-                  ))}
+                  )}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'size_gb' ? ' active' : ''}`} onClick={() => requestSort('size_gb')}>
+                    Size (GB) {sortConfig.column === 'size_gb' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'performance_tier' ? ' active' : ''}`} onClick={() => requestSort('performance_tier')}>
+                    Performance Tier {sortConfig.column === 'performance_tier' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'status' ? ' active' : ''}`} onClick={() => requestSort('status')}>
+                    Status {sortConfig.column === 'status' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'attached_vm' ? ' active' : ''}`} onClick={() => requestSort('attached_vm')}>
+                    Attached VM {sortConfig.column === 'attached_vm' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {disks.map((disk, i) => (
+                {sortedDisks.map((disk, i) => (
                   <tr
                     key={disk.name}
                     className="table-row-clickable"
@@ -231,9 +287,13 @@ export function StoragePage() {
                     </td>
                     <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
                       <DropdownMenu
-                        actions={[{ label: 'Delete', action: 'delete', danger: true }]}
+                        actions={[
+                          { label: 'Resize', action: 'resize' },
+                          { label: 'Delete', action: 'delete', danger: true },
+                        ]}
                         onAction={(action) => {
-                          if (action === 'delete') handleDelete(disk.name)
+                          if (action === 'delete') handleDelete(disk)
+                          if (action === 'resize') handleResize(disk)
                         }}
                       />
                     </td>
@@ -245,6 +305,79 @@ export function StoragePage() {
         </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={!!confirmAction}
+        title={confirmAction?.title ?? ''}
+        message={confirmAction?.message ?? ''}
+        danger={confirmAction?.danger}
+        confirmLabel={confirmAction?.confirmLabel ?? 'Confirm'}
+        onConfirm={() => confirmAction?.onConfirm()}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <Modal open={!!resizeTarget} onClose={() => setResizeTarget(null)} title="Resize Disk">
+        <form onSubmit={submitResize}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Current Size</label>
+            <div style={{ fontSize: 14, color: theme.text.primary, fontWeight: 500, fontFamily: theme.typography.mono.fontFamily }}>
+              {resizeTarget?.currentSize ?? 0} GB
+            </div>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>New Size (GB)</label>
+            <input
+              type="number"
+              min={(resizeTarget?.currentSize ?? 0) + 1}
+              value={resizeSize}
+              onChange={(e) => setResizeSize(Number(e.target.value))}
+              style={inputStyle}
+            />
+            <div style={{ fontSize: 11, color: theme.text.dim, marginTop: 4 }}>
+              Only expansion is supported. New size must be larger than current size.
+            </div>
+          </div>
+          {error && (
+            <div style={{ color: theme.status.error, fontSize: 13, marginBottom: 8 }}>{error}</div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={() => setResizeTarget(null)}
+              style={{
+                background: theme.button.secondary,
+                border: `1px solid ${theme.button.secondaryBorder}`,
+                color: theme.button.secondaryText,
+                borderRadius: theme.radius.md,
+                padding: '7px 16px',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={resizeDisk.isPending || resizeSize <= (resizeTarget?.currentSize ?? 0)}
+              style={{
+                background: theme.button.primary,
+                border: 'none',
+                color: theme.button.primaryText,
+                borderRadius: theme.radius.md,
+                padding: '7px 16px',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: resizeDisk.isPending ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                opacity: resizeDisk.isPending ? 0.7 : 1,
+              }}
+            >
+              {resizeDisk.isPending ? 'Resizing...' : 'Resize Disk'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Disk">
         <form onSubmit={handleSubmit}>

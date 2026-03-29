@@ -17,7 +17,7 @@ def _parse_memory_to_gi(size_str: str) -> int:
     if size_str.endswith("Mi"):
         return max(1, int(float(size_str[:-2]) / 1024))
     try:
-        return int(size_str) // (1024 ** 3)
+        return int(size_str) // (1024**3)
     except ValueError:
         return 0
 
@@ -65,20 +65,59 @@ def _map_status(vm: dict, vmi: dict | None) -> VMStatus:
     return status_map.get(printable, VMStatus.unknown)
 
 
-def _map_health(status: VMStatus, vmi: dict | None) -> HealthStatus:
-    """Derive health from status and VMI."""
-    if status == VMStatus.error:
+def _map_health(vm: dict, vmi: dict | None) -> HealthStatus:
+    """Derive health from VM status and VMI conditions."""
+    printable = vm.get("status", {}).get("printableStatus", "")
+
+    # Error states -> critical
+    error_statuses = {
+        "ErrImagePull",
+        "ImagePullBackOff",
+        "CrashLoopBackOff",
+        "ErrorPvcNotFound",
+        "ErrorDataVolumeNotFound",
+        "ErrorUnschedulable",
+    }
+    if printable in error_statuses:
         return HealthStatus.critical
-    if status == VMStatus.running:
-        if vmi:
-            conditions = vmi.get("status", {}).get("conditions", [])
-            agent_ready = any(
-                c.get("type") == "AgentConnected" and c.get("status") == "True"
-                for c in conditions
-            )
-            return HealthStatus.healthy if agent_ready else HealthStatus.unknown
+
+    # Not running -> unknown (health not applicable)
+    if printable != "Running":
         return HealthStatus.unknown
-    return HealthStatus.unknown
+
+    # Running VMs: check VMI conditions
+    if not vmi:
+        return HealthStatus.unknown
+
+    conditions = vmi.get("status", {}).get("conditions", [])
+    cond_map = {c.get("type"): c for c in conditions}
+
+    ready = cond_map.get("Ready", {})
+    agent = cond_map.get("AgentConnected", {})
+    migratable = cond_map.get("LiveMigratable", {})
+
+    # Critical: not ready
+    if ready.get("status") == "False":
+        return HealthStatus.critical
+
+    # Degraded: not migratable or agent not connected after startup
+    if migratable.get("status") == "False":
+        return HealthStatus.degraded
+
+    if agent.get("status") != "True":
+        # Check if VM has been running long enough for agent to connect (>5 min)
+        creation_ts = vmi.get("metadata", {}).get("creationTimestamp", "")
+        if creation_ts:
+            try:
+                created = datetime.fromisoformat(creation_ts.replace("Z", "+00:00"))
+                if (datetime.now(tz=UTC) - created).total_seconds() > 300:
+                    return HealthStatus.degraded
+            except ValueError:
+                pass
+        return HealthStatus.unknown
+
+    # All good: ready + agent connected
+    return HealthStatus.healthy
 
 
 def _extract_disks(vm: dict) -> list[VMDiskRef]:
@@ -107,15 +146,17 @@ def _extract_disks(vm: dict) -> list[VMDiskRef]:
         elif "cloudInitNoCloud" in vol or "cloudInitConfigDrive" in vol:
             source_type = "cloud_init"
 
-        disks.append(VMDiskRef(
-            name=name,
-            size_gb=0,
-            bus=disk_iface.get("bus", "virtio"),
-            boot_order=disk.get("bootOrder"),
-            source_type=source_type,
-            image=image,
-            volume_name=volume_name,
-        ))
+        disks.append(
+            VMDiskRef(
+                name=name,
+                size_gb=0,
+                bus=disk_iface.get("bus", "virtio"),
+                boot_order=disk.get("bootOrder"),
+                source_type=source_type,
+                image=image,
+                volume_name=volume_name,
+            )
+        )
     return disks
 
 
@@ -142,12 +183,14 @@ def _extract_networks(vm: dict, vmi: dict | None) -> list[VMNetworkRef]:
             network_profile = "pod"
 
         vmi_iface = vmi_ifaces.get(name, {})
-        networks.append(VMNetworkRef(
-            name=name,
-            network_profile=network_profile,
-            ip_address=vmi_iface.get("ipAddress"),
-            mac_address=vmi_iface.get("mac") or iface.get("macAddress"),
-        ))
+        networks.append(
+            VMNetworkRef(
+                name=name,
+                network_profile=network_profile,
+                ip_address=vmi_iface.get("ipAddress"),
+                mac_address=vmi_iface.get("mac") or iface.get("macAddress"),
+            )
+        )
     return networks
 
 
@@ -164,7 +207,7 @@ def _vm_from_raw(vm: dict, vmi: dict | None) -> VM:
     memory_mb = _parse_memory(memory_str)
 
     status = _map_status(vm, vmi)
-    health = _map_health(status, vmi)
+    health = _map_health(vm, vmi)
 
     node = None
     ip_addresses = []
@@ -222,10 +265,12 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
             disk_entry["bootOrder"] = disk_ref.boot_order
         disks.append(disk_entry)
         if disk_ref.source_type == "container_disk":
-            volumes.append({
-                "name": disk_ref.name,
-                "containerDisk": {"image": disk_ref.image},
-            })
+            volumes.append(
+                {
+                    "name": disk_ref.name,
+                    "containerDisk": {"image": disk_ref.image},
+                }
+            )
         elif disk_ref.source_type == "datavolume_clone":
             dv_name = f"{request.name}-{disk_ref.name}-dv"
             # Resolve clone namespace: use explicit value, or look up the image's namespace
@@ -255,15 +300,19 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
             if disk_ref.storage_class:
                 dv_template["spec"]["pvc"]["storageClassName"] = disk_ref.storage_class
             data_volume_templates.append(dv_template)
-            volumes.append({
-                "name": disk_ref.name,
-                "dataVolume": {"name": dv_name},
-            })
+            volumes.append(
+                {
+                    "name": disk_ref.name,
+                    "dataVolume": {"name": dv_name},
+                }
+            )
         else:
-            volumes.append({
-                "name": disk_ref.name,
-                "persistentVolumeClaim": {"claimName": disk_ref.name},
-            })
+            volumes.append(
+                {
+                    "name": disk_ref.name,
+                    "persistentVolumeClaim": {"claimName": disk_ref.name},
+                }
+            )
 
     if request.cloud_init_user_data or request.cloud_init_network_data:
         disks.append({"name": "cloudinit", "disk": {"bus": "virtio"}})
@@ -285,10 +334,12 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
             networks.append({"name": net_ref.name, "pod": {}})
         else:
             iface["bridge"] = {}
-            networks.append({
-                "name": net_ref.name,
-                "multus": {"networkName": net_ref.network_profile},
-            })
+            networks.append(
+                {
+                    "name": net_ref.name,
+                    "multus": {"networkName": net_ref.network_profile},
+                }
+            )
         interfaces.append(iface)
 
     labels = {**request.labels}
@@ -379,11 +430,10 @@ class VMService:
     def list_vms(self, namespace: str) -> list[VM]:
         vms_raw = self.kv.list_vms(namespace)
         vmis_raw = self.kv.list_vmis(namespace)
-        vmi_map = {
-            v.get("metadata", {}).get("name", ""): v for v in vmis_raw
-        }
-        return [_vm_from_raw(vm, vmi_map.get(vm.get("metadata", {}).get("name", "")))
-                for vm in vms_raw]
+        vmi_map = {v.get("metadata", {}).get("name", ""): v for v in vmis_raw}
+        return [
+            _vm_from_raw(vm, vmi_map.get(vm.get("metadata", {}).get("name", ""))) for vm in vms_raw
+        ]
 
     def get_vm(self, namespace: str, name: str) -> VM | None:
         vm_raw = self.kv.get_vm(namespace, name)
@@ -397,9 +447,13 @@ class VMService:
         for disk in vm.disks:
             if disk.volume_name:
                 try:
-                    pvc = self.kv.core_api.read_namespaced_persistent_volume_claim(disk.volume_name, namespace)
+                    pvc = self.kv.core_api.read_namespaced_persistent_volume_claim(
+                        disk.volume_name, namespace
+                    )
                     if pvc.spec.resources and pvc.spec.resources.requests:
-                        disk.size_gb = _parse_memory_to_gi(pvc.spec.resources.requests.get("storage", ""))
+                        disk.size_gb = _parse_memory_to_gi(
+                            pvc.spec.resources.requests.get("storage", "")
+                        )
                 except Exception:
                     pass
 
@@ -423,17 +477,28 @@ class VMService:
                     if mapped_name and mapped_name not in used_by_disk:
                         used_by_disk[mapped_name] = fs.get("usedBytes", 0)
                     elif mapped_name:
-                        used_by_disk[mapped_name] = max(used_by_disk[mapped_name], fs.get("usedBytes", 0))
+                        used_by_disk[mapped_name] = max(
+                            used_by_disk[mapped_name], fs.get("usedBytes", 0)
+                        )
 
                 for disk in vm.disks:
                     if disk.name in used_by_disk:
-                        disk.used_gb = round(used_by_disk[disk.name] / (1024 ** 3), 1)
+                        disk.used_gb = round(used_by_disk[disk.name] / (1024**3), 1)
             except Exception:
                 pass
+        # Enrich guest agent info
+        if vm.status.value == "running":
+            guest_info = self.kv.get_guest_os_info(namespace, name)
+            if guest_info and any(guest_info.values()):
+                from app.models.vm import GuestAgentInfo
+
+                vm.guest_agent_info = GuestAgentInfo(**guest_info)
+
         try:
             all_events = self.kv.list_events(namespace)
             raw_events = [
-                e for e in all_events
+                e
+                for e in all_events
                 if e.get("involved_object_name", "") == name
                 or e.get("involved_object_name", "").startswith(f"{name}-")
             ]
@@ -463,11 +528,15 @@ class VMService:
     def vm_action(self, namespace: str, name: str, action: str) -> None:
         self.kv.vm_action(namespace, name, action)
 
-    def add_volume(self, namespace: str, vm_name: str, name: str, pvc_name: str, bus: str = "scsi") -> None:
+    def add_volume(
+        self, namespace: str, vm_name: str, name: str, pvc_name: str, bus: str = "scsi"
+    ) -> None:
         body = {
             "name": name,
             "disk": {"disk": {"bus": bus}, "name": name},
-            "volumeSource": {"persistentVolumeClaim": {"claimName": pvc_name, "hotpluggable": True}},
+            "volumeSource": {
+                "persistentVolumeClaim": {"claimName": pvc_name, "hotpluggable": True}
+            },
         }
         self.kv.add_volume(namespace, vm_name, body)
 
@@ -516,7 +585,9 @@ class VMService:
         body = {"spec": {"runStrategy": strategy}}
         self.kv.patch_vm(namespace, name, body)
 
-    def update_compute(self, namespace: str, name: str, cpu_cores: int | None, memory_mb: int | None) -> None:
+    def update_compute(
+        self, namespace: str, name: str, cpu_cores: int | None, memory_mb: int | None
+    ) -> None:
         domain_patch: dict = {}
         if cpu_cores is not None:
             domain_patch["cpu"] = {"cores": cpu_cores}

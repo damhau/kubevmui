@@ -1,11 +1,13 @@
 import { TopBar } from '@/components/layout/TopBar'
 import { useDashboard } from '@/hooks/useVMs'
 import { useImages } from '@/hooks/useImages'
+import { useClusterEvents } from '@/hooks/useEvents'
 import { useNavigate } from 'react-router-dom'
 import { theme } from '@/lib/theme'
+import { formatTimeAgo } from '@/lib/format'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton'
-import { Monitor, AlertTriangle, Loader2, Play, Square, Server } from 'lucide-react'
+import { Monitor, AlertTriangle, Loader2, Play, Square, Server, HardDrive, Activity } from 'lucide-react'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: theme.status.runningBg, color: theme.status.running, border: `1px solid ${theme.status.running}40` },
@@ -141,7 +143,14 @@ function ResourceGauge({ label, used, total, unit, color, animationDelay }: { la
 export function DashboardPage() {
   const { data, isLoading } = useDashboard()
   const { data: imagesData } = useImages()
+  const { data: eventsData } = useClusterEvents(10)
   const navigate = useNavigate()
+  const recentEvents: Array<{ timestamp: string; type: string; reason: string; message: string; namespace: string; involved_object_name: string; involved_object_kind: string }> =
+    Array.isArray(eventsData) ? eventsData : []
+  const storageTotalGb: number = data?.storage_total_gb ?? 0
+  const storageTotalDisks: number = data?.storage_total_disks ?? 0
+  const storageAttachedDisks: number = data?.storage_attached_disks ?? 0
+  const storageByTier: Array<{ tier: string; total_gb: number; count: number }> = data?.storage_by_tier ?? []
 
   const stats = {
     total: data?.total_vms ?? 0,
@@ -241,6 +250,66 @@ export function DashboardPage() {
               </div>
             )}
 
+            {/* Storage Overview */}
+            {storageTotalDisks > 0 && (
+              <div style={{
+                background: theme.main.card,
+                border: `1px solid ${theme.main.cardBorder}`,
+                boxShadow: theme.shadow.card,
+                borderRadius: theme.radius.lg,
+                padding: 16,
+                marginBottom: 20,
+                animation: 'fadeInUp 0.35s ease-out both',
+                animationDelay: '0.36s',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <HardDrive size={14} style={{ color: theme.text.secondary }} />
+                    <span style={{ fontSize: 12, fontWeight: 500, color: theme.text.secondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Storage</span>
+                  </div>
+                  <span
+                    onClick={() => navigate('/storage')}
+                    style={{ fontSize: 12, color: theme.accent, cursor: 'pointer', fontWeight: 500 }}
+                  >
+                    View all
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 24, marginBottom: storageByTier.length > 0 ? 12 : 0 }}>
+                  <div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: theme.text.heading, fontFamily: theme.typography.heading.fontFamily }}>{storageTotalGb}</div>
+                    <div style={{ fontSize: 11, color: theme.text.dim }}>Total GB</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: theme.text.heading, fontFamily: theme.typography.heading.fontFamily }}>{storageTotalDisks}</div>
+                    <div style={{ fontSize: 11, color: theme.text.dim }}>Disks</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: theme.status.running, fontFamily: theme.typography.heading.fontFamily }}>{storageAttachedDisks}</div>
+                    <div style={{ fontSize: 11, color: theme.text.dim }}>Attached</div>
+                  </div>
+                </div>
+                {storageByTier.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {storageByTier.map((tier) => (
+                      <span
+                        key={tier.tier}
+                        style={{
+                          fontSize: 11,
+                          padding: '3px 8px',
+                          borderRadius: theme.radius.sm,
+                          background: `${theme.accent}12`,
+                          color: theme.text.secondary,
+                          border: `1px solid ${theme.main.cardBorder}`,
+                        }}
+                      >
+                        {tier.tier}: {tier.total_gb} GB ({tier.count})
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Health Alerts */}
             {(stats.error > 0 || errorImages.length > 0) && (
               <div style={{
@@ -335,6 +404,88 @@ export function DashboardPage() {
                 </table>
               )}
             </div>
+
+            {/* Activity Feed */}
+            {recentEvents.length > 0 && (
+              <div className="card" style={{ marginTop: 20 }}>
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    borderBottom: `1px solid ${theme.main.cardBorder}`,
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: theme.text.heading,
+                    fontFamily: theme.typography.heading.fontFamily,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Activity size={16} style={{ color: theme.text.secondary }} />
+                    Recent Activity
+                  </div>
+                  <span
+                    onClick={() => navigate('/events')}
+                    style={{ fontSize: 12, color: theme.accent, cursor: 'pointer', fontWeight: 500 }}
+                  >
+                    View all
+                  </span>
+                </div>
+                <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                  {recentEvents.map((event, i) => (
+                    <div
+                      key={`${event.timestamp}-${event.involved_object_name}-${i}`}
+                      style={{
+                        padding: '10px 16px',
+                        borderBottom: `1px solid ${theme.main.tableRowBorder}`,
+                        display: 'flex',
+                        gap: 12,
+                        alignItems: 'flex-start',
+                        animation: i < 8 ? 'fadeInRow 0.3s ease-out both' : undefined,
+                        animationDelay: i < 8 ? `${0.1 + i * 0.04}s` : undefined,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          marginTop: 6,
+                          flexShrink: 0,
+                          background: event.type === 'Warning' ? theme.status.migrating : theme.status.running,
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: theme.text.primary }}>{event.reason}</span>
+                            <span style={{
+                              fontSize: 10,
+                              padding: '1px 6px',
+                              borderRadius: 3,
+                              background: `${theme.accent}12`,
+                              color: theme.accent,
+                              fontWeight: 500,
+                              border: `1px solid ${theme.accent}30`,
+                            }}>
+                              {event.involved_object_kind}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: 11, color: theme.text.dim, whiteSpace: 'nowrap' }}>
+                            {formatTimeAgo(event.timestamp)}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: theme.text.secondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 500 }}>{event.involved_object_name}</span>
+                          {event.message && <span> — {event.message}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Nodes */}
             <div className="card" style={{ marginTop: 20 }}>

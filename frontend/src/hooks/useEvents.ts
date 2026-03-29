@@ -21,3 +21,19 @@ export function useResourceEvents(namespace: string, resourceName: string) {
     refetchInterval: 5000,
   })
 }
+
+export function useClusterEvents(limit: number = 15) {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['cluster-events', activeCluster],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/events`
+      )
+      const items = data.items || []
+      // Already sorted by timestamp desc from backend, just limit
+      return items.slice(0, limit)
+    },
+    refetchInterval: 10000,
+  })
+}

@@ -18,6 +18,22 @@ export function useVMMetrics(namespace: string, vmName: string, range: string = 
   })
 }
 
+export function useVMTimeline(namespace: string, vmName: string, range: string = '1h') {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['vm-timeline', activeCluster, namespace, vmName, range],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/timeline`,
+        { params: { range } }
+      )
+      return data
+    },
+    enabled: !!namespace && !!vmName,
+    refetchInterval: 30000,
+  })
+}
+
 export function useNodeMetrics(nodeName: string, range: string = '1h') {
   const { activeCluster } = useUIStore()
   return useQuery({

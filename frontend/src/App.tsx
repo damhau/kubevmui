@@ -19,6 +19,9 @@ import { TemplateDetailPage } from '@/pages/TemplateDetailPage'
 import { ImageDetailPage } from '@/pages/ImageDetailPage'
 import { StorageDetailPage } from '@/pages/StorageDetailPage'
 import { NodeDetailPage } from '@/pages/NodeDetailPage'
+import { ClusterMetricsPage } from '@/pages/ClusterMetricsPage'
+import { AnalyticsPage } from '@/pages/AnalyticsPage'
+import { AuditLogPage } from '@/pages/AuditLogPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +57,9 @@ function App() {
             <Route path="/nodes/:name" element={<NodeDetailPage />} />
             <Route path="/ssh-keys" element={<SSHKeysPage />} />
             <Route path="/events" element={<EventsPage />} />
+            <Route path="/monitoring/cluster" element={<ClusterMetricsPage />} />
+            <Route path="/monitoring/analytics" element={<AnalyticsPage />} />
+            <Route path="/monitoring/audit" element={<AuditLogPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

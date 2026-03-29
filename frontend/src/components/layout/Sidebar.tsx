@@ -9,6 +9,9 @@ import {
   KeyRound,
   Server,
   Activity,
+  BarChart3,
+  TrendingUp,
+  FileText,
 } from 'lucide-react'
 import { theme } from '@/lib/theme'
 
@@ -33,6 +36,14 @@ const navGroups: NavGroup[] = [
       { label: 'Virtual Machines', to: '/vms', icon: <Monitor size={16} /> },
       { label: 'Templates', to: '/templates', icon: <Copy size={16} /> },
       { label: 'Events', to: '/events', icon: <Activity size={16} /> },
+    ],
+  },
+  {
+    section: 'Monitoring',
+    items: [
+      { label: 'Cluster Metrics', to: '/monitoring/cluster', icon: <BarChart3 size={16} /> },
+      { label: 'Analytics', to: '/monitoring/analytics', icon: <TrendingUp size={16} /> },
+      { label: 'Audit Log', to: '/monitoring/audit', icon: <FileText size={16} /> },
     ],
   },
   {

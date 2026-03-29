@@ -15,12 +15,18 @@ class Disk(ResourceMeta):
     backend_info: str | None = None
     raw_manifest: dict | None = None
 
+
 class DiskCreate(BaseModel):
     name: str
     namespace: str
     size_gb: int
     performance_tier: str
     labels: dict[str, str] = {}
+
+
+class DiskResize(BaseModel):
+    size_gb: int
+
 
 class DiskList(BaseModel):
     items: list[Disk]

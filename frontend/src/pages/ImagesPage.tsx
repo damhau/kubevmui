@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useImages, useCreateImage, useDeleteImage, useStorageClasses } from '@/hooks/useImages'
+import { useSortable } from '@/hooks/useSortable'
 import { theme } from '@/lib/theme'
 import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
@@ -105,6 +106,7 @@ export function ImagesPage() {
   const { data: storageClassData } = useStorageClasses()
   const storageClasses: string[] = Array.isArray(storageClassData?.items) ? storageClassData.items.map((sc: { name: string }) => sc.name) : []
   const images: ImageItem[] = Array.isArray(data?.items) ? data.items : []
+  const { sorted: sortedImages, sortConfig, requestSort } = useSortable(images, { column: 'name', direction: 'asc' })
   const [showCreate, setShowCreate] = useState(false)
   const [editingName, setEditingName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -355,28 +357,39 @@ export function ImagesPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {[
-                    'Name',
-                    ...(activeNamespace === '_all' ? ['Namespace'] : []),
-                    'Display Name',
-                    'OS Type',
-                    'Source Type',
-                    'Source URL',
-                    'Status',
-                    'Created',
-                    'Actions',
-                  ].map((col) => (
-                    <th
-                      key={col}
-                      className="table-header-cell"
-                    >
-                      {col}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>
+                    Name{sortConfig.column === 'name' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
+                  </th>
+                  {activeNamespace === '_all' && (
+                    <th className={`table-header-cell-sortable${sortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestSort('namespace')}>
+                      Namespace{sortConfig.column === 'namespace' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
                     </th>
-                  ))}
+                  )}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'display_name' ? ' active' : ''}`} onClick={() => requestSort('display_name')}>
+                    Display Name{sortConfig.column === 'display_name' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'os_type' ? ' active' : ''}`} onClick={() => requestSort('os_type')}>
+                    OS Type{sortConfig.column === 'os_type' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'source_type' ? ' active' : ''}`} onClick={() => requestSort('source_type')}>
+                    Source Type{sortConfig.column === 'source_type' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'source_url' ? ' active' : ''}`} onClick={() => requestSort('source_url')}>
+                    Source URL{sortConfig.column === 'source_url' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'dv_phase' ? ' active' : ''}`} onClick={() => requestSort('dv_phase')}>
+                    Status{sortConfig.column === 'dv_phase' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'created_at' ? ' active' : ''}`} onClick={() => requestSort('created_at')}>
+                    Created{sortConfig.column === 'created_at' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
+                  </th>
+                  <th className="table-header-cell">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {images.map((img, i) => (
+                {sortedImages.map((img, i) => (
                   <tr
                     key={img.name}
                     className="table-row-clickable"

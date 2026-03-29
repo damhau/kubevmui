@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { KeyRound } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
+import { useSortable } from '@/hooks/useSortable'
 
 interface SSHKey {
   name: string
@@ -39,6 +40,7 @@ export function SSHKeysPage() {
   const createSSHKey = useCreateSSHKey()
   const deleteSSHKey = useDeleteSSHKey()
   const keys: SSHKey[] = data?.items ?? []
+  const { sorted: sortedKeys, sortConfig, requestSort } = useSortable(keys, { column: 'name', direction: 'asc' })
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<SSHKeyForm>({ name: '', public_key: '' })
@@ -124,18 +126,18 @@ export function SSHKeysPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', 'Public Key', 'Created', 'Actions'].map((col) => (
-                    <th
-                      key={col}
-                      className="table-header-cell"
-                    >
-                      {col}
-                    </th>
-                  ))}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>
+                    Name{sortConfig.column === 'name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className="table-header-cell">Public Key</th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'created_at' ? ' active' : ''}`} onClick={() => requestSort('created_at')}>
+                    Created{sortConfig.column === 'created_at' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {keys.map((key, i) => (
+                {sortedKeys.map((key, i) => (
                   <tr
                     key={key.name}
                     className="table-row"

@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Network } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
+import { useSortable } from '@/hooks/useSortable'
 
 const typeColor: Record<string, string> = {
   Bridge: theme.status.running,
@@ -64,6 +65,8 @@ export function NetworksPage() {
   const allNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
     Array.isArray(allNADsData?.items) ? allNADsData.items : []
   const clusterNADs = allNADs.filter((nad) => nad.namespace !== activeNamespace)
+  const { sorted: sortedNetworks, sortConfig, requestSort } = useSortable(networks, { column: 'display_name', direction: 'asc' })
+  const { sorted: sortedClusterNADs, sortConfig: nadSortConfig, requestSort: requestNADSort } = useSortable(clusterNADs, { column: 'display_name', direction: 'asc' })
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<NetworkForm>({
@@ -225,18 +228,26 @@ export function NetworksPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Display Name', 'Type', 'VLAN ID', 'DHCP', 'Subnet', 'Actions'].map((col) => (
-                    <th
-                      key={col}
-                      className="table-header-cell"
-                    >
-                      {col}
-                    </th>
-                  ))}
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'display_name' ? ' active' : ''}`} onClick={() => requestSort('display_name')}>
+                    Display Name{sortConfig.column === 'display_name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'type' ? ' active' : ''}`} onClick={() => requestSort('type')}>
+                    Type{sortConfig.column === 'type' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'vlan_id' ? ' active' : ''}`} onClick={() => requestSort('vlan_id')}>
+                    VLAN ID{sortConfig.column === 'vlan_id' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'dhcp' ? ' active' : ''}`} onClick={() => requestSort('dhcp')}>
+                    DHCP{sortConfig.column === 'dhcp' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'subnet' ? ' active' : ''}`} onClick={() => requestSort('subnet')}>
+                    Subnet{sortConfig.column === 'subnet' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {networks.map((net, i) => (
+                {sortedNetworks.map((net, i) => (
                   <tr
                     key={net.name}
                     className="table-row"
@@ -319,18 +330,19 @@ export function NetworksPage() {
             <table className="table">
               <thead>
                 <tr className="table-header">
-                  {['Name', 'Namespace', 'Full Reference'].map((col) => (
-                    <th
-                      key={col}
-                      className="table-header-cell"
-                    >
-                      {col}
-                    </th>
-                  ))}
+                  <th className={`table-header-cell-sortable${nadSortConfig.column === 'display_name' ? ' active' : ''}`} onClick={() => requestNADSort('display_name')}>
+                    Name{nadSortConfig.column === 'display_name' ? (nadSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${nadSortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestNADSort('namespace')}>
+                    Namespace{nadSortConfig.column === 'namespace' ? (nadSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th className={`table-header-cell-sortable${nadSortConfig.column === 'full_name' ? ' active' : ''}`} onClick={() => requestNADSort('full_name')}>
+                    Full Reference{nadSortConfig.column === 'full_name' ? (nadSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {clusterNADs.map((nad, i) => (
+                {sortedClusterNADs.map((nad, i) => (
                   <tr
                     key={nad.full_name}
                     className="table-row"

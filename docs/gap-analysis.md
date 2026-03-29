@@ -13,12 +13,12 @@ Legend: [x] Implemented | [~] Partial | [ ] Missing
 | Stats cards (total VMs running/stopped/error) | [x] | |
 | Aggregate CPU usage gauge | [x] | Now filters to running VMs only |
 | Total memory allocated gauge | [x] | Now filters to running VMs only |
-| Storage utilization | [ ] | No storage gauge on dashboard |
+| Storage utilization | [X] | No storage gauge on dashboard |
 | Recent VMs table | [x] | |
 | Cluster health / node status summary | [x] | Node cards with status |
 | KubeVirt version display | [ ] | Not shown |
 | Alerts | [~] | Shows error VMs and importing images, no K8s alerts integration |
-| Activity feed (recent events) | [ ] | No events feed on dashboard (Events page exists separately) |
+| Activity feed (recent events) | [X] | No events feed on dashboard (Events page exists separately) |
 
 **Missing for 5.1:**
 - Storage utilization gauge on dashboard
@@ -33,10 +33,10 @@ Legend: [x] Implemented | [~] Partial | [ ] Missing
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Sortable table | [ ] | No column sorting |
+| Sortable table | [X] | No column sorting |
 | Filterable table | [x] | Search by name/namespace |
 | Columns: name, namespace, status, CPU, memory, node, OS, age | [~] | Missing OS column |
-| Bulk actions (start, stop, restart, delete) | [ ] | No multi-select / bulk actions |
+| Bulk actions (start, stop, restart, delete) | [X] | No multi-select / bulk actions |
 | Namespace filter dropdown | [x] | In TopBar, supports "All Namespaces" |
 | Quick search by name | [x] | |
 | Status badges | [x] | Running, Stopped, Migrating, Error, Provisioning |
@@ -46,7 +46,7 @@ Legend: [x] Implemented | [~] Partial | [ ] Missing
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Overview tab | [x] | Status, IPs, creation time, labels, run strategy (editable), OS, template link |
-| Guest agent info on overview | [ ] | Guest OS info not shown (backend has it via VMI status) |
+| Guest agent info on overview | [X] | Guest OS info not shown (backend has it via VMI status) |
 | Metrics tab (CPU, memory, network) | [x] | CPU, memory, network RX/TX, storage usage charts |
 | Disk I/O charts | [ ] | No disk I/O metrics |
 | Disks tab - list volumes | [x] | With links to storage detail |

@@ -3,7 +3,25 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, cluster_lists, dashboard, events, images, metrics, migrations, namespaces, networks, nodes, snapshots, ssh_keys, storage, templates, vms
+from app.api.routes import (
+    analytics,
+    audit,
+    auth,
+    cluster_lists,
+    dashboard,
+    events,
+    images,
+    metrics,
+    migrations,
+    namespaces,
+    networks,
+    nodes,
+    snapshots,
+    ssh_keys,
+    storage,
+    templates,
+    vms,
+)
 from app.api.routes.networks import cluster_router as networks_cluster_router
 from app.api.routes.storage import cluster_router as storage_cluster_router
 from app.core.cluster_manager import ClusterManager
@@ -36,6 +54,8 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok"}
 
+    application.include_router(analytics.router)
+    application.include_router(audit.router)
     application.include_router(auth.router)
     application.include_router(images.router)
     application.include_router(snapshots.router)

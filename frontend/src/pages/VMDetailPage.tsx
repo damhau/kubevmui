@@ -10,15 +10,17 @@ import { useAddVolume, useRemoveVolume, useAddInterface, useRemoveInterface } fr
 import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
-import { useVMMetrics } from '@/hooks/useMetrics'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { useVMMetrics, useVMTimeline } from '@/hooks/useMetrics'
+import { MetricChart } from '@/components/ui/MetricChart'
+import { TimeRangeSelector } from '@/components/ui/TimeRangeSelector'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
 import { YamlViewer } from '@/components/ui/YamlViewer'
-import { Cpu, Network, HardDrive, Tag } from 'lucide-react'
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { Cpu, Network, HardDrive, Tag, Monitor } from 'lucide-react'
 import { VNCConsole } from '@/components/console/VNCConsole'
 import type { VNCConsoleRef, ConnectionStatus } from '@/components/console/VNCConsole'
 
@@ -51,44 +53,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-type Tab = 'overview' | 'console' | 'metrics' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
-
-function MetricChart({ title, data, color, formatValue }: { title: string; data: any[]; color: string; formatValue: (v: number) => string }) {
-  return (
-    <div className="card" style={{ padding: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>{title}</div>
-      {data.length === 0 ? (
-        <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.secondary, fontSize: 13 }}>
-          No data available
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke={theme.main.cardBorder} />
-            <XAxis
-              dataKey="timestamp"
-              tickFormatter={(ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              tick={{ fontSize: 10, fill: theme.text.secondary }}
-              stroke={theme.main.cardBorder}
-            />
-            <YAxis
-              tickFormatter={(v) => formatValue(v)}
-              tick={{ fontSize: 10, fill: theme.text.secondary }}
-              stroke={theme.main.cardBorder}
-              width={50}
-            />
-            <Tooltip
-              contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, boxShadow: theme.shadow.card, boxShadow: theme.shadow.card, borderRadius: 6, fontSize: 12 }}
-              labelFormatter={(ts) => new Date(Number(ts) * 1000).toLocaleString()}
-              formatter={(value: number) => [formatValue(value), '']}
-            />
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      )}
-    </div>
-  )
-}
+type Tab = 'overview' | 'console' | 'metrics' | 'timeline' | 'disks' | 'network' | 'snapshots' | 'events' | 'yaml'
 
 export function VMDetailPage() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>()
@@ -102,6 +67,7 @@ export function VMDetailPage() {
   const vncRef = useRef<VNCConsoleRef>(null)
   const [consoleStatus, setConsoleStatus] = useState<ConnectionStatus>('connecting')
   const { data: metricsData, isLoading: metricsLoading } = useVMMetrics(namespace!, name!, metricsRange)
+  const { data: timelineData, isLoading: timelineLoading } = useVMTimeline(namespace ?? '', name ?? '', metricsRange)
   const { data: liveEvents } = useResourceEvents(namespace!, name!)
 
   const cloneMutation = useMutation({
@@ -266,6 +232,7 @@ export function VMDetailPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'metrics', label: 'Metrics' },
+    { id: 'timeline', label: 'Timeline' },
     { id: 'disks', label: 'Disks' },
     { id: 'network', label: 'Network' },
     { id: 'snapshots', label: 'Snapshots' },
@@ -776,6 +743,32 @@ export function VMDetailPage() {
                     <InfoRow label="Interfaces" value={`${vm.networks?.length ?? 0}`} />
                   </div>
 
+                  {/* Guest Agent card */}
+                  {vm.guest_agent_info && (vm.guest_agent_info.hostname || vm.guest_agent_info.os_name) && (
+                    <div className="card-padded animate-fade-in-up stagger-2">
+                      <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Monitor size={13} style={{ opacity: 0.6 }} />
+                        Guest Agent
+                      </div>
+                      {vm.guest_agent_info.hostname && (
+                        <InfoRow label="Hostname" value={vm.guest_agent_info.hostname} mono />
+                      )}
+                      {vm.guest_agent_info.os_name && (
+                        <InfoRow label="OS" value={
+                          vm.guest_agent_info.os_version
+                            ? `${vm.guest_agent_info.os_name} ${vm.guest_agent_info.os_version}`
+                            : vm.guest_agent_info.os_name
+                        } />
+                      )}
+                      {vm.guest_agent_info.kernel && (
+                        <InfoRow label="Kernel" value={vm.guest_agent_info.kernel} mono />
+                      )}
+                      {vm.guest_agent_info.timezone && (
+                        <InfoRow label="Timezone" value={vm.guest_agent_info.timezone} />
+                      )}
+                    </div>
+                  )}
+
                   {/* Storage card */}
                   <div className="card-padded animate-fade-in-up stagger-2">
                     <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -868,26 +861,8 @@ export function VMDetailPage() {
             {activeTab === 'metrics' && (
               <div>
                 {/* Time range selector */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                  {['1h', '6h', '24h', '7d'].map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => setMetricsRange(r)}
-                      style={{
-                        padding: '5px 12px',
-                        fontSize: 12,
-                        fontFamily: 'inherit',
-                        borderRadius: theme.radius.md,
-                        cursor: 'pointer',
-                        background: metricsRange === r ? theme.accent : theme.main.card,
-                        color: metricsRange === r ? '#fff' : theme.text.primary,
-                        border: metricsRange === r ? `1px solid ${theme.accent}` : `1px solid ${theme.main.inputBorder}`,
-                        fontWeight: metricsRange === r ? 600 : 400,
-                      }}
-                    >
-                      {r}
-                    </button>
-                  ))}
+                <div style={{ marginBottom: 16 }}>
+                  <TimeRangeSelector value={metricsRange} onChange={setMetricsRange} ranges={['1h', '6h', '24h', '7d']} />
                 </div>
 
                 {metricsLoading ? (
@@ -921,6 +896,24 @@ export function VMDetailPage() {
                   </div>
                 )}
 
+                {/* Disk I/O charts */}
+                {(metricsData?.disk_read?.length > 0 || metricsData?.disk_write?.length > 0) && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <MetricChart
+                      title="Disk Read"
+                      data={(metricsData?.disk_read ?? []).map((d: any) => ({ ...d, value: d.value / 1024 }))}
+                      color="#8b5cf6"
+                      formatValue={(v) => `${v.toFixed(1)} KB/s`}
+                    />
+                    <MetricChart
+                      title="Disk Write"
+                      data={(metricsData?.disk_write ?? []).map((d: any) => ({ ...d, value: d.value / 1024 }))}
+                      color="#ec4899"
+                      formatValue={(v) => `${v.toFixed(1)} KB/s`}
+                    />
+                  </div>
+                )}
+
                 {/* Storage charts */}
                 {metricsData?.storage && Object.keys(metricsData.storage).length > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: Object.keys(metricsData.storage).length === 1 ? '1fr' : '1fr 1fr', gap: 16 }}>
@@ -934,6 +927,103 @@ export function VMDetailPage() {
                       />
                     ))}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Timeline */}
+            {activeTab === 'timeline' && (
+              <div>
+                <TimeRangeSelector value={metricsRange} onChange={setMetricsRange} />
+                {timelineLoading ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>Loading timeline...</div>
+                ) : (
+                  <>
+                    {/* CPU chart with event markers */}
+                    <div className="card" style={{ padding: 16, marginTop: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>CPU Usage with Events</div>
+                      {(timelineData?.cpu ?? []).length === 0 ? (
+                        <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.secondary, fontSize: 13 }}>No data available</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                          <ComposedChart data={timelineData?.cpu ?? []}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={theme.main.cardBorder} />
+                            <XAxis dataKey="timestamp" tickFormatter={(ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: theme.text.secondary }} stroke={theme.main.cardBorder} />
+                            <YAxis tickFormatter={(v) => `${v.toFixed(2)}`} tick={{ fontSize: 10, fill: theme.text.secondary }} stroke={theme.main.cardBorder} width={50} />
+                            <Tooltip contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: 6, fontSize: 12 }} labelFormatter={(ts) => new Date(Number(ts) * 1000).toLocaleString()} formatter={(value: number) => [`${value.toFixed(3)} cores`, 'CPU']} />
+                            <Line type="monotone" dataKey="value" stroke={theme.accent} strokeWidth={1.5} dot={false} />
+                            {(timelineData?.events ?? []).map((event: any, i: number) => (
+                              <ReferenceLine key={i} x={new Date(event.timestamp).getTime() / 1000} stroke={event.type === 'Warning' ? theme.status.migrating : theme.status.running} strokeDasharray="3 3" strokeWidth={1} />
+                            ))}
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+
+                    {/* Memory chart with event markers */}
+                    <div className="card" style={{ padding: 16, marginTop: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>Memory Usage with Events</div>
+                      {(timelineData?.memory ?? []).length === 0 ? (
+                        <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.secondary, fontSize: 13 }}>No data available</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                          <ComposedChart data={(timelineData?.memory ?? []).map((d: any) => ({ ...d, value: d.value / (1024 * 1024) }))}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={theme.main.cardBorder} />
+                            <XAxis dataKey="timestamp" tickFormatter={(ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: theme.text.secondary }} stroke={theme.main.cardBorder} />
+                            <YAxis tickFormatter={(v) => `${v.toFixed(0)} MB`} tick={{ fontSize: 10, fill: theme.text.secondary }} stroke={theme.main.cardBorder} width={60} />
+                            <Tooltip contentStyle={{ background: theme.main.card, border: `1px solid ${theme.main.cardBorder}`, borderRadius: 6, fontSize: 12 }} labelFormatter={(ts) => new Date(Number(ts) * 1000).toLocaleString()} formatter={(value: number) => [`${value.toFixed(0)} MB`, 'Memory']} />
+                            <Line type="monotone" dataKey="value" stroke={theme.status.running} strokeWidth={1.5} dot={false} />
+                            {(timelineData?.events ?? []).map((event: any, i: number) => (
+                              <ReferenceLine key={i} x={new Date(event.timestamp).getTime() / 1000} stroke={event.type === 'Warning' ? theme.status.migrating : theme.status.running} strokeDasharray="3 3" strokeWidth={1} />
+                            ))}
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+
+                    {/* Event timeline */}
+                    <div className="card" style={{ padding: 16, marginTop: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>Events Timeline</div>
+                      {(timelineData?.events ?? []).length === 0 ? (
+                        <div style={{ padding: 20, textAlign: 'center', color: theme.text.secondary, fontSize: 13 }}>No events in this time range</div>
+                      ) : (
+                        <div style={{ position: 'relative', paddingLeft: 24 }}>
+                          {/* Vertical line */}
+                          <div style={{ position: 'absolute', left: 7, top: 0, bottom: 0, width: 2, background: theme.main.cardBorder }} />
+                          {(timelineData?.events ?? []).map((event: any, i: number) => {
+                            const isStateChange = timelineData?.state_changes?.some((sc: any) => sc.timestamp === event.timestamp)
+                            return (
+                              <div key={i} style={{ position: 'relative', paddingBottom: 16, display: 'flex', gap: 12 }}>
+                                {/* Dot */}
+                                <div style={{
+                                  position: 'absolute',
+                                  left: -20,
+                                  top: 4,
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  background: event.type === 'Warning' ? theme.status.migrating : theme.status.running,
+                                  border: `2px solid ${theme.main.card}`,
+                                  zIndex: 1,
+                                }} />
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 11, color: theme.text.dim, fontFamily: theme.typography.mono.fontFamily }}>{new Date(event.timestamp).toLocaleTimeString()}</span>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: theme.text.primary }}>{event.reason}</span>
+                                    {isStateChange && (
+                                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: `${theme.accent}15`, color: theme.accent, border: `1px solid ${theme.accent}40` }}>State Change</span>
+                                    )}
+                                    <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: event.type === 'Warning' ? `${theme.status.migrating}15` : `${theme.status.running}15`, color: event.type === 'Warning' ? theme.status.migrating : theme.status.running, border: `1px solid ${event.type === 'Warning' ? theme.status.migrating : theme.status.running}30` }}>{event.type}</span>
+                                  </div>
+                                  <div style={{ fontSize: 12, color: theme.text.secondary, marginTop: 2 }}>{event.message}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -1491,13 +1581,13 @@ export function VMDetailPage() {
                                       if (!namespace || !name) return
                                       setConfirmAction({
                                         title: 'Restore Snapshot',
-                                        message: `Restore VM "${name}" from snapshot "${snap.name}"? The VM will be reverted to this snapshot state.`,
+                                        message: `Restore VM "${name}" from snapshot "${snap.name}"? The VM will be stopped, reverted to this snapshot state, and restarted.`,
                                         confirmLabel: 'Restore',
                                         onConfirm: () => {
                                           restoreSnapshot.mutate(
                                             { namespace, vmName: name, snapshotName: snap.name },
                                             {
-                                              onSuccess: () => toast.success('Snapshot restored'),
+                                              onSuccess: () => toast.success('Snapshot restored — VM restarting'),
                                               onError: (err: unknown) => {
                                                 const msg = (err as { message?: string }).message ?? 'Restore failed'
                                                 setSnapshotError(msg)
@@ -1522,7 +1612,7 @@ export function VMDetailPage() {
                                       fontWeight: 500,
                                     }}
                                   >
-                                    Restore
+                                    {restoreSnapshot.isPending ? 'Restoring…' : 'Restore'}
                                   </button>
                                 )}
                                 <button

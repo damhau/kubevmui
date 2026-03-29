@@ -7,7 +7,8 @@ import { TopBar } from '@/components/layout/TopBar'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
 import { YamlViewer } from '@/components/ui/YamlViewer'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { MetricChart } from '@/components/ui/MetricChart'
+import { TimeRangeSelector } from '@/components/ui/TimeRangeSelector'
 
 function formatMemory(s: string): string {
   if (!s) return '—'
@@ -17,27 +18,6 @@ function formatMemory(s: string): string {
   const bytes = parseInt(s)
   if (!isNaN(bytes)) return `${(bytes / (1024 ** 3)).toFixed(1)} Gi`
   return s
-}
-
-function MetricChart({ title, data, color, formatValue }: { title: string; data: any[]; color: string; formatValue: (v: number) => string }) {
-  return (
-    <div className="card" style={{ padding: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>{title}</div>
-      {data.length === 0 ? (
-        <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text.secondary, fontSize: 13 }}>No data available</div>
-      ) : (
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke={theme.main.cardBorder} />
-            <XAxis dataKey="timestamp" tickFormatter={(ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: theme.text.secondary }} stroke={theme.main.cardBorder} />
-            <YAxis tickFormatter={(v) => formatValue(v)} tick={{ fontSize: 10, fill: theme.text.secondary }} stroke={theme.main.cardBorder} domain={[0, 1]} />
-            <Tooltip formatter={(value: number) => [formatValue(value), title]} labelFormatter={(ts) => new Date(ts * 1000).toLocaleString()} />
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      )}
-    </div>
-  )
 }
 
 type Tab = 'overview' | 'vms' | 'metrics' | 'yaml'
@@ -307,27 +287,8 @@ export function NodeDetailPage() {
               {activeTab === 'metrics' && (
                 <div style={{ animation: 'fadeInUp 0.35s ease-out both' }}>
                   {/* Range selector */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16, gap: 4 }}>
-                    {['1h', '6h', '24h'].map((range) => (
-                      <button
-                        key={range}
-                        onClick={() => setMetricsRange(range)}
-                        style={{
-                          background: metricsRange === range ? theme.accent : theme.main.card,
-                          color: metricsRange === range ? '#fff' : theme.text.secondary,
-                          border: `1px solid ${metricsRange === range ? theme.accent : theme.main.cardBorder}`,
-                          borderRadius: theme.radius.md,
-                          padding: '5px 12px',
-                          fontSize: 12,
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {range}
-                      </button>
-                    ))}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                    <TimeRangeSelector value={metricsRange} onChange={setMetricsRange} ranges={['1h', '6h', '24h']} />
                   </div>
 
                   {/* Charts */}
@@ -337,12 +298,14 @@ export function NodeDetailPage() {
                       data={metricsData?.cpu_usage_pct ?? []}
                       color="#3b82f6"
                       formatValue={(v) => `${(v * 100).toFixed(1)}%`}
+                      yDomain={[0, 1]}
                     />
                     <MetricChart
                       title="Memory Usage (%)"
                       data={metricsData?.memory_usage_pct ?? []}
                       color="#8b5cf6"
                       formatValue={(v) => `${(v * 100).toFixed(1)}%`}
+                      yDomain={[0, 1]}
                     />
                   </div>
                 </div>

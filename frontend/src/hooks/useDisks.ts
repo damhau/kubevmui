@@ -64,3 +64,22 @@ export function useDeleteDisk() {
     },
   })
 }
+
+export function useResizeDisk() {
+  const queryClient = useQueryClient()
+  const { activeCluster, activeNamespace } = useUIStore()
+  const ns = activeNamespace === '_all' ? 'default' : activeNamespace
+  return useMutation({
+    mutationFn: async ({ name, size_gb }: { name: string; size_gb: number }) => {
+      const { data } = await apiClient.patch(
+        `/clusters/${activeCluster}/namespaces/${ns}/disks/${name}`,
+        { size_gb },
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disks'] })
+      queryClient.invalidateQueries({ queryKey: ['disk'] })
+    },
+  })
+}
