@@ -1,15 +1,71 @@
 """Default catalog entry definitions for well-known Linux distributions."""
 
-DEBIAN_CLOUD_INIT = """\
+UBUNTU_CLOUD_INIT = """\
 #cloud-config
+user: ubuntu
+password: ubuntu
+chpasswd: {expire: false}
+ssh_pwauth: true
 package_update: true
 packages: [qemu-guest-agent]
 runcmd:
   - systemctl enable --now qemu-guest-agent
 """
 
-RHEL_CLOUD_INIT = """\
+DEBIAN_CLOUD_INIT = """\
 #cloud-config
+user: debian
+password: debian
+chpasswd: {expire: false}
+ssh_pwauth: true
+package_update: true
+packages: [qemu-guest-agent]
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+"""
+
+FEDORA_CLOUD_INIT = """\
+#cloud-config
+user: fedora
+password: fedora
+chpasswd: {expire: false}
+ssh_pwauth: true
+package_update: true
+packages: [qemu-guest-agent]
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+"""
+
+CENTOS_CLOUD_INIT = """\
+#cloud-config
+user: cloud-user
+password: centos
+chpasswd: {expire: false}
+ssh_pwauth: true
+package_update: true
+packages: [qemu-guest-agent]
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+"""
+
+ROCKY_CLOUD_INIT = """\
+#cloud-config
+user: rocky
+password: rocky
+chpasswd: {expire: false}
+ssh_pwauth: true
+package_update: true
+packages: [qemu-guest-agent]
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+"""
+
+ALMA_CLOUD_INIT = """\
+#cloud-config
+user: almalinux
+password: almalinux
+chpasswd: {expire: false}
+ssh_pwauth: true
 package_update: true
 packages: [qemu-guest-agent]
 runcmd:
@@ -18,6 +74,10 @@ runcmd:
 
 ALPINE_CLOUD_INIT = """\
 #cloud-config
+user: alpine
+password: alpine
+chpasswd: {expire: false}
+ssh_pwauth: true
 apk_repos:
   - main
   - community
@@ -74,7 +134,7 @@ DEFAULT_ENTRIES: list[dict] = [
         source_type="http",
         source_url="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img",
         default_size_gb=20,
-        cloud_init=DEBIAN_CLOUD_INIT,
+        cloud_init=UBUNTU_CLOUD_INIT,
         templates=STANDARD_TEMPLATES,
     ),
     _entry(
@@ -85,7 +145,7 @@ DEFAULT_ENTRIES: list[dict] = [
         source_type="http",
         source_url="https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
         default_size_gb=20,
-        cloud_init=DEBIAN_CLOUD_INIT,
+        cloud_init=UBUNTU_CLOUD_INIT,
         templates=STANDARD_TEMPLATES,
     ),
     _entry(
@@ -118,7 +178,7 @@ DEFAULT_ENTRIES: list[dict] = [
         source_type="http",
         source_url="https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-41-1.4.x86_64.qcow2",
         default_size_gb=20,
-        cloud_init=RHEL_CLOUD_INIT,
+        cloud_init=FEDORA_CLOUD_INIT,
         templates=STANDARD_TEMPLATES,
     ),
     _entry(
@@ -129,7 +189,7 @@ DEFAULT_ENTRIES: list[dict] = [
         source_type="http",
         source_url="https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2",
         default_size_gb=20,
-        cloud_init=RHEL_CLOUD_INIT,
+        cloud_init=CENTOS_CLOUD_INIT,
         templates=STANDARD_TEMPLATES,
     ),
     _entry(
@@ -140,7 +200,7 @@ DEFAULT_ENTRIES: list[dict] = [
         source_type="http",
         source_url="https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2",
         default_size_gb=20,
-        cloud_init=RHEL_CLOUD_INIT,
+        cloud_init=ROCKY_CLOUD_INIT,
         templates=STANDARD_TEMPLATES,
     ),
     _entry(
@@ -151,7 +211,7 @@ DEFAULT_ENTRIES: list[dict] = [
         source_type="http",
         source_url="https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base.latest.x86_64.qcow2",
         default_size_gb=20,
-        cloud_init=RHEL_CLOUD_INIT,
+        cloud_init=ROCKY_CLOUD_INIT,
         templates=STANDARD_TEMPLATES,
     ),
     _entry(
@@ -162,7 +222,7 @@ DEFAULT_ENTRIES: list[dict] = [
         source_type="http",
         source_url="https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2",
         default_size_gb=20,
-        cloud_init=RHEL_CLOUD_INIT,
+        cloud_init=ALMA_CLOUD_INIT,
         templates=STANDARD_TEMPLATES,
     ),
     _entry(
