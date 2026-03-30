@@ -27,7 +27,7 @@ export function useAddDiskToSpec() {
     mutationFn: async ({ namespace, vmName, disk }: {
       namespace: string
       vmName: string
-      disk: { name: string; bus: string; size_gb?: number; storage_class?: string; pvc_name?: string; source_type: string; disk_type?: string; image_name?: string; image_namespace?: string }
+      disk: { name: string; bus: string; size_gb?: number; storage_class?: string; pvc_name?: string; source_type: string; disk_type?: string; image_name?: string; image_namespace?: string; image?: string }
     }) => {
       const { data } = await apiClient.post(
         `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/disks`,

@@ -99,9 +99,10 @@ class AddDiskToSpecRequest(BaseModel):
     size_gb: int | None = None
     storage_class: str | None = None
     pvc_name: str | None = None
-    source_type: str = "blank"  # "blank", "existing", "clone"
+    source_type: str = "blank"  # "blank", "existing", "clone", "container_disk"
     image_name: str | None = None
     image_namespace: str | None = None
+    image: str | None = None  # container disk image URL (for source_type="container_disk")
 
 
 class AddVolumeRequest(BaseModel):

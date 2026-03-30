@@ -273,7 +273,7 @@ def _build_manifest(
 
     for disk_ref in request.disks:
         # Skip CDROM entries with no source (would create empty CDROM, rejected by KubeVirt)
-        if disk_ref.disk_type == "cdrom" and not disk_ref.clone_source:
+        if disk_ref.disk_type == "cdrom" and not disk_ref.clone_source and not disk_ref.image:
             continue
         if disk_ref.disk_type == "cdrom":
             disk_entry = {"name": disk_ref.name, "cdrom": {"bus": disk_ref.bus}}
@@ -767,6 +767,7 @@ class VMService:
         source_type: str = "pvc",
         image_name: str | None = None,
         image_namespace: str | None = None,
+        image: str | None = None,
     ) -> None:
         """Add a disk to a stopped VM's spec via JSON merge patch."""
         vm_raw = self.kv.get_vm(namespace, vm_name)
@@ -783,7 +784,9 @@ class VMService:
             disk_entry = {"name": disk_name, "disk": {"bus": bus}}
         disks.append(disk_entry)
 
-        if source_type == "existing" and pvc_name:
+        if source_type == "container_disk" and image:
+            volumes.append({"name": disk_name, "containerDisk": {"image": image}})
+        elif source_type == "existing" and pvc_name:
             volumes.append({"name": disk_name, "persistentVolumeClaim": {"claimName": pvc_name}})
         elif source_type == "clone" and image_name:
             dv_name = f"{vm_name}-{disk_name}-dv"

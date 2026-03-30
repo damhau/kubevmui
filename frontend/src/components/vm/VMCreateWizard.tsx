@@ -1030,20 +1030,28 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                           </FieldGroup>
                           <FieldGroup label="ISO Image">
                             <select
-                              value={disk.clone_source}
-                              onChange={(e) => updateDisk(i, { clone_source: e.target.value })}
+                              value={disk.source_type === 'container_disk' ? disk.image : disk.clone_source}
+                              onChange={(e) => {
+                                const selectedImg = registeredImages.find((img: any) => img.media_type === 'iso' && (img.name === e.target.value || img.source_url === e.target.value))
+                                if (selectedImg?.source_type === 'container_disk') {
+                                  updateDisk(i, { source_type: 'container_disk', image: selectedImg.source_url, clone_source: '' })
+                                } else {
+                                  updateDisk(i, { source_type: 'datavolume_clone', clone_source: e.target.value, image: '' })
+                                }
+                              }}
                               style={inputStyle()}
                             >
                               <option value="">Select ISO image...</option>
                               {registeredImages
                                 .filter((img: any) => img.media_type === 'iso')
                                 .map((img: any) => (
-                                  <option key={img.name} value={img.name}>{img.display_name || img.name}</option>
+                                  <option key={img.name} value={img.source_type === 'container_disk' ? img.source_url : img.name}>{img.display_name || img.name}</option>
                                 ))}
                             </select>
                           </FieldGroup>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: disk.source_type === 'container_disk' ? '1fr' : '1fr 1fr', gap: 12, marginTop: 12 }}>
+                          {disk.source_type !== 'container_disk' && (
                           <FieldGroup label="Storage Class">
                             <select value={disk.storage_class} onChange={(e) => updateDisk(i, { storage_class: e.target.value })} style={inputStyle()}>
                               <option value="">Default</option>
@@ -1052,6 +1060,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                               ))}
                             </select>
                           </FieldGroup>
+                          )}
                           <FieldGroup label="Bus">
                             <select value={disk.bus} onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })} style={inputStyle()}>
                               <option value="sata">sata</option>
