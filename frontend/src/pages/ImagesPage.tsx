@@ -536,18 +536,27 @@ export function ImagesPage() {
                               borderRadius: 5,
                               overflow: 'hidden',
                               border: `1px solid ${theme.main.inputBorder}`,
+                              position: 'relative',
                             }}>
-                              <div style={{
-                                height: '100%',
-                                width: isActive && progress ? `${Math.min(pct, 100)}%` : '0%',
-                                background: theme.status.provisioning,
-                                borderRadius: 5,
-                                transition: 'width 0.5s ease',
-                                ...(isActive && !progress ? {
-                                  width: '100%',
-                                  opacity: 0.4,
-                                } : {}),
-                              }} />
+                              {isActive && !progress ? (
+                                <div style={{
+                                  height: '100%',
+                                  width: '40%',
+                                  background: theme.status.provisioning,
+                                  borderRadius: 5,
+                                  opacity: 0.6,
+                                  animation: 'indeterminate 1.5s ease-in-out infinite',
+                                  position: 'absolute',
+                                }} />
+                              ) : (
+                                <div style={{
+                                  height: '100%',
+                                  width: progress ? `${Math.min(pct, 100)}%` : '0%',
+                                  background: theme.status.provisioning,
+                                  borderRadius: 5,
+                                  transition: 'width 0.5s ease',
+                                }} />
+                              )}
                             </div>
                           </div>
                         )
