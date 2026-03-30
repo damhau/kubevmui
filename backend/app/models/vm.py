@@ -24,6 +24,8 @@ class VMNetworkRef(BaseModel):
     network_profile: str = ""  # Legacy: raw multus networkName or "pod" (read from existing VMs)
     ip_address: str | None = None
     mac_address: str | None = None
+    model: str | None = None  # NIC model (virtio, e1000e, rtl8139)
+    interface_type: str = "masquerade"  # "masquerade" or "bridge"
 
 
 class VMCompute(BaseModel):
@@ -128,6 +130,17 @@ class AddInterfaceToSpecRequest(BaseModel):
 
 class RemoveInterfaceRequest(BaseModel):
     name: str
+
+
+class EditDiskRequest(BaseModel):
+    bus: str | None = None
+    boot_order: int | None = None  # 0 to clear boot order
+
+
+class EditInterfaceRequest(BaseModel):
+    model: str | None = None
+    mac_address: str | None = None
+    network_cr: str | None = None  # Change the network attachment
 
 
 class VMCloneRequest(BaseModel):

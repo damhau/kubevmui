@@ -45,6 +45,30 @@ def get_network_cr(
     return cr
 
 
+@router.get("/network-crs/{name}/nads")
+def list_nads_for_network_cr(
+    cluster: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    return svc.list_nads_for_network(name)
+
+
+@router.delete("/network-crs/{name}/nads/{nad_namespace}/{nad_name}", status_code=204)
+def delete_nad_for_network_cr(
+    cluster: str,
+    name: str,
+    nad_namespace: str,
+    nad_name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.delete_nad(nad_namespace, nad_name)
+
+
 @router.post("/network-crs/preview")
 def preview_network_cr(
     cluster: str,

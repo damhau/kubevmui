@@ -29,12 +29,4 @@ Misc:
 
 - [ ] add pagination on the event in main
 
-VM:
-- [ ] allow edit of cpu and ram when vm is stopped
 
-Tempalte:
-- [ ] Add the Global: true/false in the image and tempalte overview "basic info"
-
-
-Monitoring:
-- [ ] Add "core assigned" and "mem assigned" in the node monitoring

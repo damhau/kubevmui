@@ -143,6 +143,25 @@ class NetworkCRService:
         raw = self.kv.patch_network_cr(name, patch_body)
         return _cr_from_raw(raw)
 
+    def list_nads_for_network(self, network_name: str) -> list[dict]:
+        """List all NADs created from this Network CR across all namespaces."""
+        label_selector = f"{LABEL_NETWORK_SOURCE}={network_name}"
+        nads = self.kv.list_all_nads_by_label(label_selector)
+        result = []
+        for nad in nads:
+            metadata = nad.get("metadata", {})
+            result.append({
+                "name": metadata.get("name", ""),
+                "namespace": metadata.get("namespace", ""),
+                "created_at": metadata.get("creationTimestamp"),
+                "raw_manifest": nad,
+            })
+        return result
+
+    def delete_nad(self, namespace: str, name: str) -> None:
+        """Delete a single NAD in a namespace."""
+        self.kv.delete_nad(namespace, name)
+
     def delete_network(self, name: str) -> None:
         # Delete all NADs sourced from this Network CR
         label_selector = f"{LABEL_NETWORK_SOURCE}={name}"

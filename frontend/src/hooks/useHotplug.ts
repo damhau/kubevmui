@@ -94,6 +94,86 @@ export function useRemoveInterface() {
   })
 }
 
+export function useRemoveDiskFromSpec() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ namespace, vmName, diskName }: { namespace: string; vmName: string; diskName: string }) => {
+      const { data } = await apiClient.delete(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/disks/${diskName}`
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+}
+
+export function useRemoveInterfaceFromSpec() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ namespace, vmName, ifaceName }: { namespace: string; vmName: string; ifaceName: string }) => {
+      const { data } = await apiClient.delete(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/nics/${ifaceName}`
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+}
+
+export function useEditDisk() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ namespace, vmName, diskName, updates }: {
+      namespace: string
+      vmName: string
+      diskName: string
+      updates: { bus?: string; boot_order?: number | null }
+    }) => {
+      const { data } = await apiClient.patch(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/disks/${diskName}`,
+        updates
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+}
+
+export function useEditInterface() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ namespace, vmName, ifaceName, updates }: {
+      namespace: string
+      vmName: string
+      ifaceName: string
+      updates: { model?: string; mac_address?: string; network_cr?: string }
+    }) => {
+      const { data } = await apiClient.patch(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/nics/${ifaceName}`,
+        updates
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+}
+
 export function useAddInterfaceToSpec() {
   const queryClient = useQueryClient()
   const { activeCluster } = useUIStore()
