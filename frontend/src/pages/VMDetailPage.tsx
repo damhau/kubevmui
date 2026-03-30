@@ -7,6 +7,7 @@ import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
 import { useRemoveVolume, useRemoveDiskFromSpec, useRemoveInterface } from '@/hooks/useHotplug'
+import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
@@ -1094,11 +1095,13 @@ export function VMDetailPage() {
                           <td className="table-cell" style={{ color: theme.text.secondary }}>
                             {disk.bus ?? '—'}
                           </td>
-                          <td className="table-cell">
-                            {(vm.status === 'running' || vm.status === 'stopped') && (
-                              <button
-                                onClick={() => {
-                                  if (!namespace || !name) return
+                          <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
+                            <DropdownMenu
+                              actions={[
+                                { label: 'Remove', action: 'remove', danger: true },
+                              ]}
+                              onAction={(action) => {
+                                if (action === 'remove' && namespace && name) {
                                   const isRunning = vm.status === 'running'
                                   setConfirmAction({
                                     title: 'Remove Disk',
@@ -1128,23 +1131,9 @@ export function VMDetailPage() {
                                       setConfirmAction(null)
                                     },
                                   })
-                                }}
-                                disabled={removeVolume.isPending || removeDiskFromSpec.isPending}
-                                style={{
-                                  background: 'rgba(239,68,68,0.08)',
-                                  color: theme.status.error,
-                                  border: `1px solid rgba(239,68,68,0.3)`,
-                                  borderRadius: theme.radius.md,
-                                  padding: '3px 8px',
-                                  fontSize: 11,
-                                  cursor: removeVolume.isPending || removeDiskFromSpec.isPending ? 'not-allowed' : 'pointer',
-                                  fontFamily: 'inherit',
-                                  fontWeight: 500,
-                                }}
-                              >
-                                Remove
-                              </button>
-                            )}
+                                }
+                              }}
+                            />
                           </td>
                         </tr>
                       ))}
