@@ -31,7 +31,8 @@ interface Disk {
   name: string
   size_gb: number
   bus: 'virtio' | 'sata' | 'scsi'
-  source_type: 'pvc' | 'container_disk' | 'datavolume_clone'
+  source_type: 'pvc' | 'container_disk' | 'datavolume_clone' | 'blank'
+  disk_type: 'disk' | 'cdrom'
   image: string
   clone_source: string
   clone_namespace: string
@@ -265,6 +266,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
         size_gb: d.size_gb || 20,
         bus: d.bus || 'virtio',
         source_type: d.source_type || 'pvc',
+        disk_type: d.disk_type || 'disk',
         image: d.image || '',
         clone_source: d.clone_source || '',
         clone_namespace: d.clone_namespace || '',
@@ -291,7 +293,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
 
   const addDisk = () =>
     updateForm({
-      disks: [...form.disks, { name: `disk${form.disks.length}`, size_gb: 10, bus: 'virtio', source_type: 'pvc', image: '', clone_source: '', clone_namespace: '', storage_class: '' }],
+      disks: [...form.disks, { name: `disk${form.disks.length}`, size_gb: 10, bus: 'virtio', source_type: 'blank', disk_type: 'disk', image: '', clone_source: '', clone_namespace: '', storage_class: '' }],
     })
 
   const removeDisk = (i: number) =>
@@ -328,6 +330,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
         size_gb: d.size_gb,
         bus: d.bus,
         source_type: d.source_type,
+        disk_type: d.disk_type || 'disk',
         image: d.image,
         clone_source: d.clone_source,
         clone_namespace: d.clone_namespace,
@@ -964,11 +967,43 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                       </button>
                     </div>
 
+                    {/* Disk type toggle */}
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                      {(['disk', 'cdrom'] as const).map((dt) => (
+                        <button
+                          key={dt}
+                          type="button"
+                          onClick={() => updateDisk(i, {
+                            disk_type: dt,
+                            name: dt === 'cdrom'
+                              ? `cdrom${form.disks.filter((d, j) => j !== i && d.disk_type === 'cdrom').length}`
+                              : `disk${form.disks.filter((d, j) => j !== i && d.disk_type !== 'cdrom').length}`,
+                            bus: dt === 'cdrom' ? 'sata' : 'virtio',
+                            source_type: dt === 'cdrom' ? 'datavolume_clone' : disk.source_type === 'datavolume_clone' ? 'blank' : disk.source_type,
+                          })}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: 11,
+                            fontFamily: 'inherit',
+                            borderRadius: theme.radius.sm,
+                            cursor: 'pointer',
+                            background: disk.disk_type === dt ? theme.accentLight : theme.main.card,
+                            border: disk.disk_type === dt ? `2px solid ${theme.accent}` : `1px solid ${theme.main.cardBorder}`,
+                            color: disk.disk_type === dt ? theme.accent : theme.text.primary,
+                            fontWeight: disk.disk_type === dt ? 600 : 400,
+                          }}
+                        >
+                          {dt === 'disk' ? 'Disk' : 'CD-ROM'}
+                        </button>
+                      ))}
+                    </div>
+
                     {/* Source type selector */}
+                    {disk.disk_type !== 'cdrom' && (
                     <div style={{ marginBottom: 14 }}>
                       <FieldGroup label="Source Type">
                         <div style={{ display: 'flex', gap: 8 }}>
-                          {(['pvc', 'container_disk', 'datavolume_clone'] as const).map((st) => (
+                          {(['blank', 'datavolume_clone', 'pvc', 'container_disk'] as const).map((st) => (
                             <button
                               key={st}
                               onClick={() => updateDisk(i, { source_type: st })}
@@ -987,14 +1022,55 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                                 margin: disk.source_type === st ? 0 : 1,
                               }}
                             >
-                              {st === 'pvc' ? 'PVC' : st === 'container_disk' ? 'Container Disk' : 'Clone from Image'}
+                              {st === 'blank' ? 'Blank Disk' : st === 'pvc' ? 'Existing PVC' : st === 'container_disk' ? 'Container Disk' : 'Clone from Image'}
                             </button>
                           ))}
                         </div>
                       </FieldGroup>
                     </div>
+                    )}
 
-                    {disk.source_type === 'container_disk' ? (
+                    {disk.disk_type === 'cdrom' ? (
+                      <>
+                        {/* CD-ROM fields */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <FieldGroup label="Name">
+                            <input type="text" value={disk.name} onChange={(e) => updateDisk(i, { name: e.target.value })} style={inputStyle()} />
+                          </FieldGroup>
+                          <FieldGroup label="ISO Image">
+                            <select
+                              value={disk.clone_source}
+                              onChange={(e) => updateDisk(i, { clone_source: e.target.value })}
+                              style={inputStyle()}
+                            >
+                              <option value="">Select ISO image...</option>
+                              {registeredImages
+                                .filter((img: any) => img.media_type === 'iso')
+                                .map((img: any) => (
+                                  <option key={img.name} value={img.name}>{img.display_name || img.name}</option>
+                                ))}
+                            </select>
+                          </FieldGroup>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                          <FieldGroup label="Storage Class">
+                            <select value={disk.storage_class} onChange={(e) => updateDisk(i, { storage_class: e.target.value })} style={inputStyle()}>
+                              <option value="">Default</option>
+                              {storageClasses.map((sc: any) => (
+                                <option key={sc.name} value={sc.name}>{sc.name}{sc.is_default ? ' (default)' : ''}</option>
+                              ))}
+                            </select>
+                          </FieldGroup>
+                          <FieldGroup label="Bus">
+                            <select value={disk.bus} onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })} style={inputStyle()}>
+                              <option value="sata">sata</option>
+                              <option value="scsi">scsi</option>
+                              <option value="virtio">virtio</option>
+                            </select>
+                          </FieldGroup>
+                        </div>
+                      </>
+                    ) : disk.source_type === 'container_disk' ? (
                       <>
                         {/* Container disk fields */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
@@ -1623,6 +1699,9 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                       <span style={{ fontSize: 13, color: theme.text.primary, marginRight: 2 }}>
                         {d.name}
                       </span>
+                      {d.disk_type === 'cdrom' && (
+                        <Badge label="CD-ROM" variant="warning" />
+                      )}
                       {d.source_type === 'container_disk' ? (
                         <Badge label="container" variant="warning" />
                       ) : d.source_type === 'datavolume_clone' ? (
@@ -1878,6 +1957,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                     size_gb: d.size_gb,
                     bus: d.bus,
                     source_type: d.source_type,
+                    disk_type: d.disk_type || 'disk',
                     image: d.image,
                     clone_source: d.clone_source,
                     clone_namespace: d.clone_namespace,

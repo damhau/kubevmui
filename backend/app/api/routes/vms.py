@@ -194,6 +194,7 @@ def add_disk_to_spec(
         name,
         disk_name=body.name,
         bus=body.bus,
+        disk_type=body.disk_type,
         size_gb=body.size_gb,
         storage_class=body.storage_class,
         pvc_name=body.pvc_name,

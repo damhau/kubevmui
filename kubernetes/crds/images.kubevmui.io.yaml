@@ -39,6 +39,11 @@ spec:
                   type: string
                   enum: [linux, windows]
                   description: Operating system type
+                mediaType:
+                  type: string
+                  enum: [disk, iso]
+                  default: disk
+                  description: Media type - disk for OS/data images, iso for CD-ROM ISOs
                 source:
                   type: object
                   required:
@@ -46,7 +51,7 @@ spec:
                   properties:
                     type:
                       type: string
-                      enum: [http, registry, pvc, container_disk]
+                      enum: [http, registry, pvc, container_disk, upload]
                       description: Source type for the image
                     url:
                       type: string
@@ -68,6 +73,9 @@ spec:
         - name: OS
           type: string
           jsonPath: .spec.osType
+        - name: Media
+          type: string
+          jsonPath: .spec.mediaType
         - name: Source
           type: string
           jsonPath: .spec.source.type

@@ -257,13 +257,17 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
     data_volume_templates = []
 
     for disk_ref in request.disks:
-        disk_entry = {
-            "name": disk_ref.name,
-            "disk": {"bus": disk_ref.bus},
-        }
+        # Skip CDROM entries with no source (would create empty CDROM, rejected by KubeVirt)
+        if disk_ref.disk_type == "cdrom" and not disk_ref.clone_source:
+            continue
+        if disk_ref.disk_type == "cdrom":
+            disk_entry = {"name": disk_ref.name, "cdrom": {"bus": disk_ref.bus}}
+        else:
+            disk_entry = {"name": disk_ref.name, "disk": {"bus": disk_ref.bus}}
         if disk_ref.boot_order is not None:
             disk_entry["bootOrder"] = disk_ref.boot_order
         disks.append(disk_entry)
+
         if disk_ref.source_type == "container_disk":
             volumes.append(
                 {
@@ -272,25 +276,55 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
                 }
             )
         elif disk_ref.source_type == "datavolume_clone":
+            # CDROM disks reference existing PVCs directly instead of cloning
+            if disk_ref.disk_type == "cdrom":
+                volumes.append(
+                    {
+                        "name": disk_ref.name,
+                        "persistentVolumeClaim": {"claimName": disk_ref.clone_source},
+                    }
+                )
+            else:
+                dv_name = f"{request.name}-{disk_ref.name}-dv"
+                # Resolve clone namespace: use explicit value, or look up the image's namespace
+                clone_ns = disk_ref.clone_namespace
+                if not clone_ns and disk_ref.clone_source and kv:
+                    for ns in kv.list_namespaces():
+                        img = kv.get_image(ns, disk_ref.clone_source)
+                        if img:
+                            clone_ns = ns
+                            break
+                clone_ns = clone_ns or request.namespace
+                dv_template = {
+                    "metadata": {"name": dv_name},
+                    "spec": {
+                        "source": {
+                            "pvc": {
+                                "name": disk_ref.clone_source,
+                                "namespace": clone_ns,
+                            },
+                        },
+                        "pvc": {
+                            "accessModes": ["ReadWriteOnce"],
+                            "resources": {"requests": {"storage": f"{disk_ref.size_gb}Gi"}},
+                        },
+                    },
+                }
+                if disk_ref.storage_class:
+                    dv_template["spec"]["pvc"]["storageClassName"] = disk_ref.storage_class
+                data_volume_templates.append(dv_template)
+                volumes.append(
+                    {
+                        "name": disk_ref.name,
+                        "dataVolume": {"name": dv_name},
+                    }
+                )
+        elif disk_ref.source_type == "blank":
             dv_name = f"{request.name}-{disk_ref.name}-dv"
-            # Resolve clone namespace: use explicit value, or look up the image's namespace
-            clone_ns = disk_ref.clone_namespace
-            if not clone_ns and disk_ref.clone_source and kv:
-                for ns in kv.list_namespaces():
-                    img = kv.get_image(ns, disk_ref.clone_source)
-                    if img:
-                        clone_ns = ns
-                        break
-            clone_ns = clone_ns or request.namespace
             dv_template = {
                 "metadata": {"name": dv_name},
                 "spec": {
-                    "source": {
-                        "pvc": {
-                            "name": disk_ref.clone_source,
-                            "namespace": clone_ns,
-                        },
-                    },
+                    "source": {"blank": {}},
                     "pvc": {
                         "accessModes": ["ReadWriteOnce"],
                         "resources": {"requests": {"storage": f"{disk_ref.size_gb}Gi"}},
@@ -313,6 +347,20 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
                     "persistentVolumeClaim": {"claimName": disk_ref.name},
                 }
             )
+
+    # Auto-assign boot order if any CDROM is present and no explicit boot order set
+    has_cdrom = any("cdrom" in d for d in disks)
+    has_explicit_boot = any("bootOrder" in d for d in disks)
+    if has_cdrom and not has_explicit_boot:
+        order = 1
+        for d in disks:
+            if "cdrom" in d:
+                d["bootOrder"] = order
+                order += 1
+        for d in disks:
+            if "disk" in d:
+                d["bootOrder"] = order
+                order += 1
 
     if request.cloud_init_user_data or request.cloud_init_network_data:
         disks.append({"name": "cloudinit", "disk": {"bus": "virtio"}})
@@ -675,6 +723,7 @@ class VMService:
         vm_name: str,
         disk_name: str,
         bus: str = "virtio",
+        disk_type: str = "disk",
         size_gb: int | None = None,
         storage_class: str | None = None,
         pvc_name: str | None = None,
@@ -691,7 +740,10 @@ class VMService:
         volumes = spec.get("volumes", [])
         dv_templates = vm_raw.get("spec", {}).get("dataVolumeTemplates", [])
 
-        disk_entry = {"name": disk_name, "disk": {"bus": bus}}
+        if disk_type == "cdrom":
+            disk_entry = {"name": disk_name, "cdrom": {"bus": bus}}
+        else:
+            disk_entry = {"name": disk_name, "disk": {"bus": bus}}
         disks.append(disk_entry)
 
         if source_type == "existing" and pvc_name:

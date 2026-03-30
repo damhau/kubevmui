@@ -7,6 +7,7 @@ class VMDiskRef(BaseModel):
     name: str
     size_gb: int
     bus: str = "virtio"
+    disk_type: str = "disk"  # "disk" or "cdrom"
     boot_order: int | None = None
     source_type: str = "pvc"  # "pvc", "container_disk", or "datavolume_clone"
     image: str = ""  # container disk image URL (only for source_type="container_disk")
@@ -94,6 +95,7 @@ class VMCreate(BaseModel):
 class AddDiskToSpecRequest(BaseModel):
     name: str
     bus: str = "virtio"
+    disk_type: str = "disk"  # "disk" or "cdrom"
     size_gb: int | None = None
     storage_class: str | None = None
     pvc_name: str | None = None

@@ -12,6 +12,8 @@ dependencies = [
     "pyyaml>=6.0.2",
     "websockets>=14.0",
     "httpx>=0.28.0",
+    "python-multipart>=0.0.22",
+    "requests>=2.33.0",
 ]
 
 [project.optional-dependencies]

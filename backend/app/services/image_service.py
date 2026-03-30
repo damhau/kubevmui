@@ -28,6 +28,7 @@ def _image_from_raw(raw: dict) -> Image:
         display_name=spec.get("displayName", metadata.get("name", "")),
         description=spec.get("description", ""),
         os_type=spec.get("osType", ""),
+        media_type=spec.get("mediaType", "disk"),
         source_type=source.get("type", ""),
         source_url=source.get("url", ""),
         size_gb=int(storage.get("sizeGb", 20)),
@@ -38,9 +39,24 @@ def _image_from_raw(raw: dict) -> Image:
 
 
 def _merge_dv_status(image: Image, kv: KubeVirtClient) -> Image:
-    """Merge live DataVolume status into an Image object."""
+    """Merge live DataVolume or PVC status into an Image object."""
     if image.source_type == "container_disk":
         return image
+
+    # For upload images: check PVC status directly (no DataVolume)
+    if image.source_type == "upload":
+        try:
+            pvc = kv.core_api.read_namespaced_persistent_volume_claim(image.name, image.namespace)
+            phase = pvc.status.phase if pvc.status else "Pending"
+            if phase == "Bound":
+                image.dv_phase = "Succeeded"
+                image.dv_progress = "100%"
+            else:
+                image.dv_phase = phase
+        except Exception:
+            pass
+        return image
+
     dv = kv.get_datavolume(image.namespace, image.name)
     if dv is None:
         return image
@@ -99,14 +115,17 @@ class ImageService:
                 "description": request.description,
                 "global": request.is_global,
                 "osType": request.os_type,
+                "mediaType": request.media_type,
                 "source": {"type": request.source_type, "url": request.source_url},
                 "storage": {"sizeGb": request.size_gb, "storageClass": request.storage_class},
             },
         }
         manifests = [body]
-        if request.source_type in ("registry", "http"):
+        if request.source_type in ("registry", "http", "upload"):
             if request.source_type == "registry":
                 source_spec = {"registry": {"url": request.source_url}}
+            elif request.source_type == "upload":
+                source_spec = {"upload": {}}
             else:
                 source_spec = {"http": {"url": request.source_url}}
             pvc_spec: dict = {
@@ -138,6 +157,7 @@ class ImageService:
                 "description": request.description,
                 "global": request.is_global,
                 "osType": request.os_type,
+                "mediaType": request.media_type,
                 "source": {
                     "type": request.source_type,
                     "url": request.source_url,
@@ -150,8 +170,35 @@ class ImageService:
         }
         raw = self.kv.create_image(namespace, body)
 
-        # Create a DataVolume for registry / http sources
-        if request.source_type in ("registry", "http"):
+        # Create backing storage for the image
+        if request.source_type == "upload":
+            # ISO/upload: create a plain PVC (like virtctl image-upload does)
+            # CDI upload proxy writes raw bytes directly — no conversion
+            from kubernetes import client as k8s_client
+
+            pvc = k8s_client.V1PersistentVolumeClaim(
+                api_version="v1",
+                kind="PersistentVolumeClaim",
+                metadata=k8s_client.V1ObjectMeta(
+                    name=request.name,
+                    namespace=namespace,
+                    labels={"kubevmui.io/type": "image"},
+                    annotations={
+                        "cdi.kubevirt.io/storage.upload.target": "",
+                    },
+                ),
+                spec=k8s_client.V1PersistentVolumeClaimSpec(
+                    access_modes=["ReadWriteOnce"],
+                    storage_class_name=request.storage_class or None,
+                    resources=k8s_client.V1VolumeResourceRequirements(
+                        requests={"storage": f"{request.size_gb}Gi"},
+                    ),
+                ),
+            )
+            self.kv.core_api.create_namespaced_persistent_volume_claim(namespace, pvc)
+
+        elif request.source_type in ("registry", "http"):
+            # Disk images: create DataVolume (CDI imports and converts)
             if request.source_type == "registry":
                 source_spec = {"registry": {"url": request.source_url}}
             else:
@@ -182,6 +229,80 @@ class ImageService:
         img = _image_from_raw(raw)
         _merge_dv_status(img, self.kv)
         return img
+
+    def upload_image_stream(self, namespace: str, name: str, file_stream) -> None:
+        """Stream file data to CDI upload proxy via kubectl port-forward."""
+        import subprocess
+        import time
+
+        import requests
+
+        dv_name = name
+
+        # Create upload token
+        token_body = {
+            "apiVersion": "upload.cdi.kubevirt.io/v1beta1",
+            "kind": "UploadTokenRequest",
+            "metadata": {"name": dv_name, "namespace": namespace},
+            "spec": {"pvcName": dv_name},
+        }
+        token_result = self.kv.custom_api.create_namespaced_custom_object(
+            group="upload.cdi.kubevirt.io",
+            version="v1beta1",
+            namespace=namespace,
+            plural="uploadtokenrequests",
+            body=token_body,
+        )
+        token = token_result.get("status", {}).get("token", "")
+        if not token:
+            raise RuntimeError("Failed to get CDI upload token")
+
+        # Start port-forward to CDI upload proxy
+        from app.core.config import settings
+
+        kubeconfig_args = []
+        if settings.kubeconfig_path:
+            kubeconfig_args = ["--kubeconfig", settings.kubeconfig_path]
+
+        port_forward = subprocess.Popen(
+            ["kubectl", *kubeconfig_args, "port-forward", "-n", "cdi", "svc/cdi-uploadproxy", "0:443"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Wait for port-forward to be ready and parse the local port
+        local_port = None
+        for _ in range(30):
+            line = port_forward.stdout.readline().decode()
+            if "Forwarding from" in line:
+                # e.g. "Forwarding from 127.0.0.1:12345 -> 443"
+                local_port = line.split(":")[1].split(" ")[0]
+                break
+            time.sleep(0.2)
+
+        if not local_port:
+            port_forward.kill()
+            raise RuntimeError("Failed to start port-forward to CDI upload proxy")
+
+        try:
+            # Upload directly to CDI via port-forward (no K8s API proxy)
+            upload_url = f"https://127.0.0.1:{local_port}/v1beta1/upload"
+            response = requests.post(
+                upload_url,
+                data=file_stream,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/octet-stream",
+                },
+                verify=False,
+            )
+            if response.status_code >= 400:
+                raise RuntimeError(
+                    f"CDI upload failed ({response.status_code}): {response.text[:500]}"
+                )
+        finally:
+            port_forward.kill()
+            port_forward.wait()
 
     def delete_image(self, namespace: str, name: str) -> None:
         self.kv.delete_image(namespace, name)

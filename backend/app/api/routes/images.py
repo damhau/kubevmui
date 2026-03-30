@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
@@ -57,6 +57,49 @@ def create_image(
 ):
     svc = _get_service(cluster, cm)
     return svc.create_image(ns, body)
+
+
+@router.post("/images/upload", response_model=Image, status_code=201)
+async def upload_image(
+    cluster: str,
+    ns: str,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    display_name: str = Form(...),
+    description: str = Form(""),
+    os_type: str = Form("linux"),
+    size_gb: int = Form(20),
+    storage_class: str = Form(""),
+    is_global: bool = Form(False),
+    media_type: str = Form("disk"),
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+
+    image_create = ImageCreate(
+        name=name,
+        display_name=display_name,
+        description=description,
+        os_type=os_type,
+        source_type="upload",
+        source_url="",
+        size_gb=size_gb,
+        storage_class=storage_class,
+        is_global=is_global,
+        media_type=media_type,
+    )
+    image = svc.create_image(ns, image_create)
+
+    # Stream file to CDI in chunks (avoids loading entire file in memory)
+    import logging
+    try:
+        svc.upload_image_stream(ns, name, file.file)
+    except Exception as e:
+        logging.getLogger(__name__).exception("Upload to CDI failed")
+        raise HTTPException(status_code=502, detail=f"Upload to CDI failed: {str(e)[:500]}") from e
+
+    return image
 
 
 @router.delete("/images/{name}", status_code=204)

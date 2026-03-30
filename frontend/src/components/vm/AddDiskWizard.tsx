@@ -22,6 +22,7 @@ interface DiskConfig {
   name: string
   bus: string
   sourceType: SourceType
+  diskType: 'disk' | 'cdrom'
   sizeGb: number
   storageClass: string
   pvcName: string
@@ -130,6 +131,7 @@ export function AddDiskWizard({
     name: `disk-${existingDiskCount + 1}`,
     bus: 'virtio',
     sourceType: 'blank',
+    diskType: 'disk',
     sizeGb: 10,
     storageClass: '',
     pvcName: '',
@@ -161,6 +163,7 @@ export function AddDiskWizard({
       name: `disk-${existingDiskCount + 1}`,
       bus: 'virtio',
       sourceType: 'blank',
+      diskType: 'disk',
       sizeGb: 10,
       storageClass: '',
       pvcName: '',
@@ -213,7 +216,8 @@ export function AddDiskWizard({
             name: config.name.trim(),
             bus: config.bus,
             source_type: config.sourceType,
-            size_gb: config.sourceType !== 'existing' ? config.sizeGb : undefined,
+            disk_type: config.diskType,
+            size_gb: config.sourceType !== 'existing' && config.diskType !== 'cdrom' ? config.sizeGb : undefined,
             storage_class: config.storageClass || undefined,
             pvc_name: config.sourceType === 'existing' ? config.pvcName : undefined,
             image_name: config.sourceType === 'clone' ? config.imageName : undefined,
@@ -393,27 +397,35 @@ export function AddDiskWizard({
               </div>
 
               <RadioCard
-                selected={config.sourceType === 'blank'}
+                selected={config.sourceType === 'blank' && config.diskType === 'disk'}
                 disabled={isRunning}
-                onClick={() => setConfig({ ...config, sourceType: 'blank' })}
+                onClick={() => setConfig({ ...config, sourceType: 'blank', diskType: 'disk' })}
                 icon="💾"
                 title="New blank disk"
                 description="Create a new empty DataVolume. Choose size and storage class."
               />
               <RadioCard
-                selected={config.sourceType === 'existing'}
-                onClick={() => setConfig({ ...config, sourceType: 'existing' })}
+                selected={config.sourceType === 'existing' && config.diskType === 'disk'}
+                onClick={() => setConfig({ ...config, sourceType: 'existing', diskType: 'disk' })}
                 icon="📦"
                 title="Existing PVC"
                 description="Attach an existing PersistentVolumeClaim from this namespace."
               />
               <RadioCard
-                selected={config.sourceType === 'clone'}
+                selected={config.sourceType === 'clone' && config.diskType === 'disk'}
                 disabled={isRunning}
-                onClick={() => setConfig({ ...config, sourceType: 'clone' })}
+                onClick={() => setConfig({ ...config, sourceType: 'clone', diskType: 'disk' })}
                 icon="🖼️"
                 title="Clone from image"
                 description="Clone a DataVolume from a registered image. Choose size and storage class."
+              />
+              <RadioCard
+                selected={config.sourceType === 'clone' && config.diskType === 'cdrom'}
+                disabled={isRunning}
+                onClick={() => setConfig({ ...config, sourceType: 'clone', diskType: 'cdrom', bus: 'sata' })}
+                icon="💿"
+                title="CD-ROM (ISO)"
+                description="Mount an ISO image as a virtual CD-ROM drive. Ideal for OS installation."
               />
             </div>
           )}
@@ -474,54 +486,61 @@ export function AddDiskWizard({
 
               {config.sourceType === 'clone' && (
                 <>
-                  <FieldGroup label="Source image">
-                    {images.length > 0 ? (
-                      <select
-                        value={config.imageName}
-                        onChange={(e) => {
-                          const img = images.find((i) => i.name === e.target.value)
-                          setConfig({
-                            ...config,
-                            imageName: e.target.value,
-                            imageNamespace: img?.namespace || namespace,
-                          })
-                        }}
-                        style={inputStyle()}
-                      >
-                        <option value="">Select an image...</option>
-                        {images.map((img) => (
-                          <option key={`${img.namespace}/${img.name}`} value={img.name}>
-                            {img.display_name || img.name}{' '}
-                            {img.namespace !== namespace ? `(${img.namespace})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        value={config.imageName}
-                        onChange={(e) => setConfig({ ...config, imageName: e.target.value })}
-                        style={inputStyle()}
-                        placeholder="Enter image name"
-                      />
-                    )}
+                  <FieldGroup label={config.diskType === 'cdrom' ? 'ISO Image' : 'Source image'}>
+                    {(() => {
+                      const filteredImages = config.diskType === 'cdrom'
+                        ? images.filter((img: any) => img.media_type === 'iso')
+                        : images
+                      return filteredImages.length > 0 ? (
+                        <select
+                          value={config.imageName}
+                          onChange={(e) => {
+                            const img = filteredImages.find((i) => i.name === e.target.value)
+                            setConfig({
+                              ...config,
+                              imageName: e.target.value,
+                              imageNamespace: img?.namespace || namespace,
+                            })
+                          }}
+                          style={inputStyle()}
+                        >
+                          <option value="">{config.diskType === 'cdrom' ? 'Select an ISO image...' : 'Select an image...'}</option>
+                          {filteredImages.map((img) => (
+                            <option key={`${img.namespace}/${img.name}`} value={img.name}>
+                              {img.display_name || img.name}{' '}
+                              {img.namespace !== namespace ? `(${img.namespace})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={config.imageName}
+                          onChange={(e) => setConfig({ ...config, imageName: e.target.value })}
+                          style={inputStyle()}
+                          placeholder={config.diskType === 'cdrom' ? 'Enter ISO image name' : 'Enter image name'}
+                        />
+                      )
+                    })()}
                   </FieldGroup>
                 </>
               )}
 
               {(config.sourceType === 'blank' || config.sourceType === 'clone') && (
                 <>
-                  <FieldGroup label="Size (GB)">
-                    <input
-                      type="number"
-                      min={1}
-                      value={config.sizeGb}
-                      onChange={(e) =>
-                        setConfig({ ...config, sizeGb: parseInt(e.target.value) || 10 })
-                      }
-                      style={inputStyle()}
-                    />
-                  </FieldGroup>
+                  {config.diskType !== 'cdrom' && (
+                    <FieldGroup label="Size (GB)">
+                      <input
+                        type="number"
+                        min={1}
+                        value={config.sizeGb}
+                        onChange={(e) =>
+                          setConfig({ ...config, sizeGb: parseInt(e.target.value) || 10 })
+                        }
+                        style={inputStyle()}
+                      />
+                    </FieldGroup>
+                  )}
 
                   <FieldGroup label="Storage class (optional)">
                     {storageClasses.length > 0 ? (
@@ -569,6 +588,7 @@ export function AddDiskWizard({
               >
                 {[
                   { label: 'Disk name', value: config.name },
+                  { label: 'Disk type', value: config.diskType === 'cdrom' ? 'CD-ROM' : 'Data Disk' },
                   { label: 'Bus type', value: config.bus },
                   {
                     label: 'Source',
@@ -577,6 +597,8 @@ export function AddDiskWizard({
                         ? 'New blank disk'
                         : config.sourceType === 'existing'
                         ? 'Existing PVC'
+                        : config.diskType === 'cdrom'
+                        ? 'ISO image'
                         : 'Clone from image',
                   },
                   ...(config.sourceType === 'existing'

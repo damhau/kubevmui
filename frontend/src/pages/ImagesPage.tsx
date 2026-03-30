@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
-import { useImages, useCreateImage, useDeleteImage, useStorageClasses } from '@/hooks/useImages'
+import { useImages, useCreateImage, useDeleteImage, useStorageClasses, useUploadImage } from '@/hooks/useImages'
 import { useSortable } from '@/hooks/useSortable'
 import { theme } from '@/lib/theme'
 import { useUIStore } from '@/stores/ui-store'
@@ -69,6 +69,7 @@ interface ImageForm {
   size_gb: number
   storage_class: string
   is_global: boolean
+  media_type: string
 }
 
 const SUGGESTIONS = [
@@ -121,8 +122,11 @@ export function ImagesPage() {
     size_gb: 20,
     storage_class: '',
     is_global: false,
+    media_type: 'disk',
   }
   const [form, setForm] = useState<ImageForm>(defaultForm)
+  const { upload: uploadImage, progress: uploadProgress, isUploading, phase: uploadPhase } = useUploadImage()
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -168,13 +172,14 @@ export function ImagesPage() {
       size_gb: 20,
       storage_class: '',
       is_global: false,
+      media_type: 'disk',
     })
   }
 
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean } | null>(null)
   const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     const payload = { ...form, source_url: form.source_url.trim() }
@@ -182,7 +187,30 @@ export function ImagesPage() {
       setShowCreate(false)
       setEditingName(null)
       setForm(defaultForm)
+      setSelectedFile(null)
     }
+
+    if (form.source_type === 'upload' && selectedFile) {
+      try {
+        await uploadImage(selectedFile, {
+          name: form.name,
+          display_name: form.display_name,
+          description: form.description,
+          os_type: form.os_type,
+          size_gb: form.size_gb,
+          storage_class: form.storage_class,
+          is_global: form.is_global,
+          media_type: form.media_type,
+        })
+        resetAndClose()
+        toast.success('Image uploaded successfully')
+      } catch (err: any) {
+        setError(err.message || 'Upload failed')
+        toast.error('Upload failed')
+      }
+      return
+    }
+
     if (editingName) {
       deleteImage.mutate(editingName, {
         onSuccess: () => {
@@ -217,6 +245,7 @@ export function ImagesPage() {
         size_gb: img.size_gb ?? 20,
         storage_class: img.storage_class || '',
         is_global: (img as any).is_global ?? false,
+        media_type: (img as any).media_type || 'disk',
       })
       setEditingName(img.name)
       setError(null)
@@ -644,26 +673,88 @@ export function ImagesPage() {
               >
                 <option value="registry">Registry</option>
                 <option value="http">HTTP</option>
-                <option value="registry">Registry</option>
+                <option value="upload">Upload</option>
               </select>
             </div>
           </div>
           <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Source URL</label>
-            <input
-              type="text"
-              value={form.source_url}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, source_url: e.target.value }))
-              }
-              placeholder={
-                form.source_type === 'registry'
-                  ? 'docker://docker.io/org/image:tag'
-                  : 'https://example.com/disk.img'
-              }
+            <label style={labelStyle}>Media Type</label>
+            <select
+              value={form.media_type}
+              onChange={(e) => setForm((f) => ({ ...f, media_type: e.target.value }))}
               style={inputStyle}
-            />
+            >
+              <option value="disk">Disk Image</option>
+              <option value="iso">ISO (CD-ROM)</option>
+            </select>
           </div>
+          {form.source_type === 'upload' ? (
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>File</label>
+              <input
+                type="file"
+                accept=".iso,.img,.qcow2,.raw"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    setSelectedFile(file)
+                    // Auto-detect media type from extension
+                    if (file.name.toLowerCase().endsWith('.iso')) {
+                      setForm((f) => ({ ...f, media_type: 'iso' }))
+                    }
+                    // Auto-set size from file size (round up to nearest GB)
+                    const sizeGb = Math.max(1, Math.ceil(file.size / (1024 * 1024 * 1024)))
+                    setForm((f) => ({ ...f, size_gb: sizeGb }))
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  background: theme.main.inputBg,
+                  border: `1px solid ${theme.main.inputBorder}`,
+                  borderRadius: theme.radius.md,
+                  color: theme.text.primary,
+                  fontSize: 13,
+                  padding: '8px 12px',
+                  fontFamily: 'inherit',
+                }}
+              />
+              {selectedFile && (
+                <div style={{ fontSize: 12, color: theme.text.secondary, marginTop: 4 }}>
+                  {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(1)} MB)
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Source URL</label>
+              <input
+                type="text"
+                value={form.source_url}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, source_url: e.target.value }))
+                }
+                placeholder={
+                  form.source_type === 'registry'
+                    ? 'docker://docker.io/org/image:tag'
+                    : 'https://example.com/disk.img'
+                }
+                style={inputStyle}
+              />
+            </div>
+          )}
+          {isUploading && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: theme.text.secondary }}>
+                  {uploadPhase === 'writing' ? 'Writing to cluster storage...' : 'Uploading to server...'}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: theme.accent }}>{uploadProgress}%</span>
+              </div>
+              <div style={{ height: 6, background: theme.main.inputBg, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${uploadProgress}%`, background: theme.accent, borderRadius: 3, transition: 'width 0.3s' }} />
+              </div>
+            </div>
+          )}
           <div
               style={{
                 display: 'grid',
@@ -758,7 +849,7 @@ export function ImagesPage() {
             </button>
             <button
               type="submit"
-              disabled={createImage.isPending || !form.name}
+              disabled={createImage.isPending || isUploading || !form.name}
               style={{
                 background: theme.button.primary,
                 border: 'none',
@@ -768,14 +859,14 @@ export function ImagesPage() {
                 fontSize: 13,
                 fontWeight: 500,
                 cursor:
-                  createImage.isPending || !form.name
+                  createImage.isPending || isUploading || !form.name
                     ? 'not-allowed'
                     : 'pointer',
                 fontFamily: 'inherit',
-                opacity: createImage.isPending || !form.name ? 0.7 : 1,
+                opacity: createImage.isPending || isUploading || !form.name ? 0.7 : 1,
               }}
             >
-              {createImage.isPending || deleteImage.isPending ? 'Saving...' : editingName ? 'Save Image' : 'Add Image'}
+              {uploadPhase === 'writing' ? 'Writing to cluster...' : isUploading ? 'Uploading...' : createImage.isPending || deleteImage.isPending ? 'Saving...' : editingName ? 'Save Image' : 'Add Image'}
             </button>
           </div>
         </form>

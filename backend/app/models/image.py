@@ -9,7 +9,8 @@ class Image(BaseModel):
     display_name: str
     description: str = ""
     os_type: str = ""  # linux, windows
-    source_type: str = ""  # container_disk, http, pvc, registry
+    media_type: str = "disk"  # disk, iso
+    source_type: str = ""  # container_disk, http, pvc, registry, upload
     source_url: str = ""  # container image URL or HTTP URL
     size_gb: int = 20
     storage_class: str = ""
@@ -26,6 +27,7 @@ class ImageCreate(BaseModel):
     display_name: str
     description: str = ""
     os_type: str = "linux"
+    media_type: str = "disk"
     source_type: str = "container_disk"
     source_url: str = ""
     size_gb: int = 20
