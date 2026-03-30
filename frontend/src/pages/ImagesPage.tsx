@@ -98,6 +98,15 @@ const SUGGESTIONS = [
     source_type: 'http',
     source_url: 'https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img',
   },
+  {
+    label: 'VirtIO Drivers (Container Disk)',
+    name: 'virtio-drivers',
+    display_name: 'VirtIO Drivers',
+    os_type: 'windows',
+    source_type: 'container_disk',
+    source_url: 'kubevirt/virtio-container-disk',
+    media_type: 'iso',
+  },
 ]
 
 export function ImagesPage() {
@@ -173,7 +182,7 @@ export function ImagesPage() {
       size_gb: 20,
       storage_class: '',
       is_global: false,
-      media_type: 'disk',
+      media_type: ('media_type' in s ? s.media_type : 'disk') as string,
     })
   }
 
@@ -676,6 +685,7 @@ export function ImagesPage() {
                 <option value="registry">Registry</option>
                 <option value="http">HTTP</option>
                 <option value="upload">Upload</option>
+                <option value="container_disk">Container Disk</option>
               </select>
             </div>
           </div>
@@ -728,7 +738,7 @@ export function ImagesPage() {
             </div>
           ) : (
             <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Source URL</label>
+              <label style={labelStyle}>{form.source_type === 'container_disk' ? 'Container Image' : 'Source URL'}</label>
               <input
                 type="text"
                 value={form.source_url}
@@ -738,10 +748,17 @@ export function ImagesPage() {
                 placeholder={
                   form.source_type === 'registry'
                     ? 'docker://docker.io/org/image:tag'
-                    : 'https://example.com/disk.img'
+                    : form.source_type === 'container_disk'
+                      ? 'registry.io/image:tag'
+                      : 'https://example.com/disk.img'
                 }
                 style={inputStyle}
               />
+              {form.source_type === 'container_disk' && (
+                <div style={{ fontSize: 11, color: theme.text.secondary, marginTop: 4 }}>
+                  Container disk images are used directly by KubeVirt — no storage is provisioned.
+                </div>
+              )}
             </div>
           )}
           {isUploading && (
@@ -757,6 +774,7 @@ export function ImagesPage() {
               </div>
             </div>
           )}
+          {form.source_type !== 'container_disk' && (
           <div
               style={{
                 display: 'grid',
@@ -795,6 +813,7 @@ export function ImagesPage() {
                 </select>
               </div>
             </div>
+          )}
 
             <div style={{ marginTop: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: theme.text.primary, cursor: 'pointer' }}>

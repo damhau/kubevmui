@@ -212,6 +212,7 @@ def add_disk_to_spec(
         source_type=body.source_type,
         image_name=body.image_name,
         image_namespace=body.image_namespace,
+        image=body.image,
     )
     return {"status": "ok"}
 

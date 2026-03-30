@@ -17,7 +17,7 @@ interface AddDiskWizardProps {
   activeCluster: string
 }
 
-type SourceType = 'blank' | 'existing' | 'clone'
+type SourceType = 'blank' | 'existing' | 'clone' | 'container_disk'
 
 interface DiskConfig {
   name: string
@@ -29,6 +29,7 @@ interface DiskConfig {
   pvcName: string
   imageName: string
   imageNamespace: string
+  containerDiskImage: string
 }
 
 const STEPS = [
@@ -138,6 +139,7 @@ export function AddDiskWizard({
     pvcName: '',
     imageName: '',
     imageNamespace: namespace,
+    containerDiskImage: '',
   })
 
   const isRunning = vmStatus === 'Running'
@@ -170,6 +172,7 @@ export function AddDiskWizard({
       pvcName: '',
       imageName: '',
       imageNamespace: namespace,
+      containerDiskImage: '',
     })
     onClose()
   }
@@ -216,14 +219,15 @@ export function AddDiskWizard({
           disk: {
             name: config.name.trim(),
             bus: config.bus,
-            source_type: config.sourceType,
+            source_type: config.sourceType === 'container_disk' ? 'container_disk' : config.sourceType,
             disk_type: config.diskType,
-            size_gb: config.sourceType !== 'existing' && config.diskType !== 'cdrom' ? config.sizeGb : undefined,
-            storage_class: config.storageClass || undefined,
+            size_gb: config.sourceType !== 'existing' && config.sourceType !== 'container_disk' && config.diskType !== 'cdrom' ? config.sizeGb : undefined,
+            storage_class: config.sourceType !== 'container_disk' ? config.storageClass || undefined : undefined,
             pvc_name: config.sourceType === 'existing' ? config.pvcName : undefined,
             image_name: config.sourceType === 'clone' ? config.imageName : undefined,
             image_namespace:
               config.sourceType === 'clone' ? config.imageNamespace || namespace : undefined,
+            image: config.sourceType === 'container_disk' ? config.containerDiskImage : undefined,
           },
         },
         {
@@ -485,7 +489,7 @@ export function AddDiskWizard({
                 </FieldGroup>
               )}
 
-              {config.sourceType === 'clone' && (
+              {(config.sourceType === 'clone' || config.sourceType === 'container_disk') && (
                 <>
                   <FieldGroup label={config.diskType === 'cdrom' ? 'ISO Image' : 'Source image'}>
                     {(() => {
@@ -494,20 +498,34 @@ export function AddDiskWizard({
                         : images
                       return filteredImages.length > 0 ? (
                         <select
-                          value={config.imageName}
+                          value={config.sourceType === 'container_disk' ? config.containerDiskImage : config.imageName}
                           onChange={(e) => {
-                            const img = filteredImages.find((i) => i.name === e.target.value)
-                            setConfig({
-                              ...config,
-                              imageName: e.target.value,
-                              imageNamespace: img?.namespace || namespace,
-                            })
+                            const img = filteredImages.find((i: any) =>
+                              i.source_type === 'container_disk' ? i.source_url === e.target.value : i.name === e.target.value
+                            )
+                            if ((img as any)?.source_type === 'container_disk') {
+                              setConfig({
+                                ...config,
+                                sourceType: 'container_disk',
+                                containerDiskImage: (img as any).source_url,
+                                imageName: '',
+                                imageNamespace: namespace,
+                              })
+                            } else {
+                              setConfig({
+                                ...config,
+                                sourceType: 'clone',
+                                imageName: e.target.value,
+                                imageNamespace: img?.namespace || namespace,
+                                containerDiskImage: '',
+                              })
+                            }
                           }}
                           style={inputStyle()}
                         >
                           <option value="">{config.diskType === 'cdrom' ? 'Select an ISO image...' : 'Select an image...'}</option>
-                          {filteredImages.map((img) => (
-                            <option key={`${img.namespace}/${img.name}`} value={img.name}>
+                          {filteredImages.map((img: any) => (
+                            <option key={`${img.namespace}/${img.name}`} value={img.source_type === 'container_disk' ? img.source_url : img.name}>
                               {img.display_name || img.name}{' '}
                               {img.namespace !== namespace ? `(${img.namespace})` : ''}
                             </option>
@@ -598,6 +616,8 @@ export function AddDiskWizard({
                         ? 'New blank disk'
                         : config.sourceType === 'existing'
                         ? 'Existing PVC'
+                        : config.sourceType === 'container_disk'
+                        ? 'Container disk'
                         : config.diskType === 'cdrom'
                         ? 'ISO image'
                         : 'Clone from image',
@@ -611,10 +631,13 @@ export function AddDiskWizard({
                         { label: 'Image namespace', value: config.imageNamespace || namespace },
                       ]
                     : []),
-                  ...(config.sourceType !== 'existing'
+                  ...(config.sourceType === 'container_disk'
+                    ? [{ label: 'Container image', value: config.containerDiskImage }]
+                    : []),
+                  ...(config.sourceType !== 'existing' && config.sourceType !== 'container_disk'
                     ? [{ label: 'Size', value: `${config.sizeGb} GB` }]
                     : []),
-                  ...(config.storageClass && config.sourceType !== 'existing'
+                  ...(config.storageClass && config.sourceType !== 'existing' && config.sourceType !== 'container_disk'
                     ? [{ label: 'Storage class', value: config.storageClass }]
                     : []),
                   {

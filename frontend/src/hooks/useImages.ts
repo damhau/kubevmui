@@ -58,6 +58,8 @@ export function useCreateImage() {
       source_url?: string
       size_gb?: number
       storage_class?: string
+      media_type?: string
+      is_global?: boolean
     }) => {
       const { data } = await apiClient.post(
         `/clusters/${activeCluster}/namespaces/${ns}/images`,
