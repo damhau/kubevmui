@@ -507,6 +507,7 @@ export function ImagesPage() {
                     </td>
                     <td className="table-cell" style={{ minWidth: 160 }}>
                       {(() => {
+                        if (img.source_type === 'container_disk') return <Badge label="Ready" color={theme.status.running} />
                         const phase = img.dv_phase || 'Pending'
                         const progress = img.dv_progress && img.dv_progress !== 'N/A' ? img.dv_progress : null
                         const pct = progress ? parseFloat(progress.replace('%', '')) : 0
