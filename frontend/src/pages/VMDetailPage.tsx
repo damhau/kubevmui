@@ -6,7 +6,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
-import { useRemoveVolume, useRemoveInterface } from '@/hooks/useHotplug'
+import { useRemoveVolume, useRemoveDiskFromSpec, useRemoveInterface } from '@/hooks/useHotplug'
 import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
@@ -169,6 +169,7 @@ export function VMDetailPage() {
   const deleteSnapshot = useDeleteSnapshot()
   const restoreSnapshot = useRestoreSnapshot()
   const removeVolume = useRemoveVolume()
+  const removeDiskFromSpec = useRemoveDiskFromSpec()
   const removeInterface = useRemoveInterface()
   const [showAddDisk, setShowAddDisk] = useState(false)
   const [showAddNic, setShowAddNic] = useState(false)
@@ -1094,28 +1095,41 @@ export function VMDetailPage() {
                             {disk.bus ?? '—'}
                           </td>
                           <td className="table-cell">
-                            {vm.status === 'Running' && (
+                            {(vm.status === 'Running' || vm.status === 'Stopped') && (
                               <button
                                 onClick={() => {
                                   if (!namespace || !name) return
+                                  const isRunning = vm.status === 'Running'
                                   setConfirmAction({
                                     title: 'Remove Disk',
-                                    message: `Remove disk "${disk.name}" from VM "${name}"?`,
+                                    message: isRunning
+                                      ? `Hot-remove disk "${disk.name}" from running VM "${name}"? This only works for hotplugged disks.`
+                                      : `Remove disk "${disk.name}" from VM "${name}" spec?`,
                                     danger: true,
                                     confirmLabel: 'Remove',
                                     onConfirm: () => {
-                                      removeVolume.mutate(
-                                        { namespace, vmName: name, volName: disk.name },
-                                        {
-                                          onSuccess: () => toast.success('Disk removed'),
-                                          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove disk')),
-                                        },
-                                      )
+                                      if (isRunning) {
+                                        removeVolume.mutate(
+                                          { namespace, vmName: name, volName: disk.name },
+                                          {
+                                            onSuccess: () => toast.success('Disk removed'),
+                                            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove disk')),
+                                          },
+                                        )
+                                      } else {
+                                        removeDiskFromSpec.mutate(
+                                          { namespace, vmName: name, diskName: disk.name },
+                                          {
+                                            onSuccess: () => toast.success('Disk removed from spec'),
+                                            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove disk')),
+                                          },
+                                        )
+                                      }
                                       setConfirmAction(null)
                                     },
                                   })
                                 }}
-                                disabled={removeVolume.isPending}
+                                disabled={removeVolume.isPending || removeDiskFromSpec.isPending}
                                 style={{
                                   background: 'rgba(239,68,68,0.08)',
                                   color: theme.status.error,
@@ -1123,7 +1137,7 @@ export function VMDetailPage() {
                                   borderRadius: theme.radius.md,
                                   padding: '3px 8px',
                                   fontSize: 11,
-                                  cursor: removeVolume.isPending ? 'not-allowed' : 'pointer',
+                                  cursor: removeVolume.isPending || removeDiskFromSpec.isPending ? 'not-allowed' : 'pointer',
                                   fontFamily: 'inherit',
                                   fontWeight: 500,
                                 }}

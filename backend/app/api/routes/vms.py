@@ -215,6 +215,20 @@ def add_disk_to_spec(
     return {"status": "ok"}
 
 
+@router.delete("/vms/{name}/disks/{disk_name}", status_code=200)
+def remove_disk_from_spec(
+    cluster: str,
+    ns: str,
+    name: str,
+    disk_name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    svc.remove_disk_from_spec(ns, name, disk_name)
+    return {"status": "ok"}
+
+
 @router.post("/vms/{name}/nics", status_code=200)
 def add_interface_to_spec(
     cluster: str,

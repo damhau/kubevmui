@@ -835,6 +835,38 @@ class VMService:
         }
         self.kv.patch_vm(namespace, vm_name, body)
 
+    def remove_disk_from_spec(self, namespace: str, vm_name: str, disk_name: str) -> None:
+        """Remove a disk from a stopped VM's spec via JSON merge patch."""
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            return
+        spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+        disks = spec.get("domain", {}).get("devices", {}).get("disks", [])
+        volumes = spec.get("volumes", [])
+        dv_templates = vm_raw.get("spec", {}).get("dataVolumeTemplates", [])
+
+        # Find the volume to identify its backing DataVolume name
+        volume = next((v for v in volumes if v.get("name") == disk_name), None)
+        dv_name = volume.get("dataVolume", {}).get("name") if volume else None
+
+        disks = [d for d in disks if d.get("name") != disk_name]
+        volumes = [v for v in volumes if v.get("name") != disk_name]
+        if dv_name:
+            dv_templates = [t for t in dv_templates if t.get("metadata", {}).get("name") != dv_name]
+
+        body = {
+            "spec": {
+                "dataVolumeTemplates": dv_templates,
+                "template": {
+                    "spec": {
+                        "domain": {"devices": {"disks": disks}},
+                        "volumes": volumes,
+                    }
+                },
+            }
+        }
+        self.kv.patch_vm(namespace, vm_name, body)
+
     def force_stop(self, namespace: str, name: str) -> None:
         """Force stop by patching runStrategy to Halted."""
         body = {"spec": {"runStrategy": "Halted"}}
