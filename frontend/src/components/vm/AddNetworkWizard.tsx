@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { theme } from '@/lib/theme'
 import { toast } from '@/components/ui/Toast'
-import { useNetworks } from '@/hooks/useNetworks'
+import { useNetworkCRs, type NetworkCR } from '@/hooks/useNetworkCRs'
 import { useAddInterface, useAddInterfaceToSpec } from '@/hooks/useHotplug'
 
 interface AddNetworkWizardProps {
@@ -14,18 +14,15 @@ interface AddNetworkWizardProps {
   existingNicCount: number
 }
 
-type IfaceType = 'pod' | 'multus'
-
 interface NicConfig {
   name: string
-  ifaceType: IfaceType
+  networkCR: string
   model: string
   macAddress: string
-  nadName: string
 }
 
 const STEPS = [
-  { id: 1, label: 'Type' },
+  { id: 1, label: 'Network' },
   { id: 2, label: 'Configure' },
   { id: 3, label: 'Review' },
 ]
@@ -124,56 +121,53 @@ export function AddNetworkWizard({
   const [step, setStep] = useState(1)
   const [config, setConfig] = useState<NicConfig>({
     name: `net${existingNicCount + 1}`,
-    ifaceType: 'multus',
+    networkCR: '',
     model: 'virtio',
     macAddress: '',
-    nadName: '',
   })
 
   const isRunning = vmStatus === 'Running'
 
-  const { data: networksData } = useNetworks()
+  const { data: networkCRsData } = useNetworkCRs()
+  const networkCRs: NetworkCR[] = networkCRsData?.items || []
   const addInterface = useAddInterface()
   const addInterfaceToSpec = useAddInterfaceToSpec()
 
-  const nads: { name: string; namespace: string }[] = Array.isArray(networksData?.items)
-    ? networksData.items.filter((n: any) => n.namespace === namespace)
-    : []
+  const selectedNetwork = networkCRs.find((n) => n.name === config.networkCR)
 
   function resetAndClose() {
     setStep(1)
     setConfig({
       name: `net${existingNicCount + 1}`,
-      ifaceType: 'multus',
+      networkCR: '',
       model: 'virtio',
       macAddress: '',
-      nadName: '',
     })
     onClose()
   }
 
   function canProceedStep1() {
-    // For running VMs, only multus is supported
-    if (isRunning && config.ifaceType === 'pod') return false
+    if (!config.networkCR) return false
+    // For running VMs, pod network cannot be hotplugged
+    if (isRunning && selectedNetwork?.network_type === 'pod') return false
     return true
   }
 
   function canProceedStep2() {
     if (!config.name.trim()) return false
-    if (config.ifaceType === 'multus' && !config.nadName) return false
     return true
   }
 
   function handleSubmit() {
     if (isRunning) {
-      // Hotplug: only multus supported
-      if (!config.nadName.trim() || !namespace || !vmName) return
+      // Hotplug: backend resolves network_cr to the appropriate NAD
+      if (!config.networkCR || !namespace || !vmName) return
       addInterface.mutate(
         {
           namespace,
           vmName,
           name: config.name.trim(),
-          nadName: config.nadName.trim(),
+          networkCR: config.networkCR,
         },
         {
           onSuccess: () => {
@@ -192,8 +186,7 @@ export function AddNetworkWizard({
           vmName,
           iface: {
             name: config.name.trim(),
-            type: config.ifaceType,
-            nad_name: config.ifaceType === 'multus' ? config.nadName.trim() : undefined,
+            network_cr: config.networkCR,
             model: config.model || undefined,
             mac_address: config.macAddress.trim() || undefined,
           },
@@ -345,7 +338,7 @@ export function AddNetworkWizard({
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          {/* Step 1: Type selection */}
+          {/* Step 1: Network selection */}
           {step === 1 && (
             <div>
               {isRunning && (
@@ -360,29 +353,40 @@ export function AddNetworkWizard({
                     marginBottom: 16,
                   }}
                 >
-                  <strong>VM is running.</strong> Only Multus (bridge) interfaces can be hotplugged to a running VM. Pod network requires stopping the VM.
+                  <strong>VM is running.</strong> Only bridge interfaces can be hotplugged. Pod network requires a VM restart.
                 </div>
               )}
 
               <div style={{ fontSize: 13, color: theme.text.secondary, marginBottom: 16 }}>
-                Choose the network interface type:
+                Select a network:
               </div>
 
-              <RadioCard
-                selected={config.ifaceType === 'pod'}
-                disabled={isRunning}
-                onClick={() => setConfig({ ...config, ifaceType: 'pod' })}
-                icon="🌐"
-                title="Pod network"
-                description="Default pod network using masquerade NAT. Provides internet access via the node's network."
-              />
-              <RadioCard
-                selected={config.ifaceType === 'multus'}
-                onClick={() => setConfig({ ...config, ifaceType: 'multus' })}
-                icon="🔗"
-                title="Multus (bridge)"
-                description="Attach to an existing NetworkAttachmentDefinition. Required for VLANs, SR-IOV, or custom CNIs."
-              />
+              {networkCRs.length === 0 && (
+                <div style={{ fontSize: 13, color: theme.text.secondary, padding: '24px 0', textAlign: 'center' }}>
+                  No networks available. Create a Network CR first.
+                </div>
+              )}
+
+              {networkCRs.map((net) => {
+                const isPod = net.network_type === 'pod'
+                const disabled = isRunning && isPod
+                return (
+                  <RadioCard
+                    key={net.name}
+                    selected={config.networkCR === net.name}
+                    disabled={disabled}
+                    onClick={() => setConfig({ ...config, networkCR: net.name })}
+                    icon={isPod ? '🌐' : '🔗'}
+                    title={net.display_name}
+                    description={
+                      (disabled ? 'Requires VM restart. ' : '') +
+                      (net.description || `${net.interface_type} interface`) +
+                      (net.bridge_name ? ` (bridge: ${net.bridge_name})` : '') +
+                      (net.vlan_id != null ? ` (VLAN ${net.vlan_id})` : '')
+                    }
+                  />
+                )
+              })}
             </div>
           )}
 
@@ -422,33 +426,6 @@ export function AddNetworkWizard({
                   placeholder="e.g. 02:00:00:00:00:01"
                 />
               </FieldGroup>
-
-              {config.ifaceType === 'multus' && (
-                <FieldGroup label="Network Attachment Definition">
-                  {nads.length > 0 ? (
-                    <select
-                      value={config.nadName}
-                      onChange={(e) => setConfig({ ...config, nadName: e.target.value })}
-                      style={inputStyle()}
-                    >
-                      <option value="">Select a NAD...</option>
-                      {nads.map((nad) => (
-                        <option key={nad.name} value={nad.name}>
-                          {nad.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={config.nadName}
-                      onChange={(e) => setConfig({ ...config, nadName: e.target.value })}
-                      style={inputStyle()}
-                      placeholder="Enter NAD name"
-                    />
-                  )}
-                </FieldGroup>
-              )}
             </div>
           )}
 
@@ -470,12 +447,15 @@ export function AddNetworkWizard({
                 {[
                   { label: 'Interface name', value: config.name },
                   {
-                    label: 'Type',
-                    value: config.ifaceType === 'pod' ? 'Pod network (masquerade)' : 'Multus (bridge)',
+                    label: 'Network',
+                    value: selectedNetwork?.display_name || config.networkCR,
+                  },
+                  {
+                    label: 'Interface type',
+                    value: selectedNetwork?.interface_type || '-',
                   },
                   { label: 'NIC model', value: config.model || 'virtio' },
                   ...(config.macAddress ? [{ label: 'MAC address', value: config.macAddress }] : []),
-                  ...(config.ifaceType === 'multus' ? [{ label: 'NAD name', value: config.nadName }] : []),
                   {
                     label: 'Method',
                     value: isRunning ? 'Hotplug (live attach)' : 'Patch VM spec (requires stopped VM)',

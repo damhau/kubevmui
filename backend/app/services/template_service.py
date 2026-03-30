@@ -37,23 +37,34 @@ def _cr_to_template(raw: dict) -> Template:
     # Map CRD disk fields (camelCase) to our model (snake_case)
     disks = []
     for d in spec.get("disks", []):
-        disks.append({
-            "name": d.get("name", ""),
-            "size_gb": d.get("sizeGb", 0),
-            "bus": d.get("bus", "virtio"),
-            "source_type": d.get("sourceType", ""),
-            "image": d.get("image", ""),
-            "clone_source": d.get("cloneSource", ""),
-            "clone_namespace": d.get("cloneNamespace", ""),
-            "storage_class": d.get("storageClass", ""),
-        })
+        disks.append(
+            {
+                "name": d.get("name", ""),
+                "size_gb": d.get("sizeGb", 0),
+                "bus": d.get("bus", "virtio"),
+                "source_type": d.get("sourceType", ""),
+                "image": d.get("image", ""),
+                "clone_source": d.get("cloneSource", ""),
+                "clone_namespace": d.get("cloneNamespace", ""),
+                "storage_class": d.get("storageClass", ""),
+            }
+        )
 
     networks = []
     for n in spec.get("networks", []):
-        networks.append({
-            "name": n.get("name", ""),
-            "network_profile": n.get("networkProfile", ""),
-        })
+        # Read networkCR first, fall back to networkProfile for backward compat
+        network_cr = n.get("networkCR", "")
+        if not network_cr:
+            # Migrate legacy: networkProfile "pod" -> "pod-network", others stay as-is
+            legacy = n.get("networkProfile", "")
+            network_cr = "pod-network" if legacy == "pod" else legacy
+        networks.append(
+            {
+                "name": n.get("name", ""),
+                "network_cr": network_cr,
+                "network_profile": network_cr,  # keep for backward compat
+            }
+        )
 
     return Template(
         name=metadata.get("name", ""),
@@ -70,7 +81,6 @@ def _cr_to_template(raw: dict) -> Template:
         networks=networks,
         cloud_init_user_data=cloud_init.get("userData"),
         cloud_init_network_data=cloud_init.get("networkData"),
-        autoattach_pod_interface=spec.get("autoattachPodInterface", True),
         is_global=spec.get("global", False),
     )
 
@@ -141,14 +151,13 @@ class TemplateService:
                     for d in disks
                 ],
                 "networks": [
-                    {"name": n.get("name", ""), "networkProfile": n.get("network_profile", "")}
+                    {"name": n.get("name", ""), "networkCR": n.get("network_cr", "")}
                     for n in networks
                 ],
                 "cloudInit": {
                     "userData": request.cloud_init_user_data,
                     "networkData": request.cloud_init_network_data,
                 },
-                "autoattachPodInterface": request.autoattach_pod_interface,
                 "global": request.is_global,
             },
         }
@@ -195,7 +204,7 @@ class TemplateService:
                 "networks": [
                     {
                         "name": n.get("name", ""),
-                        "networkProfile": n.get("network_profile", ""),
+                        "networkCR": n.get("network_cr", ""),
                     }
                     for n in networks
                 ],
@@ -203,7 +212,6 @@ class TemplateService:
                     "userData": request.cloud_init_user_data,
                     "networkData": request.cloud_init_network_data,
                 },
-                "autoattachPodInterface": request.autoattach_pod_interface,
                 "global": request.is_global,
             },
         }

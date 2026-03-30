@@ -143,7 +143,7 @@ class CatalogService:
                     )
                 ],
                 networks=[
-                    VMNetworkRef(name="default", network_profile="pod"),
+                    VMNetworkRef(name="default", network_cr="pod-network"),
                 ],
                 cloud_init_user_data=entry.cloud_init_user_data,
                 is_global=request.is_global,
@@ -211,9 +211,7 @@ class CatalogService:
                     logger.warning("Failed to seed catalog entry: %s", entry_name, exc_info=True)
         return created
 
-    def _add_catalog_label(
-        self, namespace: str, plural: str, name: str, entry_name: str
-    ) -> None:
+    def _add_catalog_label(self, namespace: str, plural: str, name: str, entry_name: str) -> None:
         """Patch a namespaced resource to add the catalog label."""
         try:
             self.kv.custom_api.patch_namespaced_custom_object(

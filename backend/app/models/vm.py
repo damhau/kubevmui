@@ -20,7 +20,8 @@ class VMDiskRef(BaseModel):
 
 class VMNetworkRef(BaseModel):
     name: str
-    network_profile: str
+    network_cr: str = ""  # Name of the Network CR (new abstraction)
+    network_profile: str = ""  # Legacy: raw multus networkName or "pod" (read from existing VMs)
     ip_address: str | None = None
     mac_address: str | None = None
 
@@ -89,7 +90,6 @@ class VMCreate(BaseModel):
     node_selector: dict[str, str] = {}
     tolerations: list[dict] = []
     eviction_strategy: str | None = None  # "LiveMigrate" or None
-    autoattach_pod_interface: bool = True
 
 
 class AddDiskToSpecRequest(BaseModel):
@@ -116,13 +116,12 @@ class RemoveVolumeRequest(BaseModel):
 
 class AddInterfaceRequest(BaseModel):
     name: str
-    network_attachment_definition: str
+    network_cr: str  # Name of the Network CR
 
 
 class AddInterfaceToSpecRequest(BaseModel):
     name: str
-    type: str = "pod"  # "pod" or "multus"
-    nad_name: str | None = None
+    network_cr: str  # Name of the Network CR
     model: str | None = None
     mac_address: str | None = None
 

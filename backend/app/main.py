@@ -15,6 +15,7 @@ from app.api.routes import (
     metrics,
     migrations,
     namespaces,
+    network_crs,
     networks,
     nmstate,
     nodes,
@@ -43,29 +44,49 @@ async def lifespan(app: FastAPI):
     # Seed default catalog entries
     try:
         from app.services.catalog_service import CatalogService
+
         api_client = cm.get_api_client("local")
         if api_client:
             svc = CatalogService(KubeVirtClient(api_client))
             count = svc.seed_defaults()
             if count:
                 import logging
+
                 logging.getLogger(__name__).info("Seeded %d catalog entries", count)
     except Exception:
         import logging
+
         logging.getLogger(__name__).warning("Failed to seed catalog entries", exc_info=True)
+    # Seed default pod-network CR
+    try:
+        from app.services.network_cr_service import NetworkCRService
+
+        if api_client:
+            net_svc = NetworkCRService(KubeVirtClient(api_client))
+            if net_svc.seed_pod_network():
+                import logging
+
+                logging.getLogger(__name__).info("Seeded default pod-network CR")
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).warning("Failed to seed pod-network CR", exc_info=True)
     yield
 
 
 def create_app() -> FastAPI:
     application = FastAPI(
-        title="kubevmui API", version="0.1.0",
+        title="kubevmui API",
+        version="0.1.0",
         description="KubeVirt virtualization control plane",
         lifespan=lifespan,
     )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @application.get("/api/v1/health")
@@ -81,6 +102,7 @@ def create_app() -> FastAPI:
     application.include_router(migrations.router)
     application.include_router(ssh_keys.router)
     application.include_router(vms.router)
+    application.include_router(network_crs.router)
     application.include_router(networks.router)
     application.include_router(nmstate.router)
     application.include_router(networks_cluster_router)

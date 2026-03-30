@@ -63,10 +63,10 @@ export function useAddInterface() {
   const queryClient = useQueryClient()
   const { activeCluster } = useUIStore()
   return useMutation({
-    mutationFn: async ({ namespace, vmName, name, nadName }: { namespace: string; vmName: string; name: string; nadName: string }) => {
+    mutationFn: async ({ namespace, vmName, name, networkCR }: { namespace: string; vmName: string; name: string; networkCR: string }) => {
       const { data } = await apiClient.post(
         `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/interfaces`,
-        { name, network_attachment_definition: nadName }
+        { name, network_cr: networkCR }
       )
       return data
     },
@@ -101,7 +101,7 @@ export function useAddInterfaceToSpec() {
     mutationFn: async ({ namespace, vmName, iface }: {
       namespace: string
       vmName: string
-      iface: { name: string; type: string; nad_name?: string; model?: string; mac_address?: string }
+      iface: { name: string; network_cr: string; model?: string; mac_address?: string }
     }) => {
       const { data } = await apiClient.post(
         `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/nics`,

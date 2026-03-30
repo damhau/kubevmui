@@ -16,6 +16,7 @@ from app.models.vm import (
     VMList,
     VMPatchRequest,
 )
+from app.services.network_cr_service import NetworkCRService
 from app.services.vm_service import VMService
 
 router = APIRouter(
@@ -31,6 +32,14 @@ def _get_service(cluster: str, cm: ClusterManager) -> VMService:
     if api_client is None:
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
     return VMService(KubeVirtClient(api_client))
+
+
+def _get_services(cluster: str, cm: ClusterManager) -> tuple[VMService, NetworkCRService]:
+    api_client = cm.get_api_client(cluster)
+    if api_client is None:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
+    kv = KubeVirtClient(api_client)
+    return VMService(kv), NetworkCRService(kv)
 
 
 @router.get("/vms", response_model=VMList)
@@ -83,8 +92,8 @@ def create_vm(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc = _get_service(cluster, cm)
-    result = svc.create_vm(body)
+    svc, net_cr_svc = _get_services(cluster, cm)
+    result = svc.create_vm(body, net_cr_svc=net_cr_svc)
     audit_svc = get_audit_service()
     audit_svc.record(
         username=_user.username,
@@ -214,13 +223,13 @@ def add_interface_to_spec(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc = _get_service(cluster, cm)
+    svc, net_cr_svc = _get_services(cluster, cm)
     svc.add_interface_to_spec(
         ns,
         name,
         iface_name=body.name,
-        iface_type=body.type,
-        nad_name=body.nad_name,
+        network_cr_name=body.network_cr,
+        net_cr_svc=net_cr_svc,
         model=body.model,
         mac_address=body.mac_address,
     )
@@ -291,8 +300,11 @@ def add_interface(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc = _get_service(cluster, cm)
-    svc.add_interface(ns, name, body.name, body.network_attachment_definition)
+    svc, net_cr_svc = _get_services(cluster, cm)
+    # Ensure NAD exists before hotplugging
+    nad_name = net_cr_svc.ensure_nad(ns, body.network_cr)
+    if nad_name:
+        svc.add_interface(ns, name, body.name, nad_name)
     return {"status": "ok"}
 
 

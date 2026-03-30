@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from app.core.k8s_client import KubeVirtClient
 from app.models.common import HealthStatus, VMStatus
 from app.models.vm import VM, VMCompute, VMCreate, VMDiskRef, VMEvent, VMNetworkRef
+
+if TYPE_CHECKING:
+    from app.services.network_cr_service import NetworkCRService
 
 
 def _parse_memory_to_gi(size_str: str) -> int:
@@ -177,15 +183,20 @@ def _extract_networks(vm: dict, vmi: dict | None) -> list[VMNetworkRef]:
         name = iface.get("name", "")
         net = net_map.get(name, {})
         network_profile = ""
+        network_cr = ""
         if "multus" in net:
             network_profile = net["multus"].get("networkName", "")
+            # Network CR name matches the NAD name created by ensure_nad
+            network_cr = network_profile
         elif "pod" in net:
             network_profile = "pod"
+            network_cr = "pod-network"
 
         vmi_iface = vmi_ifaces.get(name, {})
         networks.append(
             VMNetworkRef(
                 name=name,
+                network_cr=network_cr,
                 network_profile=network_profile,
                 ip_address=vmi_iface.get("ipAddress"),
                 mac_address=vmi_iface.get("mac") or iface.get("macAddress"),
@@ -250,7 +261,11 @@ def _vm_from_raw(vm: dict, vmi: dict | None, single_node: bool = False) -> VM:
     )
 
 
-def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict:
+def _build_manifest(
+    request: VMCreate,
+    kv: KubeVirtClient | None = None,
+    net_cr_svc: NetworkCRService | None = None,
+) -> dict:
     """Build a KubeVirt VirtualMachine manifest from a VMCreate request."""
     disks = []
     volumes = []
@@ -373,21 +388,30 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
 
     interfaces = []
     networks = []
+    has_pod_network = False
     for net_ref in request.networks:
         iface: dict = {"name": net_ref.name}
         if net_ref.mac_address:
             iface["macAddress"] = net_ref.mac_address
-        if net_ref.network_profile == "pod":
+
+        # Determine network type from Network CR if available
+        net_type = "pod" if net_ref.network_cr == "pod-network" else "multus"
+        if net_cr_svc and net_ref.network_cr:
+            cr = net_cr_svc.kv.get_network_cr(net_ref.network_cr)
+            if cr:
+                net_type = cr.get("spec", {}).get("networkType", "multus")
+
+        if net_type == "pod":
+            has_pod_network = True
             iface["masquerade"] = {}
             networks.append({"name": net_ref.name, "pod": {}})
         else:
             iface["bridge"] = {}
-            networks.append(
-                {
-                    "name": net_ref.name,
-                    "multus": {"networkName": net_ref.network_profile},
-                }
-            )
+            # Ensure NAD exists in the target namespace
+            nad_name = net_ref.network_cr
+            if net_cr_svc and net_ref.network_cr:
+                nad_name = net_cr_svc.ensure_nad(request.namespace, net_ref.network_cr) or nad_name
+            networks.append({"name": net_ref.name, "multus": {"networkName": nad_name}})
         interfaces.append(iface)
 
     labels = {**request.labels}
@@ -415,7 +439,8 @@ def _build_manifest(request: VMCreate, kv: KubeVirtClient | None = None) -> dict
         },
     }
 
-    if not request.autoattach_pod_interface:
+    # Auto-derive autoattachPodInterface: disable if no pod network is selected
+    if not has_pod_network:
         domain["devices"]["autoattachPodInterface"] = False
 
     if request.firmware_boot_mode:
@@ -578,8 +603,8 @@ class VMService:
         manifest = _build_manifest(request, self.kv)
         return [manifest]
 
-    def create_vm(self, request: VMCreate) -> VM:
-        manifest = _build_manifest(request, self.kv)
+    def create_vm(self, request: VMCreate, net_cr_svc: NetworkCRService | None = None) -> VM:
+        manifest = _build_manifest(request, self.kv, net_cr_svc=net_cr_svc)
         raw = self.kv.create_vm(request.namespace, manifest)
         return _vm_from_raw(raw, None)
 
@@ -656,8 +681,8 @@ class VMService:
         namespace: str,
         vm_name: str,
         iface_name: str,
-        iface_type: str = "pod",
-        nad_name: str | None = None,
+        network_cr_name: str,
+        net_cr_svc: NetworkCRService | None = None,
         model: str | None = None,
         mac_address: str | None = None,
     ) -> None:
@@ -672,12 +697,24 @@ class VMService:
         iface_entry: dict = {"name": iface_name}
         if mac_address:
             iface_entry["macAddress"] = mac_address
-        if iface_type == "pod":
+
+        # Look up the Network CR to determine type
+        network_type = "pod" if network_cr_name == "pod-network" else "multus"
+        if net_cr_svc:
+            cr = net_cr_svc.kv.get_network_cr(network_cr_name)
+            if cr:
+                network_type = cr.get("spec", {}).get("networkType", "pod")
+
+        if network_type == "pod":
             iface_entry["masquerade"] = {}
             networks.append({"name": iface_name, "pod": {}})
         else:
             iface_entry["bridge"] = {}
-            networks.append({"name": iface_name, "multus": {"networkName": nad_name or ""}})
+            nad_name = network_cr_name
+            if net_cr_svc:
+                nad_name = net_cr_svc.ensure_nad(namespace, network_cr_name) or network_cr_name
+            networks.append({"name": iface_name, "multus": {"networkName": nad_name}})
+
         if model:
             iface_entry["model"] = model
         interfaces.append(iface_entry)

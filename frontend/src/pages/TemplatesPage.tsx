@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/useTemplates'
-import { useAllNetworks } from '@/hooks/useNetworks'
+import { useNetworkCRs, type NetworkCR } from '@/hooks/useNetworkCRs'
 import { useImages, useStorageClasses } from '@/hooks/useImages'
 import { theme } from '@/lib/theme'
 import { formatMemoryMb } from '@/lib/format'
@@ -79,8 +79,7 @@ interface TemplateDisk {
 
 interface TemplateNIC {
   name: string
-  type: 'pod' | 'multus'
-  network_profile: string
+  network_cr: string
 }
 
 interface TemplateForm {
@@ -111,8 +110,7 @@ const emptyDisk = (): TemplateDisk => ({
 
 const emptyNIC = (): TemplateNIC => ({
   name: '',
-  type: 'multus',
-  network_profile: '',
+  network_cr: '',
 })
 
 const defaultForm = (): TemplateForm => ({
@@ -201,11 +199,8 @@ export function TemplatesPage() {
   const navigate = useNavigate()
   const { activeCluster, activeNamespace } = useUIStore()
   const { data, isLoading } = useTemplates()
-  const { data: allNADsData } = useAllNetworks()
-  const availableNADs: Array<{ name: string; namespace: string; full_name: string; display_name: string }> =
-    Array.isArray(allNADsData?.items)
-      ? allNADsData.items.map((n: any) => ({ ...n, full_name: `${n.namespace}/${n.name}` }))
-      : []
+  const { data: networkCRsData } = useNetworkCRs()
+  const networkCRs: NetworkCR[] = networkCRsData?.items || []
   const { data: imagesData } = useImages()
   const registeredImages: Array<{ name: string; namespace: string; display_name: string; source_type: string; source_url: string; size_gb: number }> =
     Array.isArray(imagesData?.items) ? imagesData.items : []
@@ -249,8 +244,7 @@ export function TemplatesPage() {
         })),
         nics: (tpl.networks || []).map((n: any) => ({
           name: n.name || '',
-          type: (n.network_profile === 'pod' ? 'pod' : 'multus') as 'pod' | 'multus',
-          network_profile: n.network_profile || '',
+          network_cr: n.network_cr || (n.network_profile === 'pod' ? 'pod-network' : n.network_profile || ''),
         })),
         cloud_init_user_data: tpl.cloud_init_user_data || '',
         cloud_init_network_data: tpl.cloud_init_network_data || '',
@@ -356,7 +350,7 @@ export function TemplatesPage() {
       })),
       networks: form.nics.map((n) => ({
         name: n.name,
-        network_profile: n.network_profile,
+        network_cr: n.network_cr,
       })),
       cloud_init_user_data: form.cloud_init_user_data || null,
       cloud_init_network_data: form.cloud_init_network_data || null,
@@ -839,63 +833,35 @@ export function TemplatesPage() {
                 marginBottom: 10,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {(['pod', 'multus'] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => updateNIC(idx, {
-                        type: t,
-                        network_profile: t === 'pod' ? 'pod' : '',
-                        name: t === 'pod' ? 'default' : nic.name,
-                      })}
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: 11,
-                        fontFamily: 'inherit',
-                        borderRadius: theme.radius.sm,
-                        cursor: 'pointer',
-                        background: nic.type === t ? theme.accentLight : theme.main.card,
-                        border: nic.type === t ? `2px solid ${theme.accent}` : `1px solid ${theme.main.cardBorder}`,
-                        color: nic.type === t ? theme.accent : theme.text.primary,
-                        fontWeight: nic.type === t ? 600 : 400,
-                      }}
-                    >
-                      {t === 'pod' ? 'Pod Network' : 'Multus'}
-                    </button>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
                 <button type="button" onClick={() => removeNIC(idx)} style={removeBtnStyle} title="Remove NIC">x</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: nic.type === 'multus' ? '1fr 1fr' : '1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Name</label>
                   <input
                     type="text"
                     value={nic.name}
                     onChange={(e) => updateNIC(idx, { name: e.target.value })}
-                    placeholder={nic.type === 'pod' ? 'default' : 'nic-0'}
+                    placeholder="nic-0"
                     style={inputStyle}
                   />
                 </div>
-                {nic.type === 'multus' && (
-                  <div>
-                    <label style={labelStyle}>Network (NAD)</label>
-                    <select
-                      value={nic.network_profile}
-                      onChange={(e) => updateNIC(idx, { network_profile: e.target.value })}
-                      style={inputStyle}
-                    >
-                      <option value="">Select network...</option>
-                      {availableNADs.map((nad) => (
-                        <option key={nad.full_name} value={nad.full_name}>
-                          {nad.display_name} ({nad.namespace})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label style={labelStyle}>Network</label>
+                  <select
+                    value={nic.network_cr}
+                    onChange={(e) => updateNIC(idx, { network_cr: e.target.value })}
+                    style={inputStyle}
+                  >
+                    <option value="">Select network...</option>
+                    {networkCRs.map((ncr) => (
+                      <option key={ncr.name} value={ncr.name}>
+                        {ncr.display_name || ncr.name}{ncr.network_type === 'pod' ? ' (pod)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           ))}
@@ -994,7 +960,7 @@ export function TemplatesPage() {
                 })),
                 networks: form.nics.map((n) => ({
                   name: n.name,
-                  network_profile: n.network_profile,
+                  network_cr: n.network_cr,
                 })),
                 cloud_init_user_data: form.cloud_init_user_data || null,
                 cloud_init_network_data: form.cloud_init_network_data || null,

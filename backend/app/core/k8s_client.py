@@ -644,6 +644,97 @@ class KubeVirtClient:
             name=name,
         )
 
+    # ── Network CRs (cluster-scoped) ─────────────────────────────
+
+    def list_network_crs(self) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="networks",
+        )
+        return result.get("items", [])
+
+    def get_network_cr(self, name: str) -> dict | None:
+        try:
+            return self.custom_api.get_cluster_custom_object(
+                group=self.KUBEVMUI_GROUP,
+                version=self.KUBEVMUI_VERSION,
+                plural="networks",
+                name=name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def create_network_cr(self, body: dict) -> dict:
+        return self.custom_api.create_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="networks",
+            body=body,
+        )
+
+    def patch_network_cr(self, name: str, body: dict) -> dict:
+        return self.custom_api.patch_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="networks",
+            name=name,
+            body=body,
+        )
+
+    def delete_network_cr(self, name: str) -> None:
+        self.custom_api.delete_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="networks",
+            name=name,
+        )
+
+    # ── NAD operations for on-demand creation ─────────────────────
+
+    NAD_GROUP = "k8s.cni.cncf.io"
+    NAD_VERSION = "v1"
+    NAD_PLURAL = "network-attachment-definitions"
+
+    def list_nads_by_label(self, namespace: str, label_selector: str) -> list[dict]:
+        result = self.custom_api.list_namespaced_custom_object(
+            group=self.NAD_GROUP,
+            version=self.NAD_VERSION,
+            namespace=namespace,
+            plural=self.NAD_PLURAL,
+            label_selector=label_selector,
+        )
+        return result.get("items", [])
+
+    def list_all_nads_by_label(self, label_selector: str) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
+            group=self.NAD_GROUP,
+            version=self.NAD_VERSION,
+            plural=self.NAD_PLURAL,
+            label_selector=label_selector,
+        )
+        return result.get("items", [])
+
+    def create_nad(self, namespace: str, body: dict) -> dict:
+        return self.custom_api.create_namespaced_custom_object(
+            group=self.NAD_GROUP,
+            version=self.NAD_VERSION,
+            namespace=namespace,
+            plural=self.NAD_PLURAL,
+            body=body,
+        )
+
+    def delete_nad(self, namespace: str, name: str) -> None:
+        self.custom_api.delete_namespaced_custom_object(
+            group=self.NAD_GROUP,
+            version=self.NAD_VERSION,
+            namespace=namespace,
+            plural=self.NAD_PLURAL,
+            name=name,
+        )
+
     # ── Label-filtered queries ────────────────────────────────────
 
     def list_images_by_label(self, namespace: str, label_selector: str) -> list[dict]:

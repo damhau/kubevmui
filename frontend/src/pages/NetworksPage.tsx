@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
-import { useNetworks, useCreateNetwork, useDeleteNetwork } from '@/hooks/useNetworks'
+import { useNetworkCRs, useCreateNetworkCR, useDeleteNetworkCR, type NetworkCR, type NetworkCRCreate } from '@/hooks/useNetworkCRs'
 import { useNNCPs, useCreateNNCP, useDeleteNNCP, useAvailableBridges, useNodeInterfaces } from '@/hooks/useNMState'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
@@ -55,15 +55,7 @@ function Badge({ label, color }: { label: string; color: string }) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface NNCP { name: string; interface_name?: string; type?: string; port?: string; vlan_id?: number | null; status?: string; status_conditions?: any[] }
-interface NetworkProfile {
-  name: string
-  namespace?: string
-  display_name?: string
-  network_type?: string
-  vlan_id?: number | null
-  dhcp_enabled?: boolean
-  subnet?: string
-}
+// NetworkCR type imported from hooks
 
 interface NNCPForm {
   interface_name: string
@@ -79,17 +71,19 @@ interface NNCPForm {
 interface NetworkForm {
   display_name: string
   name: string
-  type: string
   bridge_name: string
   vlan_id: string
   dhcp: boolean
   subnet: string
   gateway: string
+  mac_spoof_check: boolean
+  cni_config: string
+  advanced: boolean
 }
 
 export function NetworksPage() {
   const navigate = useNavigate()
-  const { activeCluster, activeNamespace } = useUIStore()
+  const { activeCluster } = useUIStore()
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'interfaces' | 'networks'>('interfaces')
@@ -116,23 +110,25 @@ export function NetworksPage() {
   const [deleteNNCPTarget, setDeleteNNCPTarget] = useState<string | null>(null)
 
   // --- Networks ---
-  const { data: netData, isLoading: netLoading } = useNetworks()
-  const createNetwork = useCreateNetwork()
-  const deleteNetwork = useDeleteNetwork()
+  const { data: netData, isLoading: netLoading } = useNetworkCRs()
+  const createNetwork = useCreateNetworkCR()
+  const deleteNetwork = useDeleteNetworkCR()
   const { data: bridgesData } = useAvailableBridges()
-  const networks: NetworkProfile[] = Array.isArray(netData?.items) ? netData.items : Array.isArray(netData) ? netData : []
+  const networks: NetworkCR[] = Array.isArray(netData?.items) ? netData.items : []
   const { sorted: sortedNetworks, sortConfig: netSortConfig, requestSort: requestNetSort } = useSortable(networks, { column: 'name', direction: 'asc' })
 
   const [showCreateNetwork, setShowCreateNetwork] = useState(false)
   const [netForm, setNetForm] = useState<NetworkForm>({
     display_name: '',
     name: '',
-    type: 'bridge',
     bridge_name: '',
     vlan_id: '',
     dhcp: true,
     subnet: '',
     gateway: '',
+    mac_spoof_check: false,
+    cni_config: '',
+    advanced: false,
   })
   const [netError, setNetError] = useState<string | null>(null)
 
@@ -223,41 +219,47 @@ export function NetworksPage() {
   const handleNetworkSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setNetError(null)
-    const payload = {
+    const payload: NetworkCRCreate = {
       display_name: netForm.display_name,
       name: netForm.name,
-      network_type: netForm.type,
-      bridge_name: netForm.bridge_name,
+      network_type: 'multus',
+      bridge_name: netForm.bridge_name || undefined,
       vlan_id: netForm.vlan_id === '' ? null : Number(netForm.vlan_id),
       dhcp_enabled: netForm.dhcp,
       subnet: netForm.subnet || null,
       gateway: netForm.gateway || null,
+      mac_spoof_check: netForm.mac_spoof_check,
+      cni_config: netForm.advanced && netForm.cni_config ? netForm.cni_config : null,
     }
     createNetwork.mutate(payload, {
       onSuccess: () => {
         setShowCreateNetwork(false)
-        setNetForm({ display_name: '', name: '', type: 'bridge', bridge_name: '', vlan_id: '', dhcp: true, subnet: '', gateway: '' })
-        toast.success('Network profile created successfully')
+        setNetForm({ display_name: '', name: '', bridge_name: '', vlan_id: '', dhcp: true, subnet: '', gateway: '', mac_spoof_check: false, cni_config: '', advanced: false })
+        toast.success('Network created successfully')
       },
       onError: (err: unknown) => {
         const e = err as { message?: string }
-        setNetError(e.message ?? 'Failed to create network profile')
+        setNetError(e.message ?? 'Failed to create network')
       },
     })
   }
 
-  const handleDeleteNetwork = (name: string) => {
-    if (!confirm(`Delete network profile "${name}"?`)) return
-    deleteNetwork.mutate(name, {
-      onSuccess: () => toast.success(`Network "${name}" deleted`),
+  const [deleteNetTarget, setDeleteNetTarget] = useState<string | null>(null)
+
+  const handleDeleteNetwork = () => {
+    if (!deleteNetTarget) return
+    deleteNetwork.mutate(deleteNetTarget, {
+      onSuccess: () => {
+        toast.success(`Network "${deleteNetTarget}" deleted`)
+        setDeleteNetTarget(null)
+      },
       onError: (err: unknown) => {
         const e = err as { message?: string }
         toast.error(e.message ?? 'Failed to delete network')
+        setDeleteNetTarget(null)
       },
     })
   }
-
-  const showNamespaceCol = activeNamespace === '_all'
 
   const getNNCPStatus = (nncp: NNCP) => {
     const s = nncp.status ?? 'Unknown'
@@ -316,7 +318,7 @@ export function NetworksPage() {
                 whiteSpace: 'nowrap',
               }}
             >
-              + New Network Profile
+              + New Network
             </button>
           )
         }
@@ -452,19 +454,19 @@ export function NetworksPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Network size={14} style={{ color: theme.text.dim }} />
                   <span style={{ color: theme.text.primary, fontSize: 13, fontWeight: 500 }}>Pod Network</span>
-                  <span style={{ color: theme.text.dim, fontSize: 12 }}>Default Kubernetes pod network (masquerade)</span>
+                  <span style={{ color: theme.text.dim, fontSize: 12 }}>Default Kubernetes pod network (masquerade) — built-in, always available</span>
                 </div>
-                <Badge label="Always Available" color={theme.status.running} />
+                <Badge label="Built-in" color={theme.status.running} />
               </div>
 
               <div className="card">
                 {netLoading ? (
-                  <TableSkeleton rows={3} cols={showNamespaceCol ? 7 : 6} />
-                ) : networks.length === 0 ? (
+                  <TableSkeleton rows={3} cols={8} />
+                ) : networks.filter((n) => n.network_type !== 'pod').length === 0 ? (
                   <EmptyState
                     icon={<Network size={24} />}
-                    title="No Network Profiles"
-                    description="Create network profiles to configure VM networking."
+                    title="No Networks"
+                    description="Create network definitions to configure VM networking via Multus."
                   />
                 ) : (
                   <table className="table">
@@ -473,48 +475,44 @@ export function NetworksPage() {
                         <th className={`table-header-cell-sortable${netSortConfig.column === 'name' ? ' active' : ''}`} onClick={() => requestNetSort('name')}>
                           Name{netSortConfig.column === 'name' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                         </th>
-                        {showNamespaceCol && (
-                          <th className={`table-header-cell-sortable${netSortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestNetSort('namespace')}>
-                            Namespace{netSortConfig.column === 'namespace' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
-                          </th>
-                        )}
+                        <th className={`table-header-cell-sortable${netSortConfig.column === 'display_name' ? ' active' : ''}`} onClick={() => requestNetSort('display_name')}>
+                          Display Name{netSortConfig.column === 'display_name' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </th>
                         <th className={`table-header-cell-sortable${netSortConfig.column === 'network_type' ? ' active' : ''}`} onClick={() => requestNetSort('network_type')}>
                           Type{netSortConfig.column === 'network_type' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                         </th>
+                        <th className={`table-header-cell-sortable${netSortConfig.column === 'interface_type' ? ' active' : ''}`} onClick={() => requestNetSort('interface_type')}>
+                          Interface{netSortConfig.column === 'interface_type' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </th>
+                        <th className={`table-header-cell-sortable${netSortConfig.column === 'bridge_name' ? ' active' : ''}`} onClick={() => requestNetSort('bridge_name')}>
+                          Bridge{netSortConfig.column === 'bridge_name' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </th>
                         <th className={`table-header-cell-sortable${netSortConfig.column === 'vlan_id' ? ' active' : ''}`} onClick={() => requestNetSort('vlan_id')}>
-                          VLAN ID{netSortConfig.column === 'vlan_id' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                          VLAN{netSortConfig.column === 'vlan_id' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                         </th>
                         <th className={`table-header-cell-sortable${netSortConfig.column === 'dhcp_enabled' ? ' active' : ''}`} onClick={() => requestNetSort('dhcp_enabled')}>
                           DHCP{netSortConfig.column === 'dhcp_enabled' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
-                        </th>
-                        <th className={`table-header-cell-sortable${netSortConfig.column === 'subnet' ? ' active' : ''}`} onClick={() => requestNetSort('subnet')}>
-                          Subnet{netSortConfig.column === 'subnet' ? (netSortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                         </th>
                         <th className="table-header-cell">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedNetworks.map((net, i) => (
+                      {sortedNetworks.filter((n) => n.network_type !== 'pod').map((net, i) => (
                         <tr
-                          key={`${net.namespace ?? activeNamespace}-${net.name}`}
+                          key={net.name}
                           className="table-row-clickable"
-                          onClick={() => navigate(`/networks/${net.namespace ?? activeNamespace}/${net.name}`)}
+                          onClick={() => navigate(`/networks/network-crs/${net.name}`)}
                           style={i < 8 ? {
                             animation: `fadeInRow 0.3s ease-out both`,
                             animationDelay: `${0.05 + i * 0.04}s`,
                           } : undefined}
                         >
                           <td className="table-cell">
-                            <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14 }}>{net.display_name ?? net.name}</div>
-                            {net.display_name && (
-                              <div style={{ color: theme.text.dim, fontSize: 11, marginTop: 2, fontFamily: theme.typography.mono.fontFamily }}>{net.name}</div>
-                            )}
+                            <div style={{ color: theme.text.primary, fontWeight: 500, fontSize: 14, fontFamily: theme.typography.mono.fontFamily }}>{net.name}</div>
                           </td>
-                          {showNamespaceCol && (
-                            <td className="table-cell">
-                              <Badge label={net.namespace ?? '—'} color={theme.accent} />
-                            </td>
-                          )}
+                          <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
+                            {net.display_name || '—'}
+                          </td>
                           <td className="table-cell">
                             {net.network_type ? (
                               <Badge label={net.network_type} color={typeColor[net.network_type] ?? theme.text.dim} />
@@ -522,22 +520,29 @@ export function NetworksPage() {
                               <span style={{ color: theme.text.dim }}>—</span>
                             )}
                           </td>
+                          <td className="table-cell">
+                            {net.interface_type ? (
+                              <Badge label={net.interface_type} color={typeColor[net.interface_type] ?? theme.text.dim} />
+                            ) : (
+                              <span style={{ color: theme.text.dim }}>—</span>
+                            )}
+                          </td>
+                          <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily, fontSize: 13 }}>
+                            {net.bridge_name || '—'}
+                          </td>
                           <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>
                             {net.vlan_id ?? '—'}
                           </td>
                           <td className="table-cell">
                             <span style={{ color: net.dhcp_enabled ? theme.status.running : theme.text.secondary, fontSize: 13 }}>
-                              {net.dhcp_enabled === undefined ? '—' : net.dhcp_enabled ? 'Yes' : 'No'}
+                              {net.dhcp_enabled ? 'Yes' : 'No'}
                             </span>
-                          </td>
-                          <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily, fontSize: 13 }}>
-                            {net.subnet ?? '—'}
                           </td>
                           <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
                             <DropdownMenu
                               actions={[{ label: 'Delete', action: 'delete', danger: true }]}
                               onAction={(action) => {
-                                if (action === 'delete') handleDeleteNetwork(net.name)
+                                if (action === 'delete') setDeleteNetTarget(net.name)
                               }}
                             />
                           </td>
@@ -729,8 +734,19 @@ export function NetworksPage() {
         onCancel={() => setDeleteNNCPTarget(null)}
       />
 
+      {/* ======================== DELETE NETWORK CONFIRM ======================== */}
+      <ConfirmModal
+        open={deleteNetTarget !== null}
+        title="Delete Network"
+        message={`Are you sure you want to delete the network "${deleteNetTarget}"? This will remove the Network CR from the cluster.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={handleDeleteNetwork}
+        onCancel={() => setDeleteNetTarget(null)}
+      />
+
       {/* ======================== CREATE NETWORK MODAL ======================== */}
-      <Modal open={showCreateNetwork} onClose={() => setShowCreateNetwork(false)} title="New Network Profile">
+      <Modal open={showCreateNetwork} onClose={() => setShowCreateNetwork(false)} title="New Network">
         <form onSubmit={handleNetworkSubmit}>
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>Display Name</label>
@@ -752,48 +768,34 @@ export function NetworksPage() {
               style={inputStyle}
             />
           </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Type</label>
-            <select
-              value={netForm.type}
-              onChange={(e) => setNetForm((f) => ({ ...f, type: e.target.value }))}
-              style={inputStyle}
-            >
-              <option value="bridge">Bridge</option>
-              <option value="masquerade">Masquerade</option>
-              <option value="sr-iov">SR-IOV</option>
-            </select>
-          </div>
 
-          {netForm.type === 'bridge' && (
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Bridge</label>
-              {bridges.length === 0 ? (
-                <div style={{
-                  padding: '10px 12px',
-                  background: `${theme.status.migrating}10`,
-                  border: `1px solid ${theme.status.migrating}30`,
-                  borderRadius: theme.radius.md,
-                  fontSize: 12,
-                  color: theme.text.secondary,
-                  lineHeight: 1.5,
-                }}>
-                  No bridges available. Create an interface (linux-bridge) in the Interfaces tab first.
-                </div>
-              ) : (
-                <select
-                  value={netForm.bridge_name}
-                  onChange={(e) => setNetForm((f) => ({ ...f, bridge_name: e.target.value }))}
-                  style={inputStyle}
-                >
-                  <option value="">Select a bridge...</option>
-                  {bridges.map((b) => (
-                    <option key={b.name} value={b.name}>{b.name} ({b.nodes.length} node{b.nodes.length !== 1 ? 's' : ''})</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Bridge</label>
+            {bridges.length === 0 ? (
+              <div style={{
+                padding: '10px 12px',
+                background: `${theme.status.migrating}10`,
+                border: `1px solid ${theme.status.migrating}30`,
+                borderRadius: theme.radius.md,
+                fontSize: 12,
+                color: theme.text.secondary,
+                lineHeight: 1.5,
+              }}>
+                No bridges available. Create an interface (linux-bridge) in the Interfaces tab first.
+              </div>
+            ) : (
+              <select
+                value={netForm.bridge_name}
+                onChange={(e) => setNetForm((f) => ({ ...f, bridge_name: e.target.value }))}
+                style={inputStyle}
+              >
+                <option value="">Select a bridge...</option>
+                {bridges.map((b) => (
+                  <option key={b.name} value={b.name}>{b.name} ({b.nodes.length} node{b.nodes.length !== 1 ? 's' : ''})</option>
+                ))}
+              </select>
+            )}
+          </div>
 
           <div style={{ marginBottom: 14 }}>
             <label style={labelStyle}>VLAN ID (optional)</label>
@@ -837,17 +839,63 @@ export function NetworksPage() {
               style={inputStyle}
             />
           </div>
+          <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="checkbox"
+              id="net-mac-spoof"
+              checked={netForm.mac_spoof_check}
+              onChange={(e) => setNetForm((f) => ({ ...f, mac_spoof_check: e.target.checked }))}
+              style={{ cursor: 'pointer' }}
+            />
+            <label htmlFor="net-mac-spoof" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}>
+              MAC spoof check
+            </label>
+          </div>
+
+          {/* Advanced toggle */}
+          <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="checkbox"
+              id="net-advanced"
+              checked={netForm.advanced}
+              onChange={(e) => setNetForm((f) => ({ ...f, advanced: e.target.checked }))}
+              style={{ cursor: 'pointer' }}
+            />
+            <label htmlFor="net-advanced" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}>
+              Advanced: Edit CNI config directly
+            </label>
+          </div>
+          {netForm.advanced && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>CNI Config (JSON)</label>
+              <textarea
+                value={netForm.cni_config}
+                onChange={(e) => setNetForm((f) => ({ ...f, cni_config: e.target.value }))}
+                placeholder={'{\n  "cniVersion": "0.3.1",\n  "type": "bridge",\n  "bridge": "br0"\n}'}
+                style={{
+                  ...inputStyle,
+                  minHeight: 120,
+                  resize: 'vertical',
+                  fontFamily: theme.typography.mono.fontFamily,
+                  fontSize: 12,
+                }}
+              />
+            </div>
+          )}
+
           <YamlPreview
-            endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/networks/preview`}
+            endpoint={`/clusters/${activeCluster}/network-crs/preview`}
             payload={{
               display_name: netForm.display_name,
               name: netForm.name,
-              network_type: netForm.type,
+              network_type: 'multus',
               bridge_name: netForm.bridge_name || undefined,
               vlan_id: netForm.vlan_id === '' ? null : Number(netForm.vlan_id),
               dhcp_enabled: netForm.dhcp,
               subnet: netForm.subnet || null,
               gateway: netForm.gateway || null,
+              mac_spoof_check: netForm.mac_spoof_check,
+              cni_config: netForm.advanced && netForm.cni_config ? netForm.cni_config : null,
             }}
           />
 
@@ -887,7 +935,7 @@ export function NetworksPage() {
                 opacity: createNetwork.isPending ? 0.7 : 1,
               }}
             >
-              {createNetwork.isPending ? 'Creating...' : 'Create Network Profile'}
+              {createNetwork.isPending ? 'Creating...' : 'Create Network'}
             </button>
           </div>
         </form>
