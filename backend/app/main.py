@@ -2,6 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from kubernetes.client import ApiException
+
+from app.api.exception_handlers import k8s_api_exception_handler, value_error_handler
 
 from app.api.routes import (
     analytics,
@@ -88,6 +91,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    application.add_exception_handler(ApiException, k8s_api_exception_handler)
+    application.add_exception_handler(ValueError, value_error_handler)
 
     @application.get("/api/v1/health")
     async def health():

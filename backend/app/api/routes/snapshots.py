@@ -1,7 +1,4 @@
-import json
-
 from fastapi import APIRouter, Depends, HTTPException
-from kubernetes.client import ApiException
 
 from app.api.deps import get_cluster_manager, get_current_user
 from app.api.routes.audit import get_audit_service
@@ -62,14 +59,7 @@ def create_snapshot(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    try:
-        result = svc.create_snapshot(ns, body)
-    except ApiException as e:
-        try:
-            detail = json.loads(e.body).get("message", str(e))
-        except (json.JSONDecodeError, TypeError):
-            detail = str(e)
-        raise HTTPException(status_code=e.status, detail=detail)
+    result = svc.create_snapshot(ns, body)
     audit_svc = get_audit_service()
     audit_svc.record(
         username=_user.username,
@@ -115,13 +105,7 @@ def restore_snapshot(
     try:
         result = svc.restore_snapshot(ns, vm_name, request)
     except TimeoutError as e:
-        raise HTTPException(status_code=504, detail=str(e))
-    except ApiException as e:
-        try:
-            detail = json.loads(e.body).get("message", str(e))
-        except (json.JSONDecodeError, TypeError):
-            detail = str(e)
-        raise HTTPException(status_code=e.status, detail=detail)
+        raise HTTPException(status_code=504, detail=str(e)) from None
     audit_svc = get_audit_service()
     audit_svc.record(
         username=_user.username,

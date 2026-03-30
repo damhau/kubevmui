@@ -10,6 +10,7 @@ import { useStorageClasses } from '@/hooks/useImages'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
+import { extractErrorMessage } from '@/lib/api-client'
 import { toast } from '@/components/ui/Toast'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
@@ -263,8 +264,8 @@ function ProvisionWizard({
           )
           onClose()
         },
-        onError: (err: any) => {
-          toast.error(err?.response?.data?.detail || 'Provisioning failed')
+        onError: (err: unknown) => {
+          toast.error(extractErrorMessage(err, 'Provisioning failed'))
         },
       }
     )

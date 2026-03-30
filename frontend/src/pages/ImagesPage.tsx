@@ -7,6 +7,7 @@ import { theme } from '@/lib/theme'
 import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
 import { YamlPreview } from '@/components/ui/YamlPreview'
+import { extractErrorMessage } from '@/lib/api-client'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
@@ -204,9 +205,10 @@ export function ImagesPage() {
         })
         resetAndClose()
         toast.success('Image uploaded successfully')
-      } catch (err: any) {
-        setError(err.message || 'Upload failed')
-        toast.error('Upload failed')
+      } catch (err: unknown) {
+        const msg = extractErrorMessage(err, 'Upload failed')
+        setError(msg)
+        toast.error(msg)
       }
       return
     }
@@ -216,19 +218,19 @@ export function ImagesPage() {
         onSuccess: () => {
           createImage.mutate(payload, {
             onSuccess: () => { resetAndClose(); toast.success('Image saved') },
-            onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to save image'); toast.error('Failed to save image') },
+            onError: (err: unknown) => { const msg = extractErrorMessage(err, 'Failed to save image'); setError(msg); toast.error(msg) },
           })
         },
-        onError: (err: unknown) => { setError((err as { message?: string }).message ?? 'Failed to update image'); toast.error('Failed to update image') },
+        onError: (err: unknown) => { const msg = extractErrorMessage(err, 'Failed to update image'); setError(msg); toast.error(msg) },
       })
       return
     }
     createImage.mutate(payload, {
       onSuccess: () => { resetAndClose(); toast.success('Image created') },
       onError: (err: unknown) => {
-        const e = err as { message?: string }
-        setError(e.message ?? 'Failed to create image')
-        toast.error('Failed to create image')
+        const msg = extractErrorMessage(err, 'Failed to create image')
+        setError(msg)
+        toast.error(msg)
       },
     })
   }
@@ -272,7 +274,7 @@ export function ImagesPage() {
             },
             {
               onSuccess: () => toast.success('Image duplicated'),
-              onError: () => toast.error('Failed to duplicate image'),
+              onError: (err) => toast.error(extractErrorMessage(err, 'Failed to duplicate image')),
             },
           )
           setPromptAction(null)
@@ -301,11 +303,11 @@ export function ImagesPage() {
                 },
                 {
                   onSuccess: () => toast.success('Re-import started'),
-                  onError: () => toast.error('Failed to re-import image'),
+                  onError: (err) => toast.error(extractErrorMessage(err, 'Failed to re-import image')),
                 },
               )
             },
-            onError: () => toast.error('Failed to delete image for re-import'),
+            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete image for re-import')),
           })
           setConfirmAction(null)
         },
@@ -320,7 +322,7 @@ export function ImagesPage() {
         onConfirm: () => {
           deleteImage.mutate(img.name, {
             onSuccess: () => toast.success('Image deleted'),
-            onError: () => toast.error('Failed to delete image'),
+            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete image')),
           })
           setConfirmAction(null)
         },

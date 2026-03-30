@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { theme } from '@/lib/theme'
 import { toast } from '@/components/ui/Toast'
+import { extractErrorMessage } from '@/lib/api-client'
 import { useNetworkCRs, type NetworkCR } from '@/hooks/useNetworkCRs'
 import { useAddInterface, useAddInterfaceToSpec } from '@/hooks/useHotplug'
 
@@ -174,8 +175,8 @@ export function AddNetworkWizard({
             toast.success('Interface hotplugged successfully')
             resetAndClose()
           },
-          onError: () => {
-            toast.error('Failed to hotplug interface')
+          onError: (err) => {
+            toast.error(extractErrorMessage(err, 'Failed to hotplug interface'))
           },
         }
       )
@@ -196,8 +197,8 @@ export function AddNetworkWizard({
             toast.success('Interface added to VM spec')
             resetAndClose()
           },
-          onError: () => {
-            toast.error('Failed to add interface')
+          onError: (err) => {
+            toast.error(extractErrorMessage(err, 'Failed to add interface'))
           },
         }
       )

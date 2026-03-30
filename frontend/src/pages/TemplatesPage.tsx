@@ -9,6 +9,7 @@ import { formatMemoryMb } from '@/lib/format'
 import { useUIStore } from '@/stores/ui-store'
 import { Modal } from '@/components/ui/Modal'
 import { toast } from '@/components/ui/Toast'
+import { extractErrorMessage } from '@/lib/api-client'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { PromptModal } from '@/components/ui/PromptModal'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -266,7 +267,7 @@ export function TemplatesPage() {
             { ...tpl, name: newName, display_name: `${tpl.display_name || tpl.name} (copy)` },
             {
               onSuccess: () => toast.success('Template duplicated'),
-              onError: () => toast.error('Failed to duplicate template'),
+              onError: (err) => toast.error(extractErrorMessage(err, 'Failed to duplicate template')),
             },
           )
           setPromptAction(null)
@@ -282,7 +283,7 @@ export function TemplatesPage() {
         onConfirm: () => {
           deleteTemplate.mutate(tpl.name, {
             onSuccess: () => toast.success('Template deleted'),
-            onError: () => toast.error('Failed to delete template'),
+            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete template')),
           })
           setConfirmAction(null)
         },
@@ -369,16 +370,14 @@ export function TemplatesPage() {
               toast.success('Template saved')
             },
             onError: (err: unknown) => {
-              const e = err as { message?: string }
-              setError(e.message ?? 'Failed to save template')
-              toast.error('Failed to save template')
+              setError(extractErrorMessage(err, 'Failed to save template'))
+              toast.error(extractErrorMessage(err, 'Failed to save template'))
             },
           })
         },
         onError: (err: unknown) => {
-          const e = err as { message?: string }
-          setError(e.message ?? 'Failed to update template')
-          toast.error('Failed to update template')
+          setError(extractErrorMessage(err, 'Failed to update template'))
+          toast.error(extractErrorMessage(err, 'Failed to update template'))
         },
       })
     } else {
@@ -389,9 +388,8 @@ export function TemplatesPage() {
           toast.success('Template created')
         },
         onError: (err: unknown) => {
-          const e = err as { message?: string }
-          setError(e.message ?? 'Failed to create template')
-          toast.error('Failed to create template')
+          setError(extractErrorMessage(err, 'Failed to create template'))
+          toast.error(extractErrorMessage(err, 'Failed to create template'))
         },
       })
     }

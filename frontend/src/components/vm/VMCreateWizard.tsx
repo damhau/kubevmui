@@ -6,6 +6,7 @@ import { useNetworkCRs, type NetworkCR } from '@/hooks/useNetworkCRs'
 import { useTemplates } from '@/hooks/useTemplates'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
+import { extractErrorMessage } from '@/lib/api-client'
 import { YamlPreview } from '@/components/ui/YamlPreview'
 
 const STEPS = [
@@ -347,8 +348,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
     createVM.mutate(payload, {
       onSuccess: () => onSuccess(),
       onError: (err: unknown) => {
-        const e = err as { message?: string }
-        setError(e.message ?? 'Failed to create VM')
+        setError(extractErrorMessage(err, 'Failed to create VM'))
       },
     })
   }

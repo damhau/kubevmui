@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import apiClient from '@/lib/api-client'
+import apiClient, { extractErrorMessage } from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
@@ -88,8 +88,8 @@ export function VMDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
       toast.success('VM cloned successfully')
     },
-    onError: () => {
-      toast.error('Failed to clone VM')
+    onError: (err) => {
+      toast.error(extractErrorMessage(err, 'Failed to clone VM'))
     },
   })
 
@@ -105,8 +105,8 @@ export function VMDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['vm'] })
       toast.success('VM force stopped')
     },
-    onError: () => {
-      toast.error('Failed to force stop VM')
+    onError: (err) => {
+      toast.error(extractErrorMessage(err, 'Failed to force stop VM'))
     },
   })
 
@@ -123,8 +123,8 @@ export function VMDetailPage() {
       setEditingRunStrategy(false)
       toast.success('Run strategy updated')
     },
-    onError: () => {
-      toast.error('Failed to update run strategy')
+    onError: (err) => {
+      toast.error(extractErrorMessage(err, 'Failed to update run strategy'))
     },
   })
 
@@ -148,8 +148,8 @@ export function VMDetailPage() {
       setEditingMemory(false)
       toast.success('Compute resources updated')
     },
-    onError: () => {
-      toast.error('Failed to update compute resources')
+    onError: (err) => {
+      toast.error(extractErrorMessage(err, 'Failed to update compute resources'))
     },
   })
 
@@ -210,7 +210,7 @@ export function VMDetailPage() {
       { namespace, name, action },
       {
         onSuccess: () => toast.success(`VM ${action} requested`),
-        onError: () => toast.error(`Failed to ${action} VM`),
+        onError: (err) => toast.error(extractErrorMessage(err, `Failed to ${action} VM`)),
       },
     )
   }
@@ -397,7 +397,7 @@ export function VMDetailPage() {
               const snapName = `snap-${name}-${Date.now()}`
               createSnapshot.mutate(
                 { namespace, vmName: name, snapshotName: snapName },
-                { onError: (err: unknown) => { setSnapshotError((err as { message?: string }).message ?? 'Snapshot failed') } },
+                { onError: (err: unknown) => { setSnapshotError(extractErrorMessage(err, 'Snapshot failed')) } },
               )
             }}
             disabled={createSnapshot.isPending}
@@ -1108,7 +1108,7 @@ export function VMDetailPage() {
                                         { namespace, vmName: name, volName: disk.name },
                                         {
                                           onSuccess: () => toast.success('Disk removed'),
-                                          onError: () => toast.error('Failed to remove disk'),
+                                          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove disk')),
                                         },
                                       )
                                       setConfirmAction(null)
@@ -1217,7 +1217,7 @@ export function VMDetailPage() {
                                         { namespace, vmName: name, ifaceName: net.name },
                                         {
                                           onSuccess: () => toast.success('Interface removed'),
-                                          onError: () => toast.error('Failed to remove interface'),
+                                          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove interface')),
                                         },
                                       )
                                       setConfirmAction(null)
@@ -1299,7 +1299,7 @@ export function VMDetailPage() {
                         { namespace, vmName: name, snapshotName: snapshotName.trim() },
                         {
                           onSuccess: () => setSnapshotName(''),
-                          onError: (err: any) => setSnapshotError(err?.message ?? 'Failed to create snapshot'),
+                          onError: (err: unknown) => setSnapshotError(extractErrorMessage(err, 'Failed to create snapshot')),
                         }
                       )
                     }}
@@ -1404,7 +1404,7 @@ export function VMDetailPage() {
                                             {
                                               onSuccess: () => toast.success('Snapshot restored — VM restarting'),
                                               onError: (err: unknown) => {
-                                                const msg = (err as { message?: string }).message ?? 'Restore failed'
+                                                const msg = extractErrorMessage(err, 'Restore failed')
                                                 setSnapshotError(msg)
                                                 toast.error(msg)
                                               },
@@ -1443,7 +1443,7 @@ export function VMDetailPage() {
                                           { namespace, name: snap.name },
                                           {
                                             onSuccess: () => toast.success('Snapshot deleted'),
-                                            onError: () => toast.error('Failed to delete snapshot'),
+                                            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete snapshot')),
                                           },
                                         )
                                         setConfirmAction(null)
@@ -1622,7 +1622,7 @@ export function VMDetailPage() {
                       toast.success('VM deleted')
                       navigate('/vms')
                     })
-                    .catch(() => toast.error('Failed to delete VM'))
+                    .catch((err) => toast.error(extractErrorMessage(err, 'Failed to delete VM')))
                   setConfirmAction(null)
                 }}
                 style={{

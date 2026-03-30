@@ -8,6 +8,7 @@ import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { toast } from '@/components/ui/Toast'
+import { extractErrorMessage } from '@/lib/api-client'
 import { YamlPreview } from '@/components/ui/YamlPreview'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
@@ -185,8 +186,7 @@ export function NetworksPage() {
           toast.success('Interface created successfully')
         },
         onError: (err: unknown) => {
-          const e = err as { message?: string }
-          toast.error(e.message ?? 'Failed to create interface')
+          toast.error(extractErrorMessage(err, 'Failed to create interface'))
         },
       },
     )
@@ -200,8 +200,7 @@ export function NetworksPage() {
         setDeleteNNCPTarget(null)
       },
       onError: (err: unknown) => {
-        const e = err as { message?: string }
-        toast.error(e.message ?? 'Failed to delete interface')
+        toast.error(extractErrorMessage(err, 'Failed to delete interface'))
         setDeleteNNCPTarget(null)
       },
     })
@@ -238,8 +237,7 @@ export function NetworksPage() {
         toast.success('Network created successfully')
       },
       onError: (err: unknown) => {
-        const e = err as { message?: string }
-        setNetError(e.message ?? 'Failed to create network')
+        setNetError(extractErrorMessage(err, 'Failed to create network'))
       },
     })
   }
@@ -254,8 +252,7 @@ export function NetworksPage() {
         setDeleteNetTarget(null)
       },
       onError: (err: unknown) => {
-        const e = err as { message?: string }
-        toast.error(e.message ?? 'Failed to delete network')
+        toast.error(extractErrorMessage(err, 'Failed to delete network'))
         setDeleteNetTarget(null)
       },
     })

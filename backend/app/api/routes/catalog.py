@@ -60,10 +60,7 @@ def provision_catalog_entry(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    try:
-        return svc.provision(name, body)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
+    return svc.provision(name, body)
 
 
 @router.get("/{name}/status", response_model=CatalogStatus)

@@ -10,6 +10,7 @@ import { YamlPreview } from '@/components/ui/YamlPreview'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { TableSkeleton } from '@/components/ui/Skeleton'
+import { extractErrorMessage } from '@/lib/api-client'
 import { toast } from '@/components/ui/Toast'
 import { HardDrive } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
@@ -115,7 +116,7 @@ export function StoragePage() {
       onConfirm: () => {
         deleteDisk.mutate(disk.name, {
           onSuccess: () => toast.success('Disk deleted'),
-          onError: () => toast.error('Failed to delete disk'),
+          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete disk')),
         })
         setConfirmAction(null)
       },
@@ -137,7 +138,7 @@ export function StoragePage() {
           toast.success('Disk resize requested')
           setResizeTarget(null)
         },
-        onError: () => toast.error('Failed to resize disk'),
+        onError: (err) => toast.error(extractErrorMessage(err, 'Failed to resize disk')),
       },
     )
   }
@@ -151,8 +152,7 @@ export function StoragePage() {
         setForm({ name: '', size_gb: 20, performance_tier: '' })
       },
       onError: (err: unknown) => {
-        const e = err as { message?: string }
-        setError(e.message ?? 'Failed to create disk')
+        setError(extractErrorMessage(err, 'Failed to create disk'))
       },
     })
   }

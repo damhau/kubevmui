@@ -6,7 +6,7 @@ import { TopBar } from '@/components/layout/TopBar'
 import { useVMs, useVMAction } from '@/hooks/useVMs'
 import { useCreateSnapshot } from '@/hooks/useSnapshots'
 import { useCreateMigration } from '@/hooks/useMigrations'
-import apiClient from '@/lib/api-client'
+import apiClient, { extractErrorMessage } from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { formatTimeAgo, formatMemoryMb } from '@/lib/format'
@@ -127,7 +127,7 @@ export function VMListPage() {
           selectedVMs.forEach((vm) => {
             apiClient.delete(`/clusters/${activeCluster}/namespaces/${vm.namespace}/vms/${vm.name}`)
               .then(() => toast.success(`VM ${vm.name} deleted`))
-              .catch(() => toast.error(`Failed to delete ${vm.name}`))
+              .catch((err) => toast.error(extractErrorMessage(err, `Failed to delete ${vm.name}`)))
           })
           queryClient.invalidateQueries({ queryKey: ['vms'] })
           setSelected(new Set())
@@ -144,7 +144,7 @@ export function VMListPage() {
               { namespace: vm.namespace, name: vm.name, action },
               {
                 onSuccess: () => toast.success(`VM ${vm.name} ${action} requested`),
-                onError: () => toast.error(`Failed to ${action} ${vm.name}`),
+                onError: (err) => toast.error(extractErrorMessage(err, `Failed to ${action} ${vm.name}`)),
               },
             )
           })
@@ -170,8 +170,8 @@ export function VMListPage() {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
       toast.success('VM cloned successfully')
     },
-    onError: () => {
-      toast.error('Failed to clone VM')
+    onError: (err) => {
+      toast.error(extractErrorMessage(err, 'Failed to clone VM'))
     },
   })
 
@@ -186,8 +186,8 @@ export function VMListPage() {
       queryClient.invalidateQueries({ queryKey: ['vms'] })
       toast.success('VM force stopped')
     },
-    onError: () => {
-      toast.error('Failed to force stop VM')
+    onError: (err) => {
+      toast.error(extractErrorMessage(err, 'Failed to force stop VM'))
     },
   })
 
@@ -225,7 +225,7 @@ export function VMListPage() {
         { namespace: vm.namespace, vmName: vm.name, snapshotName: `snap-${vm.name}-${Date.now()}` },
         {
           onSuccess: () => toast.success('Snapshot created'),
-          onError: () => toast.error('Failed to create snapshot'),
+          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to create snapshot')),
         },
       )
       return
@@ -235,7 +235,7 @@ export function VMListPage() {
         { namespace: vm.namespace, vmName: vm.name },
         {
           onSuccess: () => toast.success('Migration started'),
-          onError: () => toast.error('Failed to start migration'),
+          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to start migration')),
         },
       )
       return
@@ -251,7 +251,7 @@ export function VMListPage() {
               queryClient.invalidateQueries({ queryKey: ['vms'] })
               toast.success('VM deleted')
             })
-            .catch(() => toast.error('Failed to delete VM'))
+            .catch((err) => toast.error(extractErrorMessage(err, 'Failed to delete VM')))
           setConfirmAction(null)
         },
       })
@@ -261,7 +261,7 @@ export function VMListPage() {
       { namespace: vm.namespace, name: vm.name, action },
       {
         onSuccess: () => toast.success(`VM ${action} requested`),
-        onError: () => toast.error(`Failed to ${action} VM`),
+        onError: (err) => toast.error(extractErrorMessage(err, `Failed to ${action} VM`)),
       },
     )
   }

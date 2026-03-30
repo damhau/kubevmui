@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { theme } from '@/lib/theme'
 import { toast } from '@/components/ui/Toast'
+import { extractErrorMessage } from '@/lib/api-client'
 import { useStorageClasses, useImages } from '@/hooks/useImages'
 import { useDisks } from '@/hooks/useDisks'
 import { useAddVolume, useAddDiskToSpec } from '@/hooks/useHotplug'
@@ -202,8 +203,8 @@ export function AddDiskWizard({
             toast.success('Disk attached successfully')
             resetAndClose()
           },
-          onError: () => {
-            toast.error('Failed to attach disk')
+          onError: (err) => {
+            toast.error(extractErrorMessage(err, 'Failed to attach disk'))
           },
         }
       )
@@ -230,8 +231,8 @@ export function AddDiskWizard({
             toast.success('Disk added to VM spec')
             resetAndClose()
           },
-          onError: () => {
-            toast.error('Failed to add disk')
+          onError: (err) => {
+            toast.error(extractErrorMessage(err, 'Failed to add disk'))
           },
         }
       )

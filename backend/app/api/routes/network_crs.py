@@ -76,10 +76,7 @@ def update_network_cr(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    try:
-        return svc.update_network(name, body)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
+    return svc.update_network(name, body)
 
 
 @router.delete("/network-crs/{name}", status_code=204)
