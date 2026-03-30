@@ -6,7 +6,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
-import { useRemoveVolume, useRemoveInterface, useRemoveDiskFromSpec, useRemoveInterfaceFromSpec } from '@/hooks/useHotplug'
+import { useRemoveVolume, useRemoveDiskFromSpec, useRemoveInterface } from '@/hooks/useHotplug'
 import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
 import { formatDate, formatMemoryMb } from '@/lib/format'
@@ -29,9 +29,6 @@ import { HealthBadge } from '@/components/vm/HealthBadge'
 import { AddDiskWizard } from '@/components/vm/AddDiskWizard'
 import { AddNetworkWizard } from '@/components/vm/AddNetworkWizard'
 import { DiagnosticsTab } from '@/components/vm/DiagnosticsTab'
-import { DropdownMenu } from '@/components/ui/DropdownMenu'
-import { EditDiskModal } from '@/components/vm/EditDiskModal'
-import { EditInterfaceModal } from '@/components/vm/EditInterfaceModal'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -172,13 +169,10 @@ export function VMDetailPage() {
   const deleteSnapshot = useDeleteSnapshot()
   const restoreSnapshot = useRestoreSnapshot()
   const removeVolume = useRemoveVolume()
-  const removeInterface = useRemoveInterface()
   const removeDiskFromSpec = useRemoveDiskFromSpec()
-  const removeInterfaceFromSpec = useRemoveInterfaceFromSpec()
+  const removeInterface = useRemoveInterface()
   const [showAddDisk, setShowAddDisk] = useState(false)
   const [showAddNic, setShowAddNic] = useState(false)
-  const [editingDisk, setEditingDisk] = useState<any | null>(null)
-  const [editingInterface, setEditingInterface] = useState<any | null>(null)
 
   const [snapshotName, setSnapshotName] = useState('')
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
@@ -1100,66 +1094,57 @@ export function VMDetailPage() {
                           <td className="table-cell" style={{ color: theme.text.secondary }}>
                             {disk.bus ?? '—'}
                           </td>
-                          <td className="table-cell" style={{ position: 'relative', zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-                            {(() => {
-                              const actions = []
-                              const isEditable = disk.source_type !== 'cloud_init' && disk.source_type !== 'container_disk'
-                              if (vm.status === 'stopped' && isEditable) {
-                                actions.push({ label: 'Edit', action: 'edit' })
-                              }
-                              if (vm.status === 'running') {
-                                actions.push({ label: 'Remove', action: 'hotunplug', danger: true })
-                              }
-                              if (vm.status === 'stopped' && isEditable) {
-                                actions.push({ label: 'Delete', action: 'delete', danger: true })
-                              }
-                              if (actions.length === 0) return null
-                              return (
-                                <DropdownMenu
-                                  actions={actions}
-                                  onAction={(action) => {
-                                    if (!namespace || !name) return
-                                    if (action === 'edit') {
-                                      setEditingDisk(disk)
-                                    } else if (action === 'hotunplug') {
-                                      setConfirmAction({
-                                        title: 'Remove Disk',
-                                        message: `Remove disk "${disk.name}" from VM "${name}"? This will hotunplug the disk.`,
-                                        danger: true,
-                                        confirmLabel: 'Remove',
-                                        onConfirm: () => {
-                                          removeVolume.mutate(
-                                            { namespace, vmName: name, volName: disk.name },
-                                            {
-                                              onSuccess: () => toast.success('Disk removed'),
-                                              onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove disk')),
-                                            },
-                                          )
-                                          setConfirmAction(null)
-                                        },
-                                      })
-                                    } else if (action === 'delete') {
-                                      setConfirmAction({
-                                        title: 'Delete Disk',
-                                        message: `Delete disk "${disk.name}" from VM "${name}"? This will remove the disk from the VM spec.`,
-                                        danger: true,
-                                        confirmLabel: 'Delete',
-                                        onConfirm: () => {
-                                          removeDiskFromSpec.mutate(
-                                            { namespace, vmName: name, diskName: disk.name },
-                                            {
-                                              onSuccess: () => toast.success('Disk deleted'),
-                                              onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete disk')),
-                                            },
-                                          )
-                                          setConfirmAction(null)
-                                        },
-                                      })
-                                    }
-                                  }}
-                                />
-                              )
-                            })()}
+                          <td className="table-cell">
+                            {(vm.status === 'Running' || vm.status === 'Stopped') && (
+                              <button
+                                onClick={() => {
+                                  if (!namespace || !name) return
+                                  const isRunning = vm.status === 'Running'
+                                  setConfirmAction({
+                                    title: 'Remove Disk',
+                                    message: isRunning
+                                      ? `Hot-remove disk "${disk.name}" from running VM "${name}"? This only works for hotplugged disks.`
+                                      : `Remove disk "${disk.name}" from VM "${name}" spec?`,
+                                    danger: true,
+                                    confirmLabel: 'Remove',
+                                    onConfirm: () => {
+                                      if (isRunning) {
+                                        removeVolume.mutate(
+                                          { namespace, vmName: name, volName: disk.name },
+                                          {
+                                            onSuccess: () => toast.success('Disk removed'),
+                                            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove disk')),
+                                          },
+                                        )
+                                      } else {
+                                        removeDiskFromSpec.mutate(
+                                          { namespace, vmName: name, diskName: disk.name },
+                                          {
+                                            onSuccess: () => toast.success('Disk removed from spec'),
+                                            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove disk')),
+                                          },
+                                        )
+                                      }
+                                      setConfirmAction(null)
+                                    },
+                                  })
+                                }}
+                                disabled={removeVolume.isPending || removeDiskFromSpec.isPending}
+                                style={{
+                                  background: 'rgba(239,68,68,0.08)',
+                                  color: theme.status.error,
+                                  border: `1px solid rgba(239,68,68,0.3)`,
+                                  borderRadius: theme.radius.md,
+                                  padding: '3px 8px',
+                                  fontSize: 11,
+                                  cursor: removeVolume.isPending || removeDiskFromSpec.isPending ? 'not-allowed' : 'pointer',
+                                  fontFamily: 'inherit',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1231,65 +1216,44 @@ export function VMDetailPage() {
                           <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {net.mac_address ?? '—'}
                           </td>
-                          <td className="table-cell" style={{ position: 'relative', zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-                            {(() => {
-                              const actions = []
-                              if (vm.status === 'stopped') {
-                                actions.push({ label: 'Edit', action: 'edit' })
-                              }
-                              if (vm.status === 'running') {
-                                actions.push({ label: 'Remove', action: 'hotunplug', danger: true })
-                              }
-                              if (vm.status === 'stopped' && net.network_profile !== 'pod') {
-                                actions.push({ label: 'Delete', action: 'delete', danger: true })
-                              }
-                              if (actions.length === 0) return null
-                              return (
-                                <DropdownMenu
-                                  actions={actions}
-                                  onAction={(action) => {
-                                    if (!namespace || !name) return
-                                    if (action === 'edit') {
-                                      setEditingInterface(net)
-                                    } else if (action === 'hotunplug') {
-                                      setConfirmAction({
-                                        title: 'Remove Interface',
-                                        message: `Remove interface "${net.name}" from VM "${name}"? This will hotunplug the interface.`,
-                                        danger: true,
-                                        confirmLabel: 'Remove',
-                                        onConfirm: () => {
-                                          removeInterface.mutate(
-                                            { namespace, vmName: name, ifaceName: net.name },
-                                            {
-                                              onSuccess: () => toast.success('Interface removed'),
-                                              onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove interface')),
-                                            },
-                                          )
-                                          setConfirmAction(null)
+                          <td className="table-cell">
+                            {vm.status === 'Running' && (
+                              <button
+                                onClick={() => {
+                                  if (!namespace || !name) return
+                                  setConfirmAction({
+                                    title: 'Remove Interface',
+                                    message: `Remove interface "${net.name}" from VM "${name}"?`,
+                                    danger: true,
+                                    confirmLabel: 'Remove',
+                                    onConfirm: () => {
+                                      removeInterface.mutate(
+                                        { namespace, vmName: name, ifaceName: net.name },
+                                        {
+                                          onSuccess: () => toast.success('Interface removed'),
+                                          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove interface')),
                                         },
-                                      })
-                                    } else if (action === 'delete') {
-                                      setConfirmAction({
-                                        title: 'Delete Interface',
-                                        message: `Delete interface "${net.name}" from VM "${name}"? This will remove the interface from the VM spec.`,
-                                        danger: true,
-                                        confirmLabel: 'Delete',
-                                        onConfirm: () => {
-                                          removeInterfaceFromSpec.mutate(
-                                            { namespace, vmName: name, ifaceName: net.name },
-                                            {
-                                              onSuccess: () => toast.success('Interface deleted'),
-                                              onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete interface')),
-                                            },
-                                          )
-                                          setConfirmAction(null)
-                                        },
-                                      })
-                                    }
-                                  }}
-                                />
-                              )
-                            })()}
+                                      )
+                                      setConfirmAction(null)
+                                    },
+                                  })
+                                }}
+                                disabled={removeInterface.isPending}
+                                style={{
+                                  background: 'rgba(239,68,68,0.08)',
+                                  color: theme.status.error,
+                                  border: `1px solid rgba(239,68,68,0.3)`,
+                                  borderRadius: theme.radius.md,
+                                  padding: '3px 8px',
+                                  fontSize: 11,
+                                  cursor: removeInterface.isPending ? 'not-allowed' : 'pointer',
+                                  fontFamily: 'inherit',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1719,20 +1683,6 @@ export function VMDetailPage() {
         vmName={name!}
         vmStatus={vm?.status ?? ''}
         existingNicCount={vm?.networks?.length ?? 0}
-      />
-      <EditDiskModal
-        open={!!editingDisk}
-        onClose={() => setEditingDisk(null)}
-        namespace={namespace!}
-        vmName={name!}
-        disk={editingDisk}
-      />
-      <EditInterfaceModal
-        open={!!editingInterface}
-        onClose={() => setEditingInterface(null)}
-        namespace={namespace!}
-        vmName={name!}
-        iface={editingInterface}
       />
       <PromptModal
         open={!!promptAction}
