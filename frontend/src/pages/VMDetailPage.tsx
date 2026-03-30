@@ -1095,11 +1095,11 @@ export function VMDetailPage() {
                             {disk.bus ?? '—'}
                           </td>
                           <td className="table-cell">
-                            {(vm.status === 'Running' || vm.status === 'Stopped') && (
+                            {(vm.status === 'running' || vm.status === 'stopped') && (
                               <button
                                 onClick={() => {
                                   if (!namespace || !name) return
-                                  const isRunning = vm.status === 'Running'
+                                  const isRunning = vm.status === 'running'
                                   setConfirmAction({
                                     title: 'Remove Disk',
                                     message: isRunning
