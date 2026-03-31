@@ -296,7 +296,7 @@ export function VMDetailPage() {
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
           {/* Primary action */}
-          {vm?.status === 'Running' ? (
+          {vm?.status === 'running' ? (
             <button
               onClick={() => handleAction('console')}
               style={{
@@ -332,7 +332,7 @@ export function VMDetailPage() {
             </button>
           )}
           {/* Secondary actions */}
-          {vm?.status === 'Running' && (
+          {vm?.status === 'running' && (
             <button
               onClick={() => handleAction('stop')}
               style={{
@@ -419,7 +419,7 @@ export function VMDetailPage() {
           >
             {createSnapshot.isPending ? 'Snapshotting...' : 'Snapshot'}
           </button>
-          {vm?.status === 'Running' && (
+          {vm?.status === 'running' && (
             <button
               onClick={() => {
                 setConfirmAction({
@@ -450,7 +450,7 @@ export function VMDetailPage() {
               {forceStopMutation.isPending ? 'Force Stopping...' : 'Force Stop'}
             </button>
           )}
-          {vm?.status === 'Running' && (
+          {vm?.status === 'running' && (
             <button
               onClick={() => {
                 if (namespace && name) {

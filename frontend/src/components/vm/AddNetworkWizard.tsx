@@ -127,7 +127,7 @@ export function AddNetworkWizard({
     macAddress: '',
   })
 
-  const isRunning = vmStatus === 'Running'
+  const isRunning = vmStatus === 'running'
 
   const { data: networkCRsData } = useNetworkCRs()
   const networkCRs: NetworkCR[] = networkCRsData?.items || []
