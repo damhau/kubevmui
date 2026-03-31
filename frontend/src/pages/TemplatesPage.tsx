@@ -28,6 +28,7 @@ const categoryColor: Record<string, string> = {
 
 interface Template {
   name: string
+  namespace: string
   display_name?: string
   category?: string
   os_type?: string
@@ -471,7 +472,7 @@ export function TemplatesPage() {
                   <tr
                     key={tpl.name}
                     className="table-row-clickable"
-                    onClick={() => navigate(`/templates/${tpl.name}`)}
+                    onClick={() => navigate(`/templates/${tpl.namespace}/${tpl.name}`)}
                     style={i < 8 ? {
                       animation: `fadeInRow 0.3s ease-out both`,
                       animationDelay: `${0.05 + i * 0.04}s`,
