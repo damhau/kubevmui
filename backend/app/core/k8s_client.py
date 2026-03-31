@@ -607,6 +607,14 @@ class KubeVirtClient:
 
     # ── Catalog (cluster-scoped) ──────────────────────────────────
 
+    def list_kubevirts(self) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
+            group=self.KUBEVIRT_API_GROUP,
+            version=self.KUBEVIRT_API_VERSION,
+            plural="kubevirts",
+        )
+        return result.get("items", [])
+
     def list_catalog_entries(self) -> list[dict]:
         result = self.custom_api.list_cluster_custom_object(
             group=self.CATALOG_GROUP,
