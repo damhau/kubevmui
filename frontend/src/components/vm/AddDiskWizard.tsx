@@ -140,7 +140,7 @@ export function AddDiskWizard({
     imageNamespace: namespace,
   })
 
-  const isRunning = vmStatus === 'Running'
+  const isRunning = vmStatus === 'running'
 
   const { data: storageClassesData } = useStorageClasses()
   const { data: disksData } = useDisks()
