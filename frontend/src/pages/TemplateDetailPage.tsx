@@ -18,8 +18,8 @@ const categoryColor: Record<string, string> = {
 type Tab = 'overview' | 'yaml'
 
 export function TemplateDetailPage() {
-  const { name } = useParams<{ name: string }>()
-  const { data, isLoading } = useTemplate(name!)
+  const { namespace, name } = useParams<{ namespace: string; name: string }>()
+  const { data, isLoading } = useTemplate(name!, namespace!)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const tabs: { id: Tab; label: string }[] = [

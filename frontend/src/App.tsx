@@ -54,7 +54,7 @@ function App() {
             <Route path="/images/:namespace/:name" element={<ImageDetailPage />} />
             <Route path="/catalog" element={<CatalogPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
-            <Route path="/templates/:name" element={<TemplateDetailPage />} />
+            <Route path="/templates/:namespace/:name" element={<TemplateDetailPage />} />
             <Route path="/networks" element={<NetworksPage />} />
             <Route path="/networks/network-crs/:name" element={<NetworkCRDetailPage />} />
             <Route path="/networks/interfaces/:name" element={<InterfaceDetailPage />} />

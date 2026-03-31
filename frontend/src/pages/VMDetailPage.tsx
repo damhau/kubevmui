@@ -813,7 +813,7 @@ export function VMDetailPage() {
                     <InfoRow label="Namespace" value={namespace} mono />
                     <InfoRow label="OS Type" value={vm.os_type ?? vm.os ?? '—'} />
                     <InfoRow label="Created" value={formatDate(vm.created_at ?? vm.creation_timestamp)} />
-                    <InfoRow label="Template" value={vm.template_name ? <Link to={`/templates/${vm.template_name}`} style={{ color: theme.accent, textDecoration: 'none' }}>{vm.template_name}</Link> : '—'} />
+                    <InfoRow label="Template" value={vm.template_name ? <Link to={`/templates/${namespace}/${vm.template_name}`} style={{ color: theme.accent, textDecoration: 'none' }}>{vm.template_name}</Link> : '—'} />
                     <InfoRow label="Description" value={vm.description || '—'} />
                     {vm.labels && Object.keys(vm.labels).length > 0 && (
                       <InfoRow
