@@ -74,7 +74,7 @@ const vmActions = [
 ]
 
 function getVMActions(vm: VM) {
-  if (vm.status === 'Stopped') return vmActions
+  if (vm.status === 'stopped') return vmActions
   return vmActions.filter((a) => a.action !== 'create-template')
 }
 
