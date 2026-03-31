@@ -318,17 +318,25 @@ function ComponentsTab({ info }: { info: NonNullable<ReturnType<typeof useKubeVi
   )
 }
 
+function maturityVariant(maturity: string) {
+  if (maturity === 'GA') return 'success' as const
+  if (maturity === 'Beta') return 'info' as const
+  if (maturity === 'Alpha') return 'warning' as const
+  if (maturity === 'Deprecated') return 'neutral' as const
+  if (maturity === 'Discontinued') return 'error' as const
+  return 'neutral' as const
+}
+
 function FeaturesTab({ info }: { info: NonNullable<ReturnType<typeof useKubeVirtInfo>['data']> }) {
-  if (info.feature_gates.length === 0) {
-    return (
-      <div
-        className="card-padded"
-        style={{ textAlign: 'center', color: theme.text.secondary, padding: 40 }}
-      >
-        No feature gates enabled.
-      </div>
-    )
-  }
+  const gates = info.all_feature_gates.length > 0
+    ? info.all_feature_gates
+    : info.feature_gates.map((fg) => ({ name: fg, description: '', maturity: '', enabled: true }))
+
+  // Sort: enabled first, then alphabetical
+  const sorted = [...gates].sort((a, b) => {
+    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
 
   return (
     <div className="card">
@@ -336,24 +344,33 @@ function FeaturesTab({ info }: { info: NonNullable<ReturnType<typeof useKubeVirt
         <thead>
           <tr className="table-header">
             <th className="table-header-cell">Feature Gate</th>
+            <th className="table-header-cell">Description</th>
+            <th className="table-header-cell">Maturity</th>
             <th className="table-header-cell">Status</th>
           </tr>
         </thead>
         <tbody>
-          {info.feature_gates.map((fg, i) => (
+          {sorted.map((fg, i) => (
             <tr
-              key={fg}
+              key={fg.name}
               className="table-row"
               style={{
                 animation: 'fadeInRow 0.3s ease-out both',
-                animationDelay: `${0.1 + i * 0.04}s`,
+                animationDelay: `${0.1 + Math.min(i, 15) * 0.03}s`,
+                opacity: fg.enabled ? 1 : 0.6,
               }}
             >
-              <td className="table-cell" style={{ fontWeight: 500, color: theme.text.primary }}>
-                {fg}
+              <td className="table-cell" style={{ fontWeight: 500, color: theme.text.primary, whiteSpace: 'nowrap' }}>
+                {fg.name}
+              </td>
+              <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, maxWidth: 420 }}>
+                {fg.description || '—'}
               </td>
               <td className="table-cell">
-                <Badge label="Enabled" variant="success" />
+                {fg.maturity ? <Badge label={fg.maturity} variant={maturityVariant(fg.maturity)} /> : '—'}
+              </td>
+              <td className="table-cell">
+                <Badge label={fg.enabled ? 'Enabled' : 'Disabled'} variant={fg.enabled ? 'success' : 'neutral'} />
               </td>
             </tr>
           ))}

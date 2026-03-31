@@ -16,6 +16,13 @@ export interface KubeVirtComponent {
   namespace: string | null
 }
 
+export interface FeatureGateInfo {
+  name: string
+  description: string
+  maturity: string
+  enabled: boolean
+}
+
 export interface KubeVirtInfo {
   phase: string
   operator_version: string
@@ -25,6 +32,8 @@ export interface KubeVirtInfo {
   default_architecture: string
   outdated_workloads: number
   feature_gates: string[]
+  disabled_feature_gates: string[]
+  all_feature_gates: FeatureGateInfo[]
   conditions: KubeVirtCondition[]
   components: KubeVirtComponent[]
   infra_replicas: number | null
