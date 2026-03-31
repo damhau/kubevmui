@@ -131,6 +131,17 @@ class RemoveInterfaceRequest(BaseModel):
     name: str
 
 
+class EditDiskRequest(BaseModel):
+    bus: str | None = None
+    boot_order: int | None = None  # 0 to clear boot order
+
+
+class EditInterfaceRequest(BaseModel):
+    model: str | None = None
+    mac_address: str | None = None
+    network_cr: str | None = None  # Change the network attachment
+
+
 class VMCloneRequest(BaseModel):
     new_name: str
 

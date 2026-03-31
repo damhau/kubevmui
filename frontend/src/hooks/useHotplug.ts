@@ -111,6 +111,23 @@ export function useRemoveInterface() {
   })
 }
 
+export function useRemoveInterfaceFromSpec() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ namespace, vmName, ifaceName }: { namespace: string; vmName: string; ifaceName: string }) => {
+      const { data } = await apiClient.delete(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${vmName}/nics/${ifaceName}`
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vm'] })
+      queryClient.invalidateQueries({ queryKey: ['vms'] })
+    },
+  })
+}
+
 export function useAddInterfaceToSpec() {
   const queryClient = useQueryClient()
   const { activeCluster } = useUIStore()

@@ -11,6 +11,8 @@ from app.models.vm import (
     AddInterfaceRequest,
     AddInterfaceToSpecRequest,
     AddVolumeRequest,
+    EditDiskRequest,
+    EditInterfaceRequest,
     VMCloneRequest,
     VMCreate,
     VMList,
@@ -248,6 +250,65 @@ def add_interface_to_spec(
         model=body.model,
         mac_address=body.mac_address,
     )
+    return {"status": "ok"}
+
+
+@router.delete("/vms/{name}/nics/{iface_name}", status_code=200)
+def remove_interface_from_spec(
+    cluster: str,
+    ns: str,
+    name: str,
+    iface_name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    try:
+        svc.remove_interface_from_spec(ns, name, iface_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    return {"status": "ok"}
+
+
+@router.patch("/vms/{name}/disks/{disk_name}", status_code=200)
+def edit_disk(
+    cluster: str,
+    ns: str,
+    name: str,
+    disk_name: str,
+    body: EditDiskRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    try:
+        svc.edit_disk_in_spec(ns, name, disk_name, bus=body.bus, boot_order=body.boot_order)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    return {"status": "ok"}
+
+
+@router.patch("/vms/{name}/nics/{iface_name}", status_code=200)
+def edit_interface(
+    cluster: str,
+    ns: str,
+    name: str,
+    iface_name: str,
+    body: EditInterfaceRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc, net_cr_svc = _get_services(cluster, cm)
+    try:
+        svc.edit_interface_in_spec(
+            ns, name, iface_name,
+            model=body.model,
+            mac_address=body.mac_address,
+            network_cr_name=body.network_cr,
+            net_cr_svc=net_cr_svc,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
     return {"status": "ok"}
 
 
