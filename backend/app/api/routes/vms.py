@@ -263,11 +263,9 @@ def remove_disk_from_spec(
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    try:
-        svc.remove_disk_from_spec(ns, name, disk_name)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from None
+    svc.remove_disk_from_spec(ns, name, disk_name)
     return {"status": "ok"}
+
 
 
 @router.delete("/vms/{name}/nics/{iface_name}", status_code=200)
@@ -299,9 +297,7 @@ def edit_disk(
 ):
     svc = _get_service(cluster, cm)
     try:
-        svc.edit_disk_in_spec(
-            ns, name, disk_name, bus=body.bus, boot_order=body.boot_order
-        )
+        svc.edit_disk_in_spec(ns, name, disk_name, bus=body.bus, boot_order=body.boot_order)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
     return {"status": "ok"}
@@ -320,9 +316,7 @@ def edit_interface(
     svc, net_cr_svc = _get_services(cluster, cm)
     try:
         svc.edit_interface_in_spec(
-            ns,
-            name,
-            iface_name,
+            ns, name, iface_name,
             model=body.model,
             mac_address=body.mac_address,
             network_cr_name=body.network_cr,

@@ -6,7 +6,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useVMAction } from '@/hooks/useVMs'
 import { useSnapshots, useCreateSnapshot, useDeleteSnapshot, useRestoreSnapshot } from '@/hooks/useSnapshots'
 import { useMigrations, useCreateMigration, useCancelMigration } from '@/hooks/useMigrations'
-import { useRemoveVolume, useRemoveDiskFromSpec, useRemoveInterface } from '@/hooks/useHotplug'
+import { useRemoveVolume, useRemoveDiskFromSpec, useRemoveInterface, useRemoveInterfaceFromSpec } from '@/hooks/useHotplug'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { useResourceEvents } from '@/hooks/useEvents'
 import { theme } from '@/lib/theme'
@@ -172,6 +172,7 @@ export function VMDetailPage() {
   const removeVolume = useRemoveVolume()
   const removeDiskFromSpec = useRemoveDiskFromSpec()
   const removeInterface = useRemoveInterface()
+  const removeInterfaceFromSpec = useRemoveInterfaceFromSpec()
   const [showAddDisk, setShowAddDisk] = useState(false)
   const [showAddNic, setShowAddNic] = useState(false)
 
@@ -1197,7 +1198,7 @@ export function VMDetailPage() {
                             {net.name}
                           </td>
                           <td className="table-cell" style={{ color: theme.text.secondary }}>
-                            {net.network_profile ?? '—'}
+                            {net.network_cr || net.network_profile || '—'}
                           </td>
                           <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {net.ip_address ?? '—'}
@@ -1205,44 +1206,45 @@ export function VMDetailPage() {
                           <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {net.mac_address ?? '—'}
                           </td>
-                          <td className="table-cell">
-                            {vm.status === 'Running' && (
-                              <button
-                                onClick={() => {
-                                  if (!namespace || !name) return
+                          <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
+                            <DropdownMenu
+                              actions={[
+                                { label: 'Remove', action: 'remove', danger: true },
+                              ]}
+                              onAction={(action) => {
+                                if (action === 'remove' && namespace && name) {
+                                  const isRunning = vm.status === 'running'
                                   setConfirmAction({
                                     title: 'Remove Interface',
-                                    message: `Remove interface "${net.name}" from VM "${name}"?`,
+                                    message: isRunning
+                                      ? `Hot-remove interface "${net.name}" from running VM "${name}"? This only works for hotplugged interfaces.`
+                                      : `Remove interface "${net.name}" from VM "${name}" spec?`,
                                     danger: true,
                                     confirmLabel: 'Remove',
                                     onConfirm: () => {
-                                      removeInterface.mutate(
-                                        { namespace, vmName: name, ifaceName: net.name },
-                                        {
-                                          onSuccess: () => toast.success('Interface removed'),
-                                          onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove interface')),
-                                        },
-                                      )
+                                      if (isRunning) {
+                                        removeInterface.mutate(
+                                          { namespace, vmName: name, ifaceName: net.name },
+                                          {
+                                            onSuccess: () => toast.success('Interface removed'),
+                                            onError: (err) => toast.error(extractErrorMessage(err, 'Failed to remove interface')),
+                                          },
+                                        )
+                                      } else {
+                                        removeInterfaceFromSpec.mutate(
+                                          { namespace, vmName: name, ifaceName: net.name },
+                                          {
+                                            onSuccess: () => toast.success('Interface removed from spec'),
+                                            onError: (err: unknown) => toast.error(extractErrorMessage(err, 'Failed to remove interface')),
+                                          },
+                                        )
+                                      }
                                       setConfirmAction(null)
                                     },
                                   })
-                                }}
-                                disabled={removeInterface.isPending}
-                                style={{
-                                  background: 'rgba(239,68,68,0.08)',
-                                  color: theme.status.error,
-                                  border: `1px solid rgba(239,68,68,0.3)`,
-                                  borderRadius: theme.radius.md,
-                                  padding: '3px 8px',
-                                  fontSize: 11,
-                                  cursor: removeInterface.isPending ? 'not-allowed' : 'pointer',
-                                  fontFamily: 'inherit',
-                                  fontWeight: 500,
-                                }}
-                              >
-                                Remove
-                              </button>
-                            )}
+                                }
+                              }}
+                            />
                           </td>
                         </tr>
                       ))}

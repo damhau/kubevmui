@@ -867,6 +867,135 @@ class VMService:
         }
         self.kv.patch_vm(namespace, vm_name, body)
 
+    def edit_disk_in_spec(
+        self,
+        namespace: str,
+        vm_name: str,
+        disk_name: str,
+        bus: str | None = None,
+        boot_order: int | None = None,
+    ) -> None:
+        """Edit a disk's bus or boot order in a stopped VM's spec."""
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            return
+        spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+        disks = spec.get("domain", {}).get("devices", {}).get("disks", [])
+
+        disk = next((d for d in disks if d.get("name") == disk_name), None)
+        if not disk:
+            raise ValueError(f"Disk '{disk_name}' not found")
+
+        if bus is not None:
+            for key in ("disk", "cdrom"):
+                if key in disk:
+                    disk[key]["bus"] = bus
+        if boot_order is not None:
+            if boot_order == 0:
+                disk.pop("bootOrder", None)
+            else:
+                disk["bootOrder"] = boot_order
+
+        body = {
+            "spec": {
+                "template": {
+                    "spec": {"domain": {"devices": {"disks": disks}}}
+                }
+            }
+        }
+        self.kv.patch_vm(namespace, vm_name, body)
+
+    def remove_interface_from_spec(
+        self, namespace: str, vm_name: str, iface_name: str
+    ) -> None:
+        """Remove a network interface from a stopped VM's spec."""
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            return
+        spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+        interfaces = spec.get("domain", {}).get("devices", {}).get("interfaces", [])
+        networks = spec.get("networks", [])
+
+        # Prevent removal of pod network
+        net = next((n for n in networks if n.get("name") == iface_name), None)
+        if net and "pod" in net:
+            raise ValueError("Cannot remove the pod network interface")
+
+        interfaces = [i for i in interfaces if i.get("name") != iface_name]
+        networks = [n for n in networks if n.get("name") != iface_name]
+
+        body = {
+            "spec": {
+                "template": {
+                    "spec": {
+                        "domain": {"devices": {"interfaces": interfaces}},
+                        "networks": networks,
+                    }
+                }
+            }
+        }
+        self.kv.patch_vm(namespace, vm_name, body)
+
+    def edit_interface_in_spec(
+        self,
+        namespace: str,
+        vm_name: str,
+        iface_name: str,
+        model: str | None = None,
+        mac_address: str | None = None,
+        network_cr_name: str | None = None,
+        net_cr_svc: NetworkCRService | None = None,
+    ) -> None:
+        """Edit a network interface in a stopped VM's spec."""
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            return
+        spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+        interfaces = spec.get("domain", {}).get("devices", {}).get("interfaces", [])
+        networks = spec.get("networks", [])
+
+        iface = next((i for i in interfaces if i.get("name") == iface_name), None)
+        if not iface:
+            raise ValueError(f"Interface '{iface_name}' not found")
+
+        if model is not None:
+            iface["model"] = model
+        if mac_address is not None:
+            iface["macAddress"] = mac_address
+
+        if network_cr_name and net_cr_svc:
+            net = next((n for n in networks if n.get("name") == iface_name), None)
+            if net:
+                network_type = "pod" if network_cr_name == "pod-network" else "multus"
+                cr = net_cr_svc.kv.get_network_cr(network_cr_name)
+                if cr:
+                    network_type = cr.get("spec", {}).get("networkType", "pod")
+                # Clear old type and set new
+                net.pop("pod", None)
+                net.pop("multus", None)
+                if network_type == "pod":
+                    net["pod"] = {}
+                    # Switch interface type to masquerade
+                    iface.pop("bridge", None)
+                    iface["masquerade"] = {}
+                else:
+                    nad_name = net_cr_svc.ensure_nad(namespace, network_cr_name) or network_cr_name
+                    net["multus"] = {"networkName": nad_name}
+                    iface.pop("masquerade", None)
+                    iface["bridge"] = {}
+
+        body = {
+            "spec": {
+                "template": {
+                    "spec": {
+                        "domain": {"devices": {"interfaces": interfaces}},
+                        "networks": networks,
+                    }
+                }
+            }
+        }
+        self.kv.patch_vm(namespace, vm_name, body)
+
     def force_stop(self, namespace: str, name: str) -> None:
         """Force stop by patching runStrategy to Halted."""
         body = {"spec": {"runStrategy": "Halted"}}
