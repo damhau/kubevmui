@@ -31,7 +31,9 @@ async def validate_k8s_token(token: str, api_client: client.ApiClient | None) ->
                 authenticated=True,
             )
     except ApiException as e:
-        logger.error("TokenReview API error: status=%s, reason=%s, body=%s", e.status, e.reason, e.body)
+        logger.error(
+            "TokenReview API error: status=%s, reason=%s, body=%s", e.status, e.reason, e.body
+        )
     except Exception as e:
         logger.error("TokenReview unexpected error: %s", e, exc_info=True)
     return UserInfo(username="anonymous", authenticated=False)

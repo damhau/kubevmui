@@ -30,7 +30,10 @@ class ClusterManager:
         except Exception:
             pass
         self._clusters["local"] = ClusterInfo(
-            name="local", api_client=api_client, is_local=True, connected=connected,
+            name="local",
+            api_client=api_client,
+            is_local=True,
+            connected=connected,
         )
 
     def list_clusters(self) -> list[ClusterInfo]:

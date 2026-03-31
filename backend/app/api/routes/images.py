@@ -93,6 +93,7 @@ async def upload_image(
 
     # Stream file to CDI in chunks (avoids loading entire file in memory)
     import logging
+
     try:
         svc.upload_image_stream(ns, name, file.file)
     except Exception as e:

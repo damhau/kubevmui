@@ -26,12 +26,7 @@ router = APIRouter(
 
 
 def _wrap(manifests: list[dict]) -> dict:
-    return {
-        "resources": [
-            {"kind": m.get("kind", "Unknown"), "manifest": m}
-            for m in manifests
-        ]
-    }
+    return {"resources": [{"kind": m.get("kind", "Unknown"), "manifest": m} for m in manifests]}
 
 
 @router.post("/vms/preview")

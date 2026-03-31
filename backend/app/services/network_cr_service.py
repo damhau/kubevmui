@@ -150,12 +150,14 @@ class NetworkCRService:
         result = []
         for nad in nads:
             metadata = nad.get("metadata", {})
-            result.append({
-                "name": metadata.get("name", ""),
-                "namespace": metadata.get("namespace", ""),
-                "created_at": metadata.get("creationTimestamp"),
-                "raw_manifest": nad,
-            })
+            result.append(
+                {
+                    "name": metadata.get("name", ""),
+                    "namespace": metadata.get("namespace", ""),
+                    "created_at": metadata.get("creationTimestamp"),
+                    "raw_manifest": nad,
+                }
+            )
         return result
 
     def delete_nad(self, namespace: str, name: str) -> None:

@@ -69,8 +69,11 @@ class NetworkService:
     def get_profile(self, namespace: str, name: str) -> NetworkProfile | None:
         try:
             nad = self.custom_api.get_namespaced_custom_object(
-                group=NAD_GROUP, version=NAD_VERSION,
-                namespace=namespace, plural=NAD_PLURAL, name=name,
+                group=NAD_GROUP,
+                version=NAD_VERSION,
+                namespace=namespace,
+                plural=NAD_PLURAL,
+                name=name,
             )
         except client.ApiException as e:
             if e.status == 404:
@@ -80,8 +83,10 @@ class NetworkService:
 
     def list_profiles(self, namespace: str) -> list[NetworkProfile]:
         result = self.custom_api.list_namespaced_custom_object(
-            group=NAD_GROUP, version=NAD_VERSION,
-            namespace=namespace, plural=NAD_PLURAL,
+            group=NAD_GROUP,
+            version=NAD_VERSION,
+            namespace=namespace,
+            plural=NAD_PLURAL,
         )
         return [_nad_to_profile(nad) for nad in result.get("items", [])]
 
@@ -152,13 +157,19 @@ class NetworkService:
             "spec": {"config": json.dumps(cni_config)},
         }
         raw = self.custom_api.create_namespaced_custom_object(
-            group=NAD_GROUP, version=NAD_VERSION,
-            namespace=request.namespace, plural=NAD_PLURAL, body=body,
+            group=NAD_GROUP,
+            version=NAD_VERSION,
+            namespace=request.namespace,
+            plural=NAD_PLURAL,
+            body=body,
         )
         return _nad_to_profile(raw)
 
     def delete_profile(self, namespace: str, name: str) -> None:
         self.custom_api.delete_namespaced_custom_object(
-            group=NAD_GROUP, version=NAD_VERSION,
-            namespace=namespace, plural=NAD_PLURAL, name=name,
+            group=NAD_GROUP,
+            version=NAD_VERSION,
+            namespace=namespace,
+            plural=NAD_PLURAL,
+            name=name,
         )

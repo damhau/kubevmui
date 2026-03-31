@@ -69,13 +69,15 @@ def get_node(
             vms = svc.list_vms(ns)
             for vm in vms:
                 if vm.node == name:
-                    node_vms.append({
-                        "name": vm.name,
-                        "namespace": vm.namespace,
-                        "status": vm.status.value,
-                        "cpu_cores": vm.compute.cpu_cores,
-                        "memory_mb": vm.compute.memory_mb,
-                    })
+                    node_vms.append(
+                        {
+                            "name": vm.name,
+                            "namespace": vm.namespace,
+                            "status": vm.status.value,
+                            "cpu_cores": vm.compute.cpu_cores,
+                            "memory_mb": vm.compute.memory_mb,
+                        }
+                    )
         except Exception:
             continue
 

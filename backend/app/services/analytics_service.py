@@ -13,7 +13,14 @@ class AnalyticsService:
         self.metrics = MetricsService(api_client)
         self.custom_api = client.CustomObjectsApi(api_client)
 
-    def get_top_consumers(self, metric: str = "cpu", limit: int = 10, start: str = "", end: str = "", step: str = "300s") -> list[dict]:
+    def get_top_consumers(
+        self,
+        metric: str = "cpu",
+        limit: int = 10,
+        start: str = "",
+        end: str = "",
+        step: str = "300s",
+    ) -> list[dict]:
         """Get top N VMs by resource consumption."""
         if metric == "cpu":
             query = f'topk({limit}, sum by (pod) (rate(container_cpu_usage_seconds_total{{pod=~"virt-launcher-.*",container="compute"}}[5m])))'
@@ -21,7 +28,7 @@ class AnalyticsService:
             query = f'topk({limit}, sum by (pod) (container_memory_working_set_bytes{{pod=~"virt-launcher-.*",container="compute"}}))'
         elif metric == "network":
             query = (
-                f'topk({limit}, sum by (pod) ('
+                f"topk({limit}, sum by (pod) ("
                 f'rate(container_network_receive_bytes_total{{pod=~"virt-launcher-.*"}}[5m])'
                 f' + rate(container_network_transmit_bytes_total{{pod=~"virt-launcher-.*"}}[5m])))'
             )
@@ -36,19 +43,25 @@ class AnalyticsService:
             parts = pod_name.replace("virt-launcher-", "").rsplit("-", 1)
             vm_name = parts[0] if parts else pod_name
             value = float(r.get("value", [0, 0])[1])
-            consumers.append({
-                "vm_name": vm_name,
-                "pod_name": pod_name,
-                "value": value,
-                "metric": metric,
-            })
+            consumers.append(
+                {
+                    "vm_name": vm_name,
+                    "pod_name": pod_name,
+                    "value": value,
+                    "metric": metric,
+                }
+            )
         return consumers
 
     def get_trends(self, start: str, end: str, step: str = "600s") -> dict:
         """Get cluster-level trends."""
-        vm_count_q = 'count(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"})'
+        vm_count_q = (
+            'count(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"})'
+        )
         total_cpu_q = 'sum(rate(container_cpu_usage_seconds_total{pod=~"virt-launcher-.*",container="compute"}[5m]))'
-        total_mem_q = 'sum(container_memory_working_set_bytes{pod=~"virt-launcher-.*",container="compute"})'
+        total_mem_q = (
+            'sum(container_memory_working_set_bytes{pod=~"virt-launcher-.*",container="compute"})'
+        )
 
         def extract(result):
             if not result:
@@ -82,12 +95,14 @@ class AnalyticsService:
                     continue
                 if (now - ts).days <= range_days:
                     phase = item.get("status", {}).get("phase", "Unknown")
-                    migrations.append({
-                        "timestamp": ts.isoformat(),
-                        "vm_name": item.get("spec", {}).get("vmiName", ""),
-                        "phase": phase,
-                        "namespace": item.get("metadata", {}).get("namespace", ""),
-                    })
+                    migrations.append(
+                        {
+                            "timestamp": ts.isoformat(),
+                            "vm_name": item.get("spec", {}).get("vmiName", ""),
+                            "phase": phase,
+                            "namespace": item.get("metadata", {}).get("namespace", ""),
+                        }
+                    )
         except Exception:
             pass
 

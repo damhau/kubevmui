@@ -10,6 +10,7 @@ class HealthStatus(StrEnum):
     critical = "critical"
     unknown = "unknown"
 
+
 class VMStatus(StrEnum):
     running = "running"
     stopped = "stopped"
@@ -21,15 +22,18 @@ class VMStatus(StrEnum):
     provisioning = "provisioning"
     unknown = "unknown"
 
+
 class DiskBus(StrEnum):
     virtio = "virtio"
     sata = "sata"
     scsi = "scsi"
 
+
 class NetworkType(StrEnum):
     bridge = "bridge"
     masquerade = "masquerade"
     sriov = "sr-iov"
+
 
 class ResourceMeta(BaseModel):
     name: str

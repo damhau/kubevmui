@@ -98,6 +98,7 @@ async def vnc_proxy(websocket: WebSocket, cluster: str, namespace: str, vm: str)
     ssl_context = None
     try:
         import ssl
+
         if config.ssl_ca_cert:
             ssl_context = ssl.create_default_context(cafile=config.ssl_ca_cert)
         elif not config.verify_ssl:

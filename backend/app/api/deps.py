@@ -23,6 +23,7 @@ async def get_current_user(request: Request) -> UserInfo:
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     from app.auth.k8s_token import validate_k8s_token
+
     cm: ClusterManager = request.app.state.cluster_manager
     api_client = cm.get_api_client("local")
     user = await validate_k8s_token(token, api_client)

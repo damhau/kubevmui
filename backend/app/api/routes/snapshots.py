@@ -91,7 +91,9 @@ def delete_snapshot(
     )
 
 
-@router.post("/vms/{vm_name}/snapshots/{snapshot_name}/restore", response_model=Restore, status_code=201)
+@router.post(
+    "/vms/{vm_name}/snapshots/{snapshot_name}/restore", response_model=Restore, status_code=201
+)
 def restore_snapshot(
     cluster: str,
     ns: str,

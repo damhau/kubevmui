@@ -10,7 +10,11 @@ def _ssh_key_from_raw(raw: dict) -> SSHKey:
     ts = metadata.get("creationTimestamp")
     if ts:
         try:
-            created_at = datetime.fromisoformat(str(ts).replace("Z", "+00:00")) if isinstance(ts, str) else ts
+            created_at = (
+                datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                if isinstance(ts, str)
+                else ts
+            )
         except (ValueError, TypeError):
             created_at = datetime.now(tz=UTC)
     return SSHKey(

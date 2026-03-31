@@ -94,15 +94,41 @@ STANDARD_TEMPLATES = [
 ]
 
 ALPINE_TEMPLATES = [
-    {"name": "small", "displayName": "Small (1 vCPU / 256 MB)", "cpuCores": 1, "memoryMb": 256, "diskSizeGb": 5},
-    {"name": "medium", "displayName": "Medium (1 vCPU / 512 MB)", "cpuCores": 1, "memoryMb": 512, "diskSizeGb": 10},
-    {"name": "large", "displayName": "Large (2 vCPU / 1 GB)", "cpuCores": 2, "memoryMb": 1024, "diskSizeGb": 20},
+    {
+        "name": "small",
+        "displayName": "Small (1 vCPU / 256 MB)",
+        "cpuCores": 1,
+        "memoryMb": 256,
+        "diskSizeGb": 5,
+    },
+    {
+        "name": "medium",
+        "displayName": "Medium (1 vCPU / 512 MB)",
+        "cpuCores": 1,
+        "memoryMb": 512,
+        "diskSizeGb": 10,
+    },
+    {
+        "name": "large",
+        "displayName": "Large (2 vCPU / 1 GB)",
+        "cpuCores": 2,
+        "memoryMb": 1024,
+        "diskSizeGb": 20,
+    },
 ]
 
 
-def _entry(name: str, display_name: str, description: str, icon: str,
-           source_type: str, source_url: str, default_size_gb: int,
-           cloud_init: str, templates: list[dict]) -> dict:
+def _entry(
+    name: str,
+    display_name: str,
+    description: str,
+    icon: str,
+    source_type: str,
+    source_url: str,
+    default_size_gb: int,
+    cloud_init: str,
+    templates: list[dict],
+) -> dict:
     return {
         "apiVersion": "catalog.kubevmui.io/v1",
         "kind": "CatalogEntry",

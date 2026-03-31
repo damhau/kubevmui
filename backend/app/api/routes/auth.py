@@ -15,8 +15,11 @@ async def login(request: TokenLoginRequest, req: Request, response: Response):
     if not user.authenticated:
         raise HTTPException(status_code=401, detail="Invalid token")
     response.set_cookie(
-        key="kubevmui_token", value=request.token,
-        httponly=True, samesite="strict", max_age=3600,
+        key="kubevmui_token",
+        value=request.token,
+        httponly=True,
+        samesite="strict",
+        max_age=3600,
     )
     return TokenLoginResponse(username=user.username, groups=user.groups)
 

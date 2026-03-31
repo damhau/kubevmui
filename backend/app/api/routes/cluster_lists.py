@@ -1,4 +1,5 @@
 """Cluster-scoped list endpoints for all-namespace browsing."""
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_cluster_manager, get_current_user
