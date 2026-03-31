@@ -516,7 +516,13 @@ export function VMListPage() {
                     </td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{vm.compute?.cpu_cores ?? '—'} vCPU</td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{formatMemoryMb(vm.compute?.memory_mb)}</td>
-                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{vm.node ?? '—'}</td>
+                    <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>
+                      {vm.node ? (
+                        <Link to={`/nodes/${vm.node}`} style={{ color: theme.accent, textDecoration: 'none' }} onClick={(e) => e.stopPropagation()}>
+                          {vm.node}
+                        </Link>
+                      ) : '—'}
+                    </td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>{formatTimeAgo(vm.created_at)}</td>
                     <td className="table-cell" style={{ position: 'relative', zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu actions={vmActions} onAction={(action) => handleAction(vm, action)} />

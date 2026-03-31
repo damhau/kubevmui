@@ -18,6 +18,7 @@ from app.models.vm import (
     VMList,
     VMPatchRequest,
 )
+from app.services.image_service import ImageService
 from app.services.network_cr_service import NetworkCRService
 from app.services.vm_service import VMService
 
@@ -36,12 +37,14 @@ def _get_service(cluster: str, cm: ClusterManager) -> VMService:
     return VMService(KubeVirtClient(api_client))
 
 
-def _get_services(cluster: str, cm: ClusterManager) -> tuple[VMService, NetworkCRService]:
+def _get_services(
+    cluster: str, cm: ClusterManager
+) -> tuple[VMService, NetworkCRService, ImageService]:
     api_client = cm.get_api_client(cluster)
     if api_client is None:
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
     kv = KubeVirtClient(api_client)
-    return VMService(kv), NetworkCRService(kv)
+    return VMService(kv), NetworkCRService(kv), ImageService(kv)
 
 
 @router.get("/vms", response_model=VMList)
@@ -94,8 +97,8 @@ def create_vm(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc, net_cr_svc = _get_services(cluster, cm)
-    result = svc.create_vm(body, net_cr_svc=net_cr_svc)
+    svc, net_cr_svc, img_svc = _get_services(cluster, cm)
+    result = svc.create_vm(body, net_cr_svc=net_cr_svc, img_svc=img_svc)
     audit_svc = get_audit_service()
     audit_svc.record(
         username=_user.username,
@@ -116,8 +119,8 @@ def delete_vm(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc = _get_service(cluster, cm)
-    svc.delete_vm(ns, name, delete_storage=delete_storage)
+    svc, _, img_svc = _get_services(cluster, cm)
+    svc.delete_vm(ns, name, delete_storage=delete_storage, img_svc=img_svc)
     audit_svc = get_audit_service()
     audit_svc.record(
         username=_user.username,
@@ -199,7 +202,7 @@ def add_disk_to_spec(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc = _get_service(cluster, cm)
+    svc, _, img_svc = _get_services(cluster, cm)
     svc.add_disk_to_spec(
         ns,
         name,
@@ -213,6 +216,7 @@ def add_disk_to_spec(
         image_name=body.image_name,
         image_namespace=body.image_namespace,
         image=body.image,
+        img_svc=img_svc,
     )
     return {"status": "ok"}
 
@@ -226,8 +230,8 @@ def remove_disk_from_spec(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc = _get_service(cluster, cm)
-    svc.remove_disk_from_spec(ns, name, disk_name)
+    svc, _, img_svc = _get_services(cluster, cm)
+    svc.remove_disk_from_spec(ns, name, disk_name, img_svc=img_svc)
     return {"status": "ok"}
 
 
@@ -240,7 +244,7 @@ def add_interface_to_spec(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc, net_cr_svc = _get_services(cluster, cm)
+    svc, net_cr_svc, _ = _get_services(cluster, cm)
     svc.add_interface_to_spec(
         ns,
         name,
@@ -251,21 +255,6 @@ def add_interface_to_spec(
         mac_address=body.mac_address,
     )
     return {"status": "ok"}
-
-
-@router.delete("/vms/{name}/disks/{disk_name}", status_code=200)
-def remove_disk_from_spec(
-    cluster: str,
-    ns: str,
-    name: str,
-    disk_name: str,
-    _user: UserInfo = Depends(get_current_user),
-    cm: ClusterManager = Depends(get_cluster_manager),
-):
-    svc = _get_service(cluster, cm)
-    svc.remove_disk_from_spec(ns, name, disk_name)
-    return {"status": "ok"}
-
 
 
 @router.delete("/vms/{name}/nics/{iface_name}", status_code=200)
@@ -313,10 +302,12 @@ def edit_interface(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc, net_cr_svc = _get_services(cluster, cm)
+    svc, net_cr_svc, _ = _get_services(cluster, cm)
     try:
         svc.edit_interface_in_spec(
-            ns, name, iface_name,
+            ns,
+            name,
+            iface_name,
             model=body.model,
             mac_address=body.mac_address,
             network_cr_name=body.network_cr,
@@ -391,7 +382,7 @@ def add_interface(
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
-    svc, net_cr_svc = _get_services(cluster, cm)
+    svc, net_cr_svc, _ = _get_services(cluster, cm)
     # Ensure NAD exists before hotplugging
     nad_name = net_cr_svc.ensure_nad(ns, body.network_cr)
     if nad_name:

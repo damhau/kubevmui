@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -8,6 +9,7 @@ from app.models.common import HealthStatus, VMStatus
 from app.models.vm import VM, VMCompute, VMCreate, VMDiskRef, VMEvent, VMNetworkRef
 
 if TYPE_CHECKING:
+    from app.services.image_service import ImageService
     from app.services.network_cr_service import NetworkCRService
 
 
@@ -265,6 +267,7 @@ def _build_manifest(
     request: VMCreate,
     kv: KubeVirtClient | None = None,
     net_cr_svc: NetworkCRService | None = None,
+    img_svc: ImageService | None = None,
 ) -> dict:
     """Build a KubeVirt VirtualMachine manifest from a VMCreate request."""
     disks = []
@@ -291,12 +294,17 @@ def _build_manifest(
                 }
             )
         elif disk_ref.source_type == "datavolume_clone":
-            # CDROM disks reference existing PVCs directly instead of cloning
+            # CDROM disks: ensure ISO PVC exists in VM namespace (clone cross-ns if needed)
             if disk_ref.disk_type == "cdrom":
+                pvc_name = disk_ref.clone_source
+                if img_svc:
+                    pvc_name = (
+                        img_svc.ensure_iso_pvc(request.namespace, disk_ref.clone_source) or pvc_name
+                    )
                 volumes.append(
                     {
                         "name": disk_ref.name,
-                        "persistentVolumeClaim": {"claimName": disk_ref.clone_source},
+                        "persistentVolumeClaim": {"claimName": pvc_name},
                     }
                 )
             else:
@@ -603,18 +611,38 @@ class VMService:
         manifest = _build_manifest(request, self.kv)
         return [manifest]
 
-    def create_vm(self, request: VMCreate, net_cr_svc: NetworkCRService | None = None) -> VM:
-        manifest = _build_manifest(request, self.kv, net_cr_svc=net_cr_svc)
+    def create_vm(
+        self,
+        request: VMCreate,
+        net_cr_svc: NetworkCRService | None = None,
+        img_svc: ImageService | None = None,
+    ) -> VM:
+        manifest = _build_manifest(request, self.kv, net_cr_svc=net_cr_svc, img_svc=img_svc)
         raw = self.kv.create_vm(request.namespace, manifest)
         return _vm_from_raw(raw, None)
 
-    def delete_vm(self, namespace: str, name: str, delete_storage: bool = False) -> list[str]:
+    def delete_vm(
+        self,
+        namespace: str,
+        name: str,
+        delete_storage: bool = False,
+        img_svc: ImageService | None = None,
+    ) -> list[str]:
         """Delete a VM and optionally its associated PVCs/DataVolumes."""
         deleted_pvcs: list[str] = []
+        # Collect ISO clone PVC names before deletion for cleanup
+        iso_pvc_names: list[str] = []
+        vm_raw = self.kv.get_vm(namespace, name)
+        if vm_raw:
+            spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+            volume_list = spec.get("volumes", [])
+            for vol in volume_list:
+                pvc_claim = vol.get("persistentVolumeClaim", {}).get("claimName")
+                if pvc_claim:
+                    iso_pvc_names.append(pvc_claim)
+
         if delete_storage:
-            vm_raw = self.kv.get_vm(namespace, name)
             if vm_raw:
-                spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
                 volume_list = spec.get("volumes", [])
                 dv_templates = vm_raw.get("spec", {}).get("dataVolumeTemplates", [])
                 dv_names = {dv["metadata"]["name"] for dv in dv_templates if "metadata" in dv}
@@ -630,22 +658,24 @@ class VMService:
 
                 for pvc_name in pvc_names:
                     try:
-                        self.kv.core_api.delete_namespaced_persistent_volume_claim(
-                            pvc_name, namespace
-                        )
+                        self.kv.delete_pvc(namespace, pvc_name)
                         deleted_pvcs.append(pvc_name)
                     except Exception:
                         pass
                 for dv_name in dv_names - pvc_names:
-                    try:
+                    with contextlib.suppress(Exception):
                         self.kv.custom_api.delete_namespaced_custom_object(
                             "cdi.kubevirt.io", "v1beta1", namespace, "datavolumes", dv_name
                         )
-                    except Exception:
-                        pass
-                return deleted_pvcs
+        else:
+            self.kv.delete_vm(namespace, name)
 
-        self.kv.delete_vm(namespace, name)
+        # Cleanup orphaned ISO clone PVCs (only managed ones, checked by label)
+        if img_svc:
+            for pvc_name in iso_pvc_names:
+                with contextlib.suppress(Exception):
+                    img_svc.cleanup_iso_pvc(namespace, pvc_name)
+
         return deleted_pvcs
 
     def vm_action(self, namespace: str, name: str, action: str) -> None:
@@ -768,6 +798,7 @@ class VMService:
         image_name: str | None = None,
         image_namespace: str | None = None,
         image: str | None = None,
+        img_svc: ImageService | None = None,
     ) -> None:
         """Add a disk to a stopped VM's spec via JSON merge patch."""
         vm_raw = self.kv.get_vm(namespace, vm_name)
@@ -789,22 +820,30 @@ class VMService:
         elif source_type == "existing" and pvc_name:
             volumes.append({"name": disk_name, "persistentVolumeClaim": {"claimName": pvc_name}})
         elif source_type == "clone" and image_name:
-            dv_name = f"{vm_name}-{disk_name}-dv"
-            clone_ns = image_namespace or namespace
-            dv_template = {
-                "metadata": {"name": dv_name},
-                "spec": {
-                    "source": {"pvc": {"name": image_name, "namespace": clone_ns}},
-                    "pvc": {
-                        "accessModes": ["ReadWriteOnce"],
-                        "resources": {"requests": {"storage": f"{size_gb or 10}Gi"}},
+            # CDROM: ensure ISO PVC in namespace (clone cross-ns if needed)
+            if disk_type == "cdrom" and img_svc:
+                iso_pvc = img_svc.ensure_iso_pvc(namespace, image_name) or image_name
+                volumes.append({"name": disk_name, "persistentVolumeClaim": {"claimName": iso_pvc}})
+                disks_only = True
+            else:
+                disks_only = False
+            if not disks_only:
+                dv_name = f"{vm_name}-{disk_name}-dv"
+                clone_ns = image_namespace or namespace
+                dv_template = {
+                    "metadata": {"name": dv_name},
+                    "spec": {
+                        "source": {"pvc": {"name": image_name, "namespace": clone_ns}},
+                        "pvc": {
+                            "accessModes": ["ReadWriteOnce"],
+                            "resources": {"requests": {"storage": f"{size_gb or 10}Gi"}},
+                        },
                     },
-                },
-            }
-            if storage_class:
-                dv_template["spec"]["pvc"]["storageClassName"] = storage_class
-            dv_templates.append(dv_template)
-            volumes.append({"name": disk_name, "dataVolume": {"name": dv_name}})
+                }
+                if storage_class:
+                    dv_template["spec"]["pvc"]["storageClassName"] = storage_class
+                dv_templates.append(dv_template)
+                volumes.append({"name": disk_name, "dataVolume": {"name": dv_name}})
         else:
             dv_name = f"{vm_name}-{disk_name}-dv"
             dv_template = {
@@ -835,7 +874,13 @@ class VMService:
         }
         self.kv.patch_vm(namespace, vm_name, body)
 
-    def remove_disk_from_spec(self, namespace: str, vm_name: str, disk_name: str) -> None:
+    def remove_disk_from_spec(
+        self,
+        namespace: str,
+        vm_name: str,
+        disk_name: str,
+        img_svc: ImageService | None = None,
+    ) -> None:
         """Remove a disk from a stopped VM's spec via JSON merge patch."""
         vm_raw = self.kv.get_vm(namespace, vm_name)
         if not vm_raw:
@@ -845,9 +890,10 @@ class VMService:
         volumes = spec.get("volumes", [])
         dv_templates = vm_raw.get("spec", {}).get("dataVolumeTemplates", [])
 
-        # Find the volume to identify its backing DataVolume name
+        # Find the volume to identify its backing storage
         volume = next((v for v in volumes if v.get("name") == disk_name), None)
         dv_name = volume.get("dataVolume", {}).get("name") if volume else None
+        pvc_claim = volume.get("persistentVolumeClaim", {}).get("claimName") if volume else None
 
         disks = [d for d in disks if d.get("name") != disk_name]
         volumes = [v for v in volumes if v.get("name") != disk_name]
@@ -866,6 +912,11 @@ class VMService:
             }
         }
         self.kv.patch_vm(namespace, vm_name, body)
+
+        # Cleanup orphaned ISO clone PVC if this was a CDROM referencing one
+        if pvc_claim and img_svc:
+            with contextlib.suppress(Exception):
+                img_svc.cleanup_iso_pvc(namespace, pvc_claim)
 
     def edit_disk_in_spec(
         self,
@@ -896,18 +947,10 @@ class VMService:
             else:
                 disk["bootOrder"] = boot_order
 
-        body = {
-            "spec": {
-                "template": {
-                    "spec": {"domain": {"devices": {"disks": disks}}}
-                }
-            }
-        }
+        body = {"spec": {"template": {"spec": {"domain": {"devices": {"disks": disks}}}}}}
         self.kv.patch_vm(namespace, vm_name, body)
 
-    def remove_interface_from_spec(
-        self, namespace: str, vm_name: str, iface_name: str
-    ) -> None:
+    def remove_interface_from_spec(self, namespace: str, vm_name: str, iface_name: str) -> None:
         """Remove a network interface from a stopped VM's spec."""
         vm_raw = self.kv.get_vm(namespace, vm_name)
         if not vm_raw:

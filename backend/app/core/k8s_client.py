@@ -735,6 +735,25 @@ class KubeVirtClient:
             name=name,
         )
 
+    # ── PVC helpers ───────────────────────────────────────────────
+
+    def get_pvc(self, namespace: str, name: str):
+        try:
+            return self.core_api.read_namespaced_persistent_volume_claim(name, namespace)
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def list_pvcs_by_label(self, namespace: str, label_selector: str) -> list:
+        result = self.core_api.list_namespaced_persistent_volume_claim(
+            namespace, label_selector=label_selector
+        )
+        return result.items
+
+    def delete_pvc(self, namespace: str, name: str) -> None:
+        self.core_api.delete_namespaced_persistent_volume_claim(name, namespace)
+
     # ── Label-filtered queries ────────────────────────────────────
 
     def list_images_by_label(self, namespace: str, label_selector: str) -> list[dict]:

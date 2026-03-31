@@ -1,9 +1,18 @@
+import contextlib
+import logging
 from datetime import UTC, datetime
 
 from kubernetes.client import ApiException
 
 from app.core.k8s_client import KubeVirtClient
 from app.models.image import Image, ImageCreate
+
+logger = logging.getLogger(__name__)
+
+LABEL_MANAGED_BY = "app.kubernetes.io/managed-by"
+LABEL_ISO_SOURCE = "images.kubevmui.io/source"
+LABEL_ISO_SOURCE_NS = "images.kubevmui.io/source-namespace"
+LABEL_ISO_TYPE = "images.kubevmui.io/type"
 
 
 def _image_from_raw(raw: dict) -> Image:
@@ -265,7 +274,15 @@ class ImageService:
             kubeconfig_args = ["--kubeconfig", settings.kubeconfig_path]
 
         port_forward = subprocess.Popen(
-            ["kubectl", *kubeconfig_args, "port-forward", "-n", "cdi", "svc/cdi-uploadproxy", "0:443"],
+            [
+                "kubectl",
+                *kubeconfig_args,
+                "port-forward",
+                "-n",
+                "cdi",
+                "svc/cdi-uploadproxy",
+                "0:443",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -311,3 +328,101 @@ class ImageService:
         except ApiException as exc:
             if exc.status != 404:
                 raise
+
+    # ── ISO PVC ensure / cleanup (mirrors network_cr_service.ensure_nad) ──
+
+    def _find_image(self, image_name: str) -> dict | None:
+        """Find an Image CR by name across all namespaces."""
+        for ns in self.kv.list_namespaces():
+            img = self.kv.get_image(ns, image_name)
+            if img:
+                return img
+        return None
+
+    def ensure_iso_pvc(self, namespace: str, image_name: str) -> str | None:
+        """Ensure an ISO PVC exists in the target namespace for the given Image.
+
+        If the image is a container_disk, returns None (no PVC needed).
+        If the source PVC is already in the target namespace, returns its name.
+        Otherwise clones the PVC via CDI DataVolume and returns the clone name.
+        """
+        raw = self._find_image(image_name)
+        if raw is None:
+            raise ValueError(f"Image '{image_name}' not found")
+
+        spec = raw.get("spec", {})
+        source_type = spec.get("source", {}).get("type", "")
+        if source_type == "container_disk":
+            return None
+
+        source_ns = raw.get("metadata", {}).get("namespace", "")
+
+        # Source PVC is already in target namespace — use directly
+        if source_ns == namespace:
+            return image_name
+
+        # Check if a clone already exists in target namespace
+        label_selector = f"{LABEL_ISO_SOURCE}={image_name},{LABEL_ISO_TYPE}=iso-clone"
+        existing = self.kv.list_pvcs_by_label(namespace, label_selector)
+        if existing:
+            return existing[0].metadata.name
+
+        # Clone via CDI DataVolume
+        size_gb = spec.get("storage", {}).get("sizeGb", 2)
+        storage_class = spec.get("storage", {}).get("storageClass", "") or None
+        dv_body: dict = {
+            "apiVersion": "cdi.kubevirt.io/v1beta1",
+            "kind": "DataVolume",
+            "metadata": {
+                "name": image_name,
+                "namespace": namespace,
+                "labels": {
+                    LABEL_MANAGED_BY: "kubevmui",
+                    LABEL_ISO_SOURCE: image_name,
+                    LABEL_ISO_SOURCE_NS: source_ns,
+                    LABEL_ISO_TYPE: "iso-clone",
+                },
+            },
+            "spec": {
+                "source": {
+                    "pvc": {"name": image_name, "namespace": source_ns},
+                },
+                "pvc": {
+                    "accessModes": ["ReadWriteOnce"],
+                    "resources": {"requests": {"storage": f"{size_gb}Gi"}},
+                },
+            },
+        }
+        if storage_class:
+            dv_body["spec"]["pvc"]["storageClassName"] = storage_class
+        self.kv.create_datavolume(namespace, dv_body)
+        logger.info("Cloned ISO PVC %s from %s to %s", image_name, source_ns, namespace)
+        return image_name
+
+    def cleanup_iso_pvc(self, namespace: str, pvc_name: str) -> None:
+        """Delete an ISO clone PVC if no VM in the namespace still references it."""
+        pvc = self.kv.get_pvc(namespace, pvc_name)
+        if pvc is None:
+            return
+        labels = pvc.metadata.labels or {}
+        if labels.get(LABEL_ISO_TYPE) != "iso-clone":
+            return  # Not a managed ISO clone — leave it alone
+
+        # Check if any VM still references this PVC
+        for vm in self.kv.list_vms(namespace):
+            spec = vm.get("spec", {}).get("template", {}).get("spec", {})
+            for vol in spec.get("volumes", []):
+                if vol.get("persistentVolumeClaim", {}).get("claimName") == pvc_name:
+                    return  # Still in use
+                if vol.get("dataVolume", {}).get("name") == pvc_name:
+                    return  # Still in use
+
+        # Orphaned — delete
+        try:
+            self.kv.delete_pvc(namespace, pvc_name)
+            logger.info("Cleaned up orphaned ISO clone PVC %s/%s", namespace, pvc_name)
+        except ApiException as exc:
+            if exc.status != 404:
+                logger.warning("Failed to delete ISO clone PVC %s/%s: %s", namespace, pvc_name, exc)
+        with contextlib.suppress(ApiException):
+            self.kv.delete_datavolume(namespace, pvc_name)

@@ -30,6 +30,35 @@ import { HealthBadge } from '@/components/vm/HealthBadge'
 import { AddDiskWizard } from '@/components/vm/AddDiskWizard'
 import { AddNetworkWizard } from '@/components/vm/AddNetworkWizard'
 import { DiagnosticsTab } from '@/components/vm/DiagnosticsTab'
+import { useNetworkCRs, type NetworkCR } from '@/hooks/useNetworkCRs'
+
+const netTypeColor: Record<string, string> = {
+  bridge: '#16a34a',
+  masquerade: '#d97706',
+  'sr-iov': '#2563eb',
+  ovs: '#8b5cf6',
+  pod: '#d97706',
+  multus: '#16a34a',
+}
+
+function NetBadge({ label, color }: { label: string; color: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: theme.radius.sm,
+        fontSize: 11,
+        fontWeight: 600,
+        color,
+        background: `${color}1a`,
+        border: `1px solid ${color}40`,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -173,6 +202,8 @@ export function VMDetailPage() {
   const removeDiskFromSpec = useRemoveDiskFromSpec()
   const removeInterface = useRemoveInterface()
   const removeInterfaceFromSpec = useRemoveInterfaceFromSpec()
+  const { data: networkCRsData } = useNetworkCRs()
+  const networkCRMap = new Map(networkCRsData?.items?.map((cr: NetworkCR) => [cr.name, cr]) ?? [])
   const [showAddDisk, setShowAddDisk] = useState(false)
   const [showAddNic, setShowAddNic] = useState(false)
 
@@ -1184,7 +1215,7 @@ export function VMDetailPage() {
                   <table className="table">
                     <thead>
                       <tr className="table-header">
-                        {['Name', 'Network', 'IP', 'MAC', 'Actions'].map((col) => (
+                        {['Name', 'Network', 'Type', 'Interface', 'IP', 'MAC', 'Actions'].map((col) => (
                           <th key={col} className="table-header-cell">
                             {col}
                           </th>
@@ -1192,13 +1223,29 @@ export function VMDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {vm.networks.map((net: any) => (
+                      {vm.networks.map((net: any) => {
+                        const cr = networkCRMap.get(net.network_cr)
+                        return (
                         <tr key={net.name} className="table-row">
                           <td className="table-cell" style={{ color: theme.text.primary, fontWeight: 500 }}>
                             {net.name}
                           </td>
                           <td className="table-cell" style={{ color: theme.text.secondary }}>
-                            {net.network_cr || net.network_profile || '—'}
+                            {cr?.display_name || net.network_cr || net.network_profile || '—'}
+                          </td>
+                          <td className="table-cell">
+                            {(cr?.network_type) ? (
+                              <NetBadge label={cr.network_type} color={netTypeColor[cr.network_type] ?? theme.text.dim} />
+                            ) : (
+                              <span style={{ color: theme.text.dim }}>—</span>
+                            )}
+                          </td>
+                          <td className="table-cell">
+                            {(cr?.interface_type) ? (
+                              <NetBadge label={cr.interface_type} color={netTypeColor[cr.interface_type] ?? theme.text.dim} />
+                            ) : (
+                              <span style={{ color: theme.text.dim }}>—</span>
+                            )}
                           </td>
                           <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                             {net.ip_address ?? '—'}
@@ -1247,7 +1294,8 @@ export function VMDetailPage() {
                             />
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 ) : (

@@ -1034,9 +1034,9 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                               onChange={(e) => {
                                 const selectedImg = registeredImages.find((img: any) => img.media_type === 'iso' && (img.name === e.target.value || img.source_url === e.target.value))
                                 if (selectedImg?.source_type === 'container_disk') {
-                                  updateDisk(i, { source_type: 'container_disk', image: selectedImg.source_url, clone_source: '' })
+                                  updateDisk(i, { source_type: 'container_disk', image: selectedImg.source_url, clone_source: '', clone_namespace: '' })
                                 } else {
-                                  updateDisk(i, { source_type: 'datavolume_clone', clone_source: e.target.value, image: '' })
+                                  updateDisk(i, { source_type: 'datavolume_clone', clone_source: e.target.value, clone_namespace: selectedImg?.namespace || '', image: '' })
                                 }
                               }}
                               style={inputStyle()}
