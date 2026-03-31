@@ -15,6 +15,13 @@ class KubeVirtComponent(BaseModel):
     namespace: str | None = None
 
 
+class FeatureGateInfo(BaseModel):
+    name: str
+    description: str = ""
+    maturity: str = ""  # Alpha, Beta, GA, Deprecated, Discontinued
+    enabled: bool = False
+
+
 class KubeVirtInfo(BaseModel):
     phase: str
     operator_version: str
@@ -24,6 +31,8 @@ class KubeVirtInfo(BaseModel):
     default_architecture: str
     outdated_workloads: int
     feature_gates: list[str]
+    disabled_feature_gates: list[str]
+    all_feature_gates: list[FeatureGateInfo]
     conditions: list[KubeVirtCondition]
     components: list[KubeVirtComponent]
     infra_replicas: int | None = None
