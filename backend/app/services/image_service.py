@@ -168,7 +168,7 @@ class ImageService:
                 "osType": request.os_type,
                 "mediaType": request.media_type,
                 "source": {
-                    "type": request.source_type,
+                    "type": "pvc" if request.source_type == "pvc_clone" else request.source_type,
                     "url": request.source_url,
                 },
                 "storage": {
