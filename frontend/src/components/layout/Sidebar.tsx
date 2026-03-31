@@ -13,6 +13,7 @@ import {
   TrendingUp,
   FileText,
   Package,
+  Settings,
 } from 'lucide-react'
 import { theme } from '@/lib/theme'
 
@@ -55,6 +56,7 @@ const navGroups: NavGroup[] = [
       { label: 'Networks', to: '/networks', icon: <Network size={16} /> },
       { label: 'Storage', to: '/storage', icon: <HardDrive size={16} /> },
       { label: 'Nodes', to: '/nodes', icon: <Server size={16} /> },
+      { label: 'KubeVirt', to: '/kubevirt-info', icon: <Settings size={16} /> },
       { label: 'SSH Keys', to: '/ssh-keys', icon: <KeyRound size={16} /> },
     ],
   },

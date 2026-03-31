@@ -26,6 +26,7 @@ import { ClusterMetricsPage } from '@/pages/ClusterMetricsPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
 import { AuditLogPage } from '@/pages/AuditLogPage'
 import { CatalogPage } from '@/pages/CatalogPage'
+import { KubeVirtInfoPage } from '@/pages/KubeVirtInfoPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,7 @@ function App() {
             <Route path="/storage/:namespace/:name" element={<StorageDetailPage />} />
             <Route path="/nodes" element={<NodesPage />} />
             <Route path="/nodes/:name" element={<NodeDetailPage />} />
+            <Route path="/kubevirt-info" element={<KubeVirtInfoPage />} />
             <Route path="/ssh-keys" element={<SSHKeysPage />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/monitoring/cluster" element={<ClusterMetricsPage />} />

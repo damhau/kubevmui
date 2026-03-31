@@ -2,6 +2,7 @@ import { TopBar } from '@/components/layout/TopBar'
 import { useDashboard } from '@/hooks/useVMs'
 import { useImages } from '@/hooks/useImages'
 import { useClusterEvents } from '@/hooks/useEvents'
+import { useKubeVirtInfo } from '@/hooks/useKubeVirtInfo'
 import { useNavigate } from 'react-router-dom'
 import { theme } from '@/lib/theme'
 import { formatTimeAgo } from '@/lib/format'
@@ -144,6 +145,7 @@ export function DashboardPage() {
   const { data, isLoading } = useDashboard()
   const { data: imagesData } = useImages()
   const { data: eventsData } = useClusterEvents(10)
+  const { data: kvInfo } = useKubeVirtInfo()
   const navigate = useNavigate()
   const recentEvents: Array<{ timestamp: string; type: string; reason: string; message: string; namespace: string; involved_object_name: string; involved_object_kind: string }> =
     Array.isArray(eventsData) ? eventsData : []
@@ -212,6 +214,142 @@ export function DashboardPage() {
           </>
         ) : (
           <>
+            {/* KubeVirt Status */}
+            {kvInfo && (
+              <div
+                style={{
+                  background: theme.main.card,
+                  border: `1px solid ${theme.main.cardBorder}`,
+                  boxShadow: theme.shadow.card,
+                  borderRadius: theme.radius.lg,
+                  padding: '14px 20px',
+                  marginBottom: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  animation: 'fadeInUp 0.35s ease-out both',
+                  cursor: 'pointer',
+                }}
+                onClick={() => navigate('/kubevirt-info')}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.main.cardBorder }}
+              >
+                {/* Version + Phase */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: theme.text.heading,
+                    fontFamily: theme.typography.heading.fontFamily,
+                  }}>
+                    KubeVirt
+                  </span>
+                  <span style={{
+                    fontSize: 12,
+                    fontFamily: theme.typography.mono.fontFamily,
+                    color: theme.accent,
+                    fontWeight: 500,
+                  }}>
+                    {kvInfo.operator_version}
+                  </span>
+                  <span style={{
+                    fontSize: 11,
+                    padding: '2px 8px',
+                    borderRadius: 10,
+                    fontWeight: 500,
+                    background: kvInfo.phase === 'Deployed' ? theme.status.runningBg : theme.status.migratingBg,
+                    color: kvInfo.phase === 'Deployed' ? theme.status.running : theme.status.migrating,
+                    border: `1px solid ${kvInfo.phase === 'Deployed' ? theme.status.running : theme.status.migrating}40`,
+                  }}>
+                    {kvInfo.phase}
+                  </span>
+                </div>
+
+                {/* Separator */}
+                <div style={{ width: 1, height: 20, background: theme.main.cardBorder }} />
+
+                {/* Conditions */}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  {kvInfo.conditions.map((c) => {
+                    const isActive = c.status === 'True'
+                    let dotColor: string = theme.text.dim
+                    if (c.type === 'Available' && isActive) dotColor = theme.status.running
+                    else if (c.type === 'Progressing' && isActive) dotColor = theme.status.provisioning
+                    else if (c.type === 'Degraded' && isActive) dotColor = theme.status.error
+                    else if (c.type === 'Created' && isActive) dotColor = theme.status.running
+                    return (
+                      <div key={c.type} style={{ display: 'flex', alignItems: 'center', gap: 5 }} title={`${c.type}: ${c.message}`}>
+                        <span style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: '50%',
+                          background: dotColor,
+                          display: 'inline-block',
+                          ...(c.type === 'Available' && isActive ? { animation: 'pulseDot 2s ease-in-out infinite' } : {}),
+                        }} />
+                        <span style={{ fontSize: 11, color: theme.text.secondary }}>{c.type}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Separator */}
+                {kvInfo.feature_gates.length > 0 && (
+                  <>
+                    <div style={{ width: 1, height: 20, background: theme.main.cardBorder }} />
+                    {/* Feature gates */}
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                      {kvInfo.feature_gates.map((fg) => (
+                        <span key={fg} style={{
+                          fontSize: 10,
+                          padding: '1px 7px',
+                          borderRadius: theme.radius.sm,
+                          background: `${theme.accent}12`,
+                          color: theme.accent,
+                          border: `1px solid ${theme.accent}25`,
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {fg}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Outdated workloads warning */}
+                {kvInfo.outdated_workloads > 0 && (
+                  <>
+                    <div style={{ width: 1, height: 20, background: theme.main.cardBorder }} />
+                    <span style={{
+                      fontSize: 11,
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      fontWeight: 500,
+                      background: theme.status.migratingBg,
+                      color: theme.status.migrating,
+                      border: `1px solid ${theme.status.migrating}40`,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {kvInfo.outdated_workloads} outdated
+                    </span>
+                  </>
+                )}
+
+                {/* View details link */}
+                <span style={{
+                  marginLeft: 'auto',
+                  fontSize: 12,
+                  color: theme.accent,
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}>
+                  View details
+                </span>
+              </div>
+            )}
+
             {/* Stat cards */}
             <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
               <StatCard label="Total VMs" value={stats.total} borderColor={theme.accent} icon={<Monitor size={16} />} animationDelay="0s" />

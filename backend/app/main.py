@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from kubernetes.client import ApiException
 
 from app.api.exception_handlers import k8s_api_exception_handler, value_error_handler
-
 from app.api.routes import (
     analytics,
     audit,
@@ -15,6 +14,7 @@ from app.api.routes import (
     dashboard,
     events,
     images,
+    kubevirt_info,
     metrics,
     migrations,
     namespaces,
@@ -121,6 +121,7 @@ def create_app() -> FastAPI:
     application.include_router(preview.router)
     application.include_router(metrics.router)
     application.include_router(events.router)
+    application.include_router(kubevirt_info.router)
     application.include_router(cluster_lists.router)
     application.include_router(vnc_proxy.router)
     application.include_router(serial_proxy.router)
