@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, Link } from 'react-router-dom'
 import { useSortable } from '@/hooks/useSortable'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -18,6 +19,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Monitor } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { HealthBadge } from '@/components/vm/HealthBadge'
+import { CreateTemplateFromVMWizard } from '@/components/vm/CreateTemplateFromVMWizard'
 
 const statusBadge: Record<string, { bg: string; color: string; border: string }> = {
   Running:      { bg: '#ecfdf5', color: '#16a34a', border: '1px solid #bbf7d0' },
@@ -66,9 +68,15 @@ const vmActions = [
   { label: 'Snapshot', action: 'snapshot' },
   { label: 'Migrate', action: 'migrate' },
   { label: 'Clone', action: 'clone' },
+  { label: 'Create Template', action: 'create-template' },
   { label: 'Console', action: 'console' },
   { label: 'Delete', action: 'delete', danger: true },
 ]
+
+function getVMActions(vm: VM) {
+  if (vm.status === 'Stopped') return vmActions
+  return vmActions.filter((a) => a.action !== 'create-template')
+}
 
 export function VMListPage() {
   const [search, setSearch] = useState('')
@@ -81,6 +89,7 @@ export function VMListPage() {
 
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void; danger?: boolean; confirmLabel?: string } | null>(null)
   const [promptAction, setPromptAction] = useState<{ title: string; message: string; defaultValue: string; onConfirm: (value: string) => void } | null>(null)
+  const [createTemplateVM, setCreateTemplateVM] = useState<VM | null>(null)
 
   const vms: VM[] = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : []
   const filtered = vms.filter(
@@ -194,6 +203,10 @@ export function VMListPage() {
   const handleAction = (vm: VM, action: string) => {
     if (action === 'console') {
       navigate(`/vms/${vm.namespace}/${vm.name}/console`)
+      return
+    }
+    if (action === 'create-template') {
+      setCreateTemplateVM(vm)
       return
     }
     if (action === 'clone') {
@@ -525,7 +538,7 @@ export function VMListPage() {
                     </td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>{formatTimeAgo(vm.created_at)}</td>
                     <td className="table-cell" style={{ position: 'relative', zIndex: 10 }} onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu actions={vmActions} onAction={(action) => handleAction(vm, action)} />
+                      <DropdownMenu actions={getVMActions(vm)} onAction={(action) => handleAction(vm, action)} />
                     </td>
                   </tr>
                 ))}
@@ -553,6 +566,32 @@ export function VMListPage() {
         onConfirm={(value) => promptAction?.onConfirm(value)}
         onCancel={() => setPromptAction(null)}
       />
+      {createTemplateVM && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div onClick={() => setCreateTemplateVM(null)} style={{ position: 'absolute', inset: 0, background: theme.modal.overlay, backdropFilter: 'blur(4px)' }} />
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: 920,
+            height: 680,
+            maxHeight: '85vh',
+            background: theme.modal.bg,
+            borderRadius: theme.radius.xl,
+            border: `1px solid ${theme.modal.border}`,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            overflow: 'hidden',
+            animation: 'fadeInScale 0.2s ease-out',
+          }}>
+            <CreateTemplateFromVMWizard
+              vmName={createTemplateVM.name}
+              vmNamespace={createTemplateVM.namespace}
+              onClose={() => setCreateTemplateVM(null)}
+              onSuccess={() => setCreateTemplateVM(null)}
+            />
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

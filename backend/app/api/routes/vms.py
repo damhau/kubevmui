@@ -11,6 +11,7 @@ from app.models.vm import (
     AddInterfaceRequest,
     AddInterfaceToSpecRequest,
     AddVolumeRequest,
+    CreateTemplateFromVMRequest,
     EditDiskRequest,
     EditInterfaceRequest,
     VMCloneRequest,
@@ -20,6 +21,7 @@ from app.models.vm import (
 )
 from app.services.image_service import ImageService
 from app.services.network_cr_service import NetworkCRService
+from app.services.template_service import TemplateService
 from app.services.vm_service import VMService
 
 router = APIRouter(
@@ -153,6 +155,55 @@ def clone_vm(
         details=f"Cloned to {body.new_name}",
     )
     return {"status": "ok", "new_name": body.new_name}
+
+
+@router.get("/vms/{name}/template-config")
+def get_template_config(
+    cluster: str,
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    try:
+        return svc.get_template_config(ns, name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+
+@router.post("/vms/{name}/create-template", status_code=201)
+def create_template_from_vm(
+    cluster: str,
+    ns: str,
+    name: str,
+    body: CreateTemplateFromVMRequest,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    api_client = cm.get_api_client(cluster)
+    if api_client is None:
+        raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
+    kv = KubeVirtClient(api_client)
+    vm_svc = VMService(kv)
+    image_svc = ImageService(kv)
+    template_svc = TemplateService(kv)
+
+    try:
+        result = vm_svc.create_template_from_vm(ns, name, body, image_svc, template_svc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+    audit_svc = get_audit_service()
+    audit_svc.record(
+        username=_user.username,
+        action="create_template_from_vm",
+        resource_type="VirtualMachine",
+        resource_name=name,
+        namespace=ns,
+        details=f"Template: {body.template_name}",
+    )
+    return result
 
 
 @router.post("/vms/{name}/force-stop", status_code=200)

@@ -148,6 +148,35 @@ class VMCloneRequest(BaseModel):
     new_name: str
 
 
+class TemplateFromVMDisk(BaseModel):
+    name: str
+    size_gb: int
+    bus: str = "virtio"
+    source_type: str = "pvc"  # "pvc", "container_disk"
+    image: str = ""  # container disk image URL
+    volume_name: str = ""  # backing PVC/DV name (for PVC-backed disks)
+    storage_class: str = ""
+    image_name: str = ""  # name for the new Image CRD to create from this disk
+
+
+class TemplateFromVMNetwork(BaseModel):
+    name: str
+    network_cr: str = ""
+
+
+class CreateTemplateFromVMRequest(BaseModel):
+    template_name: str
+    template_display_name: str
+    description: str = ""
+    category: str = "custom"
+    os_type: str | None = None
+    compute: VMCompute
+    disks: list[TemplateFromVMDisk] = []
+    networks: list[TemplateFromVMNetwork] = []
+    cloud_init_user_data: str | None = None
+    cloud_init_network_data: str | None = None
+
+
 class VMPatchRequest(BaseModel):
     run_strategy: str | None = None
     cpu_cores: int | None = None

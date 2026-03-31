@@ -235,6 +235,35 @@ class ImageService:
             }
             self.kv.create_datavolume(namespace, dv_manifest)
 
+        elif request.source_type == "pvc_clone":
+            # Clone from an existing PVC via CDI DataVolume
+            pvc_spec: dict = {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": f"{request.size_gb}Gi"}},
+            }
+            if request.storage_class:
+                pvc_spec["storageClassName"] = request.storage_class
+
+            dv_manifest = {
+                "apiVersion": "cdi.kubevirt.io/v1beta1",
+                "kind": "DataVolume",
+                "metadata": {
+                    "name": request.name,
+                    "namespace": namespace,
+                    "labels": {"kubevmui.io/type": "image"},
+                },
+                "spec": {
+                    "source": {
+                        "pvc": {
+                            "name": request.source_pvc_name,
+                            "namespace": request.source_pvc_namespace or namespace,
+                        },
+                    },
+                    "pvc": pvc_spec,
+                },
+            }
+            self.kv.create_datavolume(namespace, dv_manifest)
+
         img = _image_from_raw(raw)
         _merge_dv_status(img, self.kv)
         return img

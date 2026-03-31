@@ -9,8 +9,10 @@ from app.models.common import HealthStatus, VMStatus
 from app.models.vm import VM, VMCompute, VMCreate, VMDiskRef, VMEvent, VMNetworkRef
 
 if TYPE_CHECKING:
+    from app.models.vm import CreateTemplateFromVMRequest
     from app.services.image_service import ImageService
     from app.services.network_cr_service import NetworkCRService
+    from app.services.template_service import TemplateService
 
 
 def _parse_memory_to_gi(size_str: str) -> int:
@@ -1186,3 +1188,220 @@ class VMService:
         if domain_patch:
             body = {"spec": {"template": {"spec": {"domain": domain_patch}}}}
             self.kv.patch_vm(namespace, name, body)
+
+    def get_template_config(self, namespace: str, vm_name: str) -> dict:
+        """Extract template-relevant configuration from a VM for the wizard to pre-populate."""
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            raise ValueError(f"VM '{vm_name}' not found")
+
+        printable = vm_raw.get("status", {}).get("printableStatus", "")
+        if printable != "Stopped":
+            raise ValueError("VM must be stopped before creating a template from it")
+
+        metadata = vm_raw.get("metadata", {})
+        spec = vm_raw.get("spec", {}).get("template", {}).get("spec", {})
+        domain = spec.get("domain", {})
+        resources = domain.get("resources", {}).get("requests", {})
+
+        # Compute
+        cpu = domain.get("cpu", {})
+        compute = {
+            "cpu_cores": cpu.get("cores", 1),
+            "memory_mb": _parse_memory(resources.get("memory", "512Mi")),
+            "sockets": cpu.get("sockets", 1),
+            "threads_per_core": cpu.get("threads", 1),
+        }
+
+        # Disks — enrich with PVC size and storage class
+        disks = []
+        disk_list = domain.get("devices", {}).get("disks", [])
+        volume_list = spec.get("volumes", [])
+        volume_map = {v["name"]: v for v in volume_list}
+
+        for disk in disk_list:
+            name = disk.get("name", "")
+            vol = volume_map.get(name, {})
+            disk_iface = disk.get("disk", {})
+
+            # Skip cloud-init volumes
+            if "cloudInitNoCloud" in vol or "cloudInitConfigDrive" in vol:
+                continue
+
+            volume_name = ""
+            source_type = "pvc"
+            image = ""
+            size_gb = 0
+            storage_class = ""
+
+            if "dataVolume" in vol:
+                volume_name = vol["dataVolume"].get("name", "")
+            elif "persistentVolumeClaim" in vol:
+                volume_name = vol["persistentVolumeClaim"].get("claimName", "")
+            elif "containerDisk" in vol:
+                source_type = "container_disk"
+                image = vol["containerDisk"].get("image", "")
+
+            # Read PVC to get actual size and storage class
+            if volume_name and source_type == "pvc":
+                try:
+                    pvc = self.kv.core_api.read_namespaced_persistent_volume_claim(
+                        volume_name, namespace
+                    )
+                    storage = pvc.spec.resources.requests.get("storage", "0Gi")
+                    size_gb = _parse_memory_to_gi(storage)
+                    storage_class = pvc.spec.storage_class_name or ""
+                except Exception:
+                    pass
+
+            disks.append(
+                {
+                    "name": name,
+                    "size_gb": size_gb,
+                    "bus": disk_iface.get("bus", "virtio"),
+                    "source_type": source_type,
+                    "image": image,
+                    "volume_name": volume_name,
+                    "storage_class": storage_class,
+                    "image_name": f"{vm_name}-{name}-img" if source_type == "pvc" else "",
+                }
+            )
+
+        # Networks
+        networks = []
+        iface_list = domain.get("devices", {}).get("interfaces", [])
+        network_list = spec.get("networks", [])
+        net_map = {n["name"]: n for n in network_list}
+        for iface in iface_list:
+            iface_name = iface.get("name", "")
+            net = net_map.get(iface_name, {})
+            network_cr = ""
+            if "multus" in net:
+                network_cr = net["multus"].get("networkName", "")
+            elif "pod" in net:
+                network_cr = "pod-network"
+            networks.append({"name": iface_name, "network_cr": network_cr})
+
+        # Cloud-init
+        cloud_init_user_data = None
+        cloud_init_network_data = None
+        for vol in volume_list:
+            ci = vol.get("cloudInitNoCloud") or vol.get("cloudInitConfigDrive")
+            if ci:
+                cloud_init_user_data = ci.get("userData")
+                cloud_init_network_data = ci.get("networkData")
+                break
+
+        os_type = metadata.get("labels", {}).get("kubevmui.io/os-type", "")
+
+        return {
+            "template_name": f"{vm_name}-tpl",
+            "template_display_name": f"{vm_name} template",
+            "os_type": os_type,
+            "compute": compute,
+            "disks": disks,
+            "networks": networks,
+            "cloud_init_user_data": cloud_init_user_data,
+            "cloud_init_network_data": cloud_init_network_data,
+        }
+
+    def create_template_from_vm(
+        self,
+        namespace: str,
+        vm_name: str,
+        request: CreateTemplateFromVMRequest,
+        image_service: ImageService,
+        template_service: TemplateService,
+    ) -> dict:
+        """Create a Template + Image(s) from a stopped VM."""
+        import contextlib
+
+        from app.models.image import ImageCreate
+        from app.models.template import TemplateCreate
+        from app.models.vm import VMDiskRef, VMNetworkRef
+
+        vm_raw = self.kv.get_vm(namespace, vm_name)
+        if not vm_raw:
+            raise ValueError(f"VM '{vm_name}' not found")
+
+        printable = vm_raw.get("status", {}).get("printableStatus", "")
+        if printable != "Stopped":
+            raise ValueError("VM must be stopped before creating a template from it")
+
+        # Create Images for PVC-backed disks
+        created_images: list[str] = []
+        template_disks: list[VMDiskRef] = []
+
+        try:
+            for disk in request.disks:
+                if disk.source_type == "pvc" and disk.volume_name and disk.image_name:
+                    # Create an Image CRD with pvc_clone to clone the VM's disk
+                    img_request = ImageCreate(
+                        name=disk.image_name,
+                        display_name=f"{request.template_display_name} - {disk.name}",
+                        description=f"Disk image cloned from VM {vm_name}",
+                        os_type=request.os_type or "linux",
+                        media_type="disk",
+                        source_type="pvc_clone",
+                        source_pvc_name=disk.volume_name,
+                        source_pvc_namespace=namespace,
+                        size_gb=disk.size_gb,
+                        storage_class=disk.storage_class,
+                    )
+                    image_service.create_image(namespace, img_request)
+                    created_images.append(disk.image_name)
+
+                    # Template disk references the new Image via datavolume_clone
+                    template_disks.append(
+                        VMDiskRef(
+                            name=disk.name,
+                            size_gb=disk.size_gb,
+                            bus=disk.bus,
+                            source_type="datavolume_clone",
+                            clone_source=disk.image_name,
+                            clone_namespace=namespace,
+                            storage_class=disk.storage_class,
+                        )
+                    )
+                elif disk.source_type == "container_disk":
+                    # Keep container disk references as-is
+                    template_disks.append(
+                        VMDiskRef(
+                            name=disk.name,
+                            size_gb=disk.size_gb,
+                            bus=disk.bus,
+                            source_type="container_disk",
+                            image=disk.image,
+                        )
+                    )
+
+            # Create the Template
+            template_request = TemplateCreate(
+                name=request.template_name,
+                namespace=namespace,
+                display_name=request.template_display_name,
+                description=request.description,
+                category=request.category,
+                os_type=request.os_type,
+                compute=request.compute,
+                disks=template_disks,
+                networks=[
+                    VMNetworkRef(name=n.name, network_cr=n.network_cr) for n in request.networks
+                ],
+                cloud_init_user_data=request.cloud_init_user_data,
+                cloud_init_network_data=request.cloud_init_network_data,
+            )
+            template_service.create_template(template_request)
+
+        except Exception:
+            # Cleanup: delete any Images we already created
+            for img_name in created_images:
+                with contextlib.suppress(Exception):
+                    image_service.delete_image(namespace, img_name)
+            raise
+
+        return {
+            "status": "ok",
+            "template_name": request.template_name,
+            "image_names": created_images,
+        }

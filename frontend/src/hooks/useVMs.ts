@@ -62,3 +62,43 @@ export function useCreateVM() {
     },
   })
 }
+
+export function useVMTemplateConfig(namespace: string, name: string, enabled: boolean) {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['vm-template-config', activeCluster, namespace, name],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}/template-config`,
+      )
+      return data
+    },
+    enabled,
+  })
+}
+
+export function useCreateTemplateFromVM() {
+  const queryClient = useQueryClient()
+  const { activeCluster } = useUIStore()
+  return useMutation({
+    mutationFn: async ({
+      namespace,
+      name,
+      body,
+    }: {
+      namespace: string
+      name: string
+      body: any
+    }) => {
+      const { data } = await apiClient.post(
+        `/clusters/${activeCluster}/namespaces/${namespace}/vms/${name}/create-template`,
+        body,
+      )
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] })
+      queryClient.invalidateQueries({ queryKey: ['images'] })
+    },
+  })
+}

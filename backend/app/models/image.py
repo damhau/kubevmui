@@ -33,6 +33,8 @@ class ImageCreate(BaseModel):
     size_gb: int = 20
     storage_class: str = ""
     is_global: bool = False
+    source_pvc_name: str = ""  # For pvc_clone: name of the source PVC to clone
+    source_pvc_namespace: str = ""  # For pvc_clone: namespace of the source PVC
 
 
 class ImageList(BaseModel):
