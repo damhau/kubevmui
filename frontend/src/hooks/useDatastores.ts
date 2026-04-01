@@ -29,6 +29,18 @@ export function useDatastores() {
   })
 }
 
+export interface PersistentVolumeInfo {
+  name: string
+  capacity_gb: number
+  phase: string
+  access_modes: string[]
+  reclaim_policy: string
+  claim_name: string | null
+  claim_namespace: string | null
+  volume_mode: string
+  raw_manifest: Record<string, unknown> | null
+}
+
 export function useDatastore(name: string) {
   const { activeCluster } = useUIStore()
   return useQuery({
@@ -36,6 +48,18 @@ export function useDatastore(name: string) {
     queryFn: async () => {
       const { data } = await apiClient.get(`/clusters/${activeCluster}/datastores/${name}`)
       return data as Datastore
+    },
+    enabled: !!name,
+  })
+}
+
+export function useDatastorePVs(name: string) {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['datastore-pvs', activeCluster, name],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/clusters/${activeCluster}/datastores/${name}/pvs`)
+      return data as { items: PersistentVolumeInfo[]; total: number }
     },
     enabled: !!name,
   })

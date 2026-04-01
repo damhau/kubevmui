@@ -1,7 +1,7 @@
 from kubernetes import client
 from kubernetes.client import ApiException
 
-from app.models.datastore import Datastore
+from app.models.datastore import Datastore, PersistentVolumeInfo
 from app.services.storage_service import _parse_size
 
 DEFAULT_SC_ANNOTATION = "storageclass.kubernetes.io/is-default-class"
@@ -161,3 +161,26 @@ class DatastoreService:
             raise
         ds = _sc_to_datastore(sc, self.api_client)
         return self._enrich_datastore(ds)
+
+    def list_pvs_for_class(self, sc_name: str) -> list[PersistentVolumeInfo]:
+        pvs = self.core_api.list_persistent_volume()
+        result = []
+        for pv in pvs.items:
+            if pv.spec.storage_class_name != sc_name:
+                continue
+            cap = pv.spec.capacity or {}
+            claim_ref = pv.spec.claim_ref
+            result.append(
+                PersistentVolumeInfo(
+                    name=pv.metadata.name,
+                    capacity_gb=_parse_size(cap.get("storage", "0")),
+                    phase=pv.status.phase if pv.status else "Unknown",
+                    access_modes=pv.spec.access_modes or [],
+                    reclaim_policy=pv.spec.persistent_volume_reclaim_policy or "Delete",
+                    claim_name=claim_ref.name if claim_ref else None,
+                    claim_namespace=claim_ref.namespace if claim_ref else None,
+                    volume_mode=pv.spec.volume_mode or "Filesystem",
+                    raw_manifest=self.api_client.sanitize_for_serialization(pv),
+                )
+            )
+        return result
