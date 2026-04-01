@@ -113,6 +113,22 @@ class StorageService:
         except Exception:
             return sc_name
 
+    def _merge_dv_status(self, disk: Disk) -> None:
+        """Merge DataVolume phase/progress into a Disk when available."""
+        try:
+            dv = self.custom_api.get_namespaced_custom_object(
+                group="cdi.kubevirt.io",
+                version="v1beta1",
+                namespace=disk.namespace,
+                plural="datavolumes",
+                name=disk.name,
+            )
+            status = dv.get("status", {})
+            disk.dv_phase = status.get("phase", "")
+            disk.dv_progress = status.get("progress", "")
+        except Exception:
+            pass
+
     def get_disk(self, namespace: str, name: str) -> Disk | None:
         try:
             pvc = self.core_api.read_namespaced_persistent_volume_claim(name, namespace)
@@ -120,6 +136,7 @@ class StorageService:
             if disk.storage_class and disk.performance_tier == disk.storage_class:
                 disk.performance_tier = self._get_storage_class_tier(disk.storage_class)
             disk.attached_vm = _find_attached_vm(self.custom_api, namespace, name)
+            self._merge_dv_status(disk)
             disk.raw_manifest = self.core_api.api_client.sanitize_for_serialization(pvc)
             return disk
         except client.ApiException as e:
@@ -150,6 +167,20 @@ class StorageService:
                         vm_pvc_map[pvc_name] = vm_name
         except Exception:
             pass
+        # Build DV status map for progress tracking
+        dv_status_map: dict[str, dict] = {}
+        try:
+            dvs = self.custom_api.list_namespaced_custom_object(
+                group="cdi.kubevirt.io",
+                version="v1beta1",
+                namespace=namespace,
+                plural="datavolumes",
+            )
+            for dv in dvs.get("items", []):
+                dv_name = dv.get("metadata", {}).get("name", "")
+                dv_status_map[dv_name] = dv.get("status", {})
+        except Exception:
+            pass
         disks = []
         for pvc in result.items:
             labels = pvc.metadata.labels or {}
@@ -164,6 +195,9 @@ class StorageService:
             if disk.storage_class and disk.performance_tier == disk.storage_class:
                 disk.performance_tier = self._get_storage_class_tier(disk.storage_class)
             disk.attached_vm = vm_pvc_map.get(disk.name)
+            if name in dv_status_map:
+                disk.dv_phase = dv_status_map[name].get("phase", "")
+                disk.dv_progress = dv_status_map[name].get("progress", "")
             disks.append(disk)
         return disks
 

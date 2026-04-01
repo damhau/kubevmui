@@ -130,6 +130,34 @@ export function StorageDetailPage() {
                       label="Status"
                       value={data.status ? <StatusDot status={data.status} /> : undefined}
                     />
+                    {data.dv_phase && data.dv_phase !== 'Succeeded' && (
+                      <InfoRow
+                        label="Provisioning"
+                        value={
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 120 }}>
+                            <span style={{ fontSize: 12, color: theme.status.migrating, fontWeight: 500 }}>
+                              {data.dv_phase === 'CloneInProgress' ? 'Cloning' : data.dv_phase} {data.dv_progress || ''}
+                            </span>
+                            {data.dv_progress && (
+                              <div style={{
+                                height: 4,
+                                borderRadius: 2,
+                                background: `${theme.status.migrating}25`,
+                                overflow: 'hidden',
+                              }}>
+                                <div style={{
+                                  height: '100%',
+                                  width: `${Math.min(parseFloat(data.dv_progress) || 0, 100)}%`,
+                                  background: theme.status.migrating,
+                                  borderRadius: 2,
+                                  transition: 'width 0.5s ease',
+                                }} />
+                              </div>
+                            )}
+                          </div>
+                        }
+                      />
+                    )}
                     {data.is_image && (
                       <InfoRow
                         label="Type"

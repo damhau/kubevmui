@@ -12,6 +12,8 @@ class Disk(ResourceMeta):
     status: str = "Available"
     attached_vm: str | None = None
     is_image: bool = False
+    dv_phase: str | None = None
+    dv_progress: str | None = None
     backend_info: str | None = None
     raw_manifest: dict | None = None
 
