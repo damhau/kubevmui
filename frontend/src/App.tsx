@@ -21,6 +21,7 @@ import { InterfaceDetailPage } from '@/pages/InterfaceDetailPage'
 import { NetworkDetailPage } from '@/pages/NetworkDetailPage'
 import { NetworkCRDetailPage } from '@/pages/NetworkCRDetailPage'
 import { StorageDetailPage } from '@/pages/StorageDetailPage'
+import { DatastoreDetailPage } from '@/pages/DatastoreDetailPage'
 import { NodeDetailPage } from '@/pages/NodeDetailPage'
 import { ClusterMetricsPage } from '@/pages/ClusterMetricsPage'
 import { AnalyticsPage } from '@/pages/AnalyticsPage'
@@ -61,6 +62,7 @@ function App() {
             <Route path="/networks/interfaces/:name" element={<InterfaceDetailPage />} />
             <Route path="/networks/:namespace/:name" element={<NetworkDetailPage />} />
             <Route path="/storage" element={<StoragePage />} />
+            <Route path="/storage/datastores/:name" element={<DatastoreDetailPage />} />
             <Route path="/storage/:namespace/:name" element={<StorageDetailPage />} />
             <Route path="/nodes" element={<NodesPage />} />
             <Route path="/nodes/:name" element={<NodeDetailPage />} />
