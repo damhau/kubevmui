@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useDatastore, useDatastorePVs, type PersistentVolumeInfo } from '@/hooks/useDatastores'
+import { useDatastore, useDatastorePVs, useDatastoreMetrics, type PersistentVolumeInfo } from '@/hooks/useDatastores'
 import { theme } from '@/lib/theme'
 import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
 import { YamlViewer } from '@/components/ui/YamlViewer'
+import { MetricChart } from '@/components/ui/MetricChart'
+import { TimeRangeSelector } from '@/components/ui/TimeRangeSelector'
 
-type Tab = 'overview' | 'pvs' | 'yaml'
+type Tab = 'overview' | 'metrics' | 'pvs' | 'yaml'
 
 const pvPhaseColor: Record<string, string> = {
   Bound: theme.status.running,
@@ -48,15 +50,115 @@ function Badge({ label, color }: { label: string; color: string }) {
   )
 }
 
+type MetricPoint = { timestamp: number; value: number }
+type PerNodeData = Record<string, MetricPoint[]>
+
+function flattenPerNode(perNode: PerNodeData | undefined): MetricPoint[] {
+  if (!perNode) return []
+  const nodes = Object.values(perNode)
+  if (nodes.length === 0) return []
+  // If single node, return directly; if multi, sum values at each timestamp
+  if (nodes.length === 1) return nodes[0]
+  const byTs = new Map<number, number>()
+  for (const series of nodes) {
+    for (const pt of series) {
+      byTs.set(pt.timestamp, (byTs.get(pt.timestamp) ?? 0) + pt.value)
+    }
+  }
+  return Array.from(byTs.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([timestamp, value]) => ({ timestamp, value }))
+}
+
+function avgPerNode(perNode: PerNodeData | undefined): MetricPoint[] {
+  if (!perNode) return []
+  const nodes = Object.values(perNode)
+  if (nodes.length === 0) return []
+  if (nodes.length === 1) return nodes[0]
+  const byTs = new Map<number, { sum: number; count: number }>()
+  for (const series of nodes) {
+    for (const pt of series) {
+      const entry = byTs.get(pt.timestamp) ?? { sum: 0, count: 0 }
+      entry.sum += pt.value
+      entry.count += 1
+      byTs.set(pt.timestamp, entry)
+    }
+  }
+  return Array.from(byTs.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([timestamp, { sum, count }]) => ({ timestamp, value: sum / count }))
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function TopolvmMetrics({ data }: { data: Record<string, any> }) {
+  const formatBytes = (v: number) => {
+    if (v >= 1024 ** 4) return `${(v / 1024 ** 4).toFixed(1)} TB`
+    if (v >= 1024 ** 3) return `${(v / 1024 ** 3).toFixed(1)} GB`
+    if (v >= 1024 ** 2) return `${(v / 1024 ** 2).toFixed(0)} MB`
+    return `${(v / 1024).toFixed(0)} KB`
+  }
+  const formatPct = (v: number) => `${v.toFixed(1)}%`
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <MetricChart
+        title="Volume Group Total Size"
+        data={data.vg_size_total ?? []}
+        color={theme.accent}
+        formatValue={formatBytes}
+        variant="area"
+      />
+      <MetricChart
+        title="Volume Group Available"
+        data={data.vg_available_total ?? []}
+        color={theme.status.running}
+        formatValue={formatBytes}
+        variant="area"
+      />
+      <MetricChart
+        title="Thin Pool Data Usage (%)"
+        data={avgPerNode(data.thinpool_data_percent)}
+        color="#f97316"
+        formatValue={formatPct}
+        yDomain={[0, 100]}
+      />
+      <MetricChart
+        title="Thin Pool Metadata Usage (%)"
+        data={avgPerNode(data.thinpool_metadata_percent)}
+        color="#8b5cf6"
+        formatValue={formatPct}
+        yDomain={[0, 100]}
+      />
+      <MetricChart
+        title="Thin Pool Size"
+        data={flattenPerNode(data.thinpool_size)}
+        color={theme.accent}
+        formatValue={formatBytes}
+        variant="area"
+      />
+      <MetricChart
+        title="Thin Pool Overprovisioned Available"
+        data={flattenPerNode(data.thinpool_overprovisioned_available)}
+        color={theme.status.provisioning}
+        formatValue={formatBytes}
+        variant="area"
+      />
+    </div>
+  )
+}
+
 export function DatastoreDetailPage() {
   const { name } = useParams<{ name: string }>()
   const { data, isLoading } = useDatastore(name!)
   const { data: pvsData, isLoading: pvsLoading } = useDatastorePVs(name!)
   const pvs: PersistentVolumeInfo[] = Array.isArray(pvsData?.items) ? pvsData.items : []
   const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [metricsRange, setMetricsRange] = useState('1h')
+  const { data: metricsData, isLoading: metricsLoading } = useDatastoreMetrics(name!, metricsRange)
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
+    { id: 'metrics', label: 'Metrics' },
     { id: 'pvs', label: `Persistent Volumes${pvs.length ? ` (${pvs.length})` : ''}` },
     { id: 'yaml', label: 'YAML' },
   ]
@@ -238,6 +340,34 @@ export function DatastoreDetailPage() {
                           <InfoRow key={key} label={key} value={String(value)} mono />
                         ))
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'metrics' && (
+                <div style={{ animation: 'fadeInUp 0.35s ease-out both' }}>
+                  <div style={{ marginBottom: 16 }}>
+                    <TimeRangeSelector value={metricsRange} onChange={setMetricsRange} />
+                  </div>
+                  {metricsLoading ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <CardSkeleton height={260} />
+                      <CardSkeleton height={260} />
+                    </div>
+                  ) : !metricsData || !metricsData.provider_type ? (
+                    <div className="card" style={{ padding: 24 }}>
+                      <div className="empty-text">
+                        No metrics available for this storage provider. Metrics are currently supported for TopoLVM datastores.
+                      </div>
+                    </div>
+                  ) : metricsData.provider_type === 'topolvm' ? (
+                    <TopolvmMetrics data={metricsData} />
+                  ) : (
+                    <div className="card" style={{ padding: 24 }}>
+                      <div className="empty-text">
+                        Metrics for {data.provider_type} datastores are not yet supported.
+                      </div>
                     </div>
                   )}
                 </div>

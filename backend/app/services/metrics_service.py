@@ -190,6 +190,108 @@ class MetricsService:
             "memory_usage_pct": extract_values(memory_data),
         }
 
+    # ── Datastore / storage-provider metrics ──────────────────────────
+
+    def get_datastore_metrics(
+        self,
+        provider_type: str,
+        parameters: dict,
+        start: str,
+        end: str,
+        step: str = "60s",
+    ) -> dict:
+        """Dispatch to provider-specific metric queries.
+
+        Returns an empty dict for providers without known metrics.
+        """
+        if provider_type == "topolvm":
+            return self._get_topolvm_metrics(parameters, start, end, step)
+        # Future providers:
+        # if provider_type == "ceph-rbd":
+        #     return self._get_ceph_metrics(...)
+        return {}
+
+    def _get_topolvm_metrics(self, parameters: dict, start: str, end: str, step: str) -> dict:
+        device_class = parameters.get("topolvm.io/device-class", "")
+        dc_filter = f',device_class="{device_class}"' if device_class else ""
+
+        def extract_per_node(result: list[dict]) -> dict[str, list[dict]]:
+            """Group time-series by node label."""
+            by_node: dict[str, list[dict]] = {}
+            for series in result:
+                node = series.get("metric", {}).get("node", "unknown")
+                values = [
+                    {"timestamp": v[0], "value": float(v[1])} for v in series.get("values", [])
+                ]
+                by_node[node] = values
+            return by_node
+
+        def extract_sum(result: list[dict]) -> list[dict]:
+            if not result:
+                return []
+            values = result[0].get("values", [])
+            return [{"timestamp": v[0], "value": float(v[1])} for v in values]
+
+        # Volume Group metrics
+        vg_size = self.query_range(
+            f"topolvm_volumegroup_size_bytes{{{dc_filter.lstrip(',')}}}", start, end, step
+        )
+        vg_available = self.query_range(
+            f"topolvm_volumegroup_available_bytes{{{dc_filter.lstrip(',')}}}", start, end, step
+        )
+
+        # Thin Pool metrics
+        tp_data_pct = self.query_range(
+            f"topolvm_thinpool_data_percent{{{dc_filter.lstrip(',')}}}", start, end, step
+        )
+        tp_metadata_pct = self.query_range(
+            f"topolvm_thinpool_metadata_percent{{{dc_filter.lstrip(',')}}}", start, end, step
+        )
+        tp_size = self.query_range(
+            f"topolvm_thinpool_size_bytes{{{dc_filter.lstrip(',')}}}", start, end, step
+        )
+        tp_overprov = self.query_range(
+            f"topolvm_thinpool_overprovisioned_available{{{dc_filter.lstrip(',')}}}",
+            start,
+            end,
+            step,
+        )
+
+        # Summed totals for overall charts
+        vg_size_total = self.query_range(
+            f"sum(topolvm_volumegroup_size_bytes{{{dc_filter.lstrip(',')}}})", start, end, step
+        )
+        vg_avail_total = self.query_range(
+            f"sum(topolvm_volumegroup_available_bytes{{{dc_filter.lstrip(',')}}})", start, end, step
+        )
+
+        return {
+            "provider_type": "topolvm",
+            "vg_size_total": extract_sum(vg_size_total),
+            "vg_available_total": extract_sum(vg_avail_total),
+            "vg_size_per_node": extract_per_node(vg_size),
+            "vg_available_per_node": extract_per_node(vg_available),
+            "thinpool_data_percent": extract_per_node(tp_data_pct),
+            "thinpool_metadata_percent": extract_per_node(tp_metadata_pct),
+            "thinpool_size": extract_per_node(tp_size),
+            "thinpool_overprovisioned_available": extract_per_node(tp_overprov),
+        }
+
+    def get_datastore_capacity_from_metrics(
+        self, provider_type: str, parameters: dict
+    ) -> int | None:
+        """Instant query for current available capacity (used to enrich list view)."""
+        if provider_type == "topolvm":
+            device_class = parameters.get("topolvm.io/device-class", "")
+            dc_filter = f'device_class="{device_class}"' if device_class else ""
+            result = self.query(f"sum(topolvm_volumegroup_available_bytes{{{dc_filter}}})")
+            if result:
+                try:
+                    return int(float(result[0]["value"][1]) / (1024**3))
+                except (KeyError, IndexError, ValueError):
+                    pass
+        return None
+
     def get_cluster_metrics(self, start: str, end: str, step: str = "300s") -> dict:
         """Get cluster-level metrics."""
 

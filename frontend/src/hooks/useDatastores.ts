@@ -53,6 +53,22 @@ export function useDatastore(name: string) {
   })
 }
 
+export function useDatastoreMetrics(name: string, range: string = '1h') {
+  const { activeCluster } = useUIStore()
+  return useQuery({
+    queryKey: ['datastore-metrics', activeCluster, name, range],
+    queryFn: async () => {
+      const { data } = await apiClient.get(
+        `/clusters/${activeCluster}/datastores/${name}/metrics`,
+        { params: { range } }
+      )
+      return data as Record<string, unknown>
+    },
+    enabled: !!name,
+    refetchInterval: 30000,
+  })
+}
+
 export function useDatastorePVs(name: string) {
   const { activeCluster } = useUIStore()
   return useQuery({
