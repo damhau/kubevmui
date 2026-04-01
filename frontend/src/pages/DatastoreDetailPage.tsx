@@ -389,7 +389,7 @@ export function DatastoreDetailPage() {
                           <th className="table-header-cell">Capacity</th>
                           <th className="table-header-cell">Status</th>
                           <th className="table-header-cell">Access Modes</th>
-                          <th className="table-header-cell">Claim</th>
+                          <th className="table-header-cell">Disk</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -410,8 +410,16 @@ export function DatastoreDetailPage() {
                             <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>
                               {pv.access_modes.join(', ') || '—'}
                             </td>
-                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, fontFamily: theme.typography.mono.fontFamily }}>
-                              {pv.claim_name ? `${pv.claim_namespace}/${pv.claim_name}` : '—'}
+                            <td className="table-cell" style={{ fontSize: 12, fontFamily: theme.typography.mono.fontFamily }}>
+                              {pv.claim_name ? (
+                                <Link
+                                  to={`/storage/${pv.claim_namespace}/${pv.claim_name}`}
+                                  style={{ color: theme.accent, textDecoration: 'none' }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {pv.claim_name}
+                                </Link>
+                              ) : '—'}
                             </td>
                           </tr>
                         ))}
