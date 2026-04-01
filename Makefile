@@ -6,7 +6,7 @@ dev:
 
 ## backend-dev: Run the backend in development mode with live reload
 backend-dev:
-	cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	cd backend && KUBEVMUI_KUBECONFIG_PATH=/home/damien/.kube/redboxdha uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## backend-test: Run backend tests with coverage
 backend-test:

@@ -36,6 +36,7 @@ storage
     Migration cancellation via spec revert	❌	Not implemented
 
 
+- Import vmdk, vhdx, etc...
  
 
 Network:
