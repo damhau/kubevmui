@@ -20,3 +20,20 @@ class Datastore(BaseModel):
 class DatastoreList(BaseModel):
     items: list[Datastore]
     total: int
+
+
+class PersistentVolumeInfo(BaseModel):
+    name: str
+    capacity_gb: int = 0
+    phase: str = "Available"
+    access_modes: list[str] = []
+    reclaim_policy: str = "Delete"
+    claim_name: str | None = None
+    claim_namespace: str | None = None
+    volume_mode: str = "Filesystem"
+    raw_manifest: dict | None = None
+
+
+class PersistentVolumeList(BaseModel):
+    items: list[PersistentVolumeInfo]
+    total: int

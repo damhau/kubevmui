@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_cluster_manager, get_current_user
 from app.core.cluster_manager import ClusterManager
 from app.models.auth import UserInfo
-from app.models.datastore import Datastore, DatastoreList
+from app.models.datastore import Datastore, DatastoreList, PersistentVolumeList
 from app.services.datastore_service import DatastoreService
 
 router = APIRouter(
@@ -42,3 +42,15 @@ def get_datastore(
     if ds is None:
         raise HTTPException(status_code=404, detail=f"Datastore '{name}' not found")
     return ds
+
+
+@router.get("/datastores/{name}/pvs", response_model=PersistentVolumeList)
+def list_datastore_pvs(
+    cluster: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+    cm: ClusterManager = Depends(get_cluster_manager),
+):
+    svc = _get_service(cluster, cm)
+    items = svc.list_pvs_for_class(name)
+    return PersistentVolumeList(items=items, total=len(items))

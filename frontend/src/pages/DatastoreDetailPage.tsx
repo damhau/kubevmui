@@ -1,12 +1,19 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useDatastore } from '@/hooks/useDatastores'
+import { useDatastore, useDatastorePVs, type PersistentVolumeInfo } from '@/hooks/useDatastores'
 import { theme } from '@/lib/theme'
-import { CardSkeleton } from '@/components/ui/Skeleton'
+import { CardSkeleton, TableSkeleton } from '@/components/ui/Skeleton'
 import { InfoRow } from '@/components/ui/InfoRow'
 import { YamlViewer } from '@/components/ui/YamlViewer'
 
 type Tab = 'overview' | 'pvs' | 'yaml'
+
+const pvPhaseColor: Record<string, string> = {
+  Bound: theme.status.running,
+  Available: theme.status.provisioning,
+  Released: theme.status.migrating,
+  Failed: theme.status.error,
+}
 
 const providerColor: Record<string, string> = {
   topolvm: theme.accent,
@@ -44,11 +51,13 @@ function Badge({ label, color }: { label: string; color: string }) {
 export function DatastoreDetailPage() {
   const { name } = useParams<{ name: string }>()
   const { data, isLoading } = useDatastore(name!)
+  const { data: pvsData, isLoading: pvsLoading } = useDatastorePVs(name!)
+  const pvs: PersistentVolumeInfo[] = Array.isArray(pvsData?.items) ? pvsData.items : []
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'pvs', label: 'Persistent Volumes' },
+    { id: 'pvs', label: `Persistent Volumes${pvs.length ? ` (${pvs.length})` : ''}` },
     { id: 'yaml', label: 'YAML' },
   ]
 
@@ -236,9 +245,49 @@ export function DatastoreDetailPage() {
 
               {activeTab === 'pvs' && (
                 <div className="card" style={{ animation: 'fadeInUp 0.35s ease-out both' }}>
-                  <div className="empty-text">
-                    Persistent Volumes using this datastore will appear here in a future update.
-                  </div>
+                  {pvsLoading ? (
+                    <TableSkeleton rows={3} cols={5} />
+                  ) : pvs.length === 0 ? (
+                    <div className="empty-text">
+                      No persistent volumes found for this datastore.
+                    </div>
+                  ) : (
+                    <table className="table">
+                      <thead>
+                        <tr className="table-header">
+                          <th className="table-header-cell">Name</th>
+                          <th className="table-header-cell">Capacity</th>
+                          <th className="table-header-cell">Status</th>
+                          <th className="table-header-cell">Access Modes</th>
+                          <th className="table-header-cell">Claim</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pvs.map((pv) => (
+                          <tr key={pv.name} className="table-row">
+                            <td className="table-cell" style={{ fontWeight: 500, color: theme.text.primary, fontFamily: theme.typography.mono.fontFamily }}>
+                              {pv.name}
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontFamily: theme.typography.mono.fontFamily }}>
+                              {pv.capacity_gb > 0 ? `${pv.capacity_gb} GB` : '—'}
+                            </td>
+                            <td className="table-cell">
+                              <Badge
+                                label={pv.phase}
+                                color={pvPhaseColor[pv.phase] ?? theme.text.dim}
+                              />
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>
+                              {pv.access_modes.join(', ') || '—'}
+                            </td>
+                            <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12, fontFamily: theme.typography.mono.fontFamily }}>
+                              {pv.claim_name ? `${pv.claim_namespace}/${pv.claim_name}` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               )}
 
