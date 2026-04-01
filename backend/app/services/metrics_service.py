@@ -1,3 +1,4 @@
+import contextlib
 import json
 import urllib.parse
 
@@ -279,17 +280,29 @@ class MetricsService:
 
     def get_datastore_capacity_from_metrics(
         self, provider_type: str, parameters: dict
-    ) -> int | None:
-        """Instant query for current available capacity (used to enrich list view)."""
+    ) -> tuple[int | None, int | None]:
+        """Instant query for current total and available capacity.
+
+        Returns (total_gb, available_gb). Either may be None if unavailable.
+        """
         if provider_type == "topolvm":
             device_class = parameters.get("topolvm.io/device-class", "")
             dc_filter = f'device_class="{device_class}"' if device_class else ""
-            result = self.query(f"sum(topolvm_volumegroup_available_bytes{{{dc_filter}}})")
-            if result:
-                try:
-                    return int(float(result[0]["value"][1]) / (1024**3))
-                except (KeyError, IndexError, ValueError):
-                    pass
+            total_gb = self._extract_instant_gb(
+                f"sum(topolvm_volumegroup_size_bytes{{{dc_filter}}})"
+            )
+            available_gb = self._extract_instant_gb(
+                f"sum(topolvm_volumegroup_available_bytes{{{dc_filter}}})"
+            )
+            return total_gb, available_gb
+        return None, None
+
+    def _extract_instant_gb(self, promql: str) -> int | None:
+        result = self.query(promql)
+        if not result:
+            return None
+        with contextlib.suppress(KeyError, IndexError, ValueError):
+            return int(float(result[0]["value"][1]) / (1024**3))
         return None
 
     def get_cluster_metrics(self, start: str, end: str, step: str = "300s") -> dict:

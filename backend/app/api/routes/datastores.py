@@ -30,12 +30,16 @@ def _get_metrics_service(cluster: str, cm: ClusterManager) -> MetricsService:
 
 
 def _enrich_capacity_from_metrics(items: list[Datastore], metrics_svc: MetricsService) -> None:
-    """Override available_capacity_gb with live Prometheus data when possible."""
+    """Override total/available capacity with live Prometheus data when possible."""
     for ds in items:
         try:
-            cap = metrics_svc.get_datastore_capacity_from_metrics(ds.provider_type, ds.parameters)
-            if cap is not None:
-                ds.available_capacity_gb = cap
+            total, available = metrics_svc.get_datastore_capacity_from_metrics(
+                ds.provider_type, ds.parameters
+            )
+            if total is not None:
+                ds.total_capacity_gb = total
+            if available is not None:
+                ds.available_capacity_gb = available
         except Exception:
             pass
 
@@ -84,9 +88,13 @@ def get_datastore(
     # Enrich with live Prometheus capacity
     try:
         metrics_svc = _get_metrics_service(cluster, cm)
-        cap = metrics_svc.get_datastore_capacity_from_metrics(ds.provider_type, ds.parameters)
-        if cap is not None:
-            ds.available_capacity_gb = cap
+        total, available = metrics_svc.get_datastore_capacity_from_metrics(
+            ds.provider_type, ds.parameters
+        )
+        if total is not None:
+            ds.total_capacity_gb = total
+        if available is not None:
+            ds.available_capacity_gb = available
     except Exception:
         pass
     return ds

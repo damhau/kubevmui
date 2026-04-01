@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useDisks, useCreateDisk, useDeleteDisk, useResizeDisk } from '@/hooks/useDisks'
 import { useDatastores, type Datastore } from '@/hooks/useDatastores'
@@ -82,8 +82,10 @@ export function StoragePage() {
   const navigate = useNavigate()
   const { activeCluster, activeNamespace } = useUIStore()
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'disks' | 'datastores'>('disks')
+  // Tab state — respect ?tab= query param for back navigation from detail pages
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'datastores' ? 'datastores' : 'disks'
+  const [activeTab, setActiveTab] = useState<'disks' | 'datastores'>(initialTab)
 
   // --- Disks ---
   const { data, isLoading } = useDisks()
