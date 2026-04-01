@@ -392,8 +392,8 @@ export function AddDiskWizard({
                     marginBottom: 16,
                   }}
                 >
-                  <strong>VM is running.</strong> Only existing PVC hotplug is supported. Stop the
-                  VM to add blank disks or clone from an image.
+                  <strong>VM is running.</strong> Only existing PVC hotplug is supported by
+                  KubeVirt. Stop the VM to add blank disks, clone images, or attach ISOs.
                 </div>
               )}
 
