@@ -184,7 +184,7 @@ export function DatastoreDetailPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          <Link to="/storage" className="back-link" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginBottom: 0 }}>
+          <Link to="/storage?tab=datastores" className="back-link" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginBottom: 0 }}>
             &larr; Storage
           </Link>
           <h1
