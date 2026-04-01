@@ -51,6 +51,8 @@ interface Disk {
   status?: string
   attached_vm?: string | null
   is_image?: boolean
+  dv_phase?: string | null
+  dv_progress?: string | null
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -69,6 +71,42 @@ function Badge({ label, color }: { label: string; color: string }) {
     >
       {label}
     </span>
+  )
+}
+
+const dvPhaseLabel: Record<string, string> = {
+  CloneInProgress: 'Cloning',
+  CloneScheduled: 'Clone scheduled',
+  ImportInProgress: 'Importing',
+  ImportScheduled: 'Import scheduled',
+  UploadScheduled: 'Upload scheduled',
+  Pending: 'Pending',
+  SnapshotForSmartCloneInProgress: 'Cloning',
+}
+
+function DvProgress({ phase, progress }: { phase: string; progress: string }) {
+  const pct = parseFloat(progress) || 0
+  const label = dvPhaseLabel[phase] ?? phase
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 100 }}>
+      <span style={{ fontSize: 11, color: theme.status.migrating, fontWeight: 500 }}>
+        {label} {progress && `${progress}`}
+      </span>
+      <div style={{
+        height: 4,
+        borderRadius: 2,
+        background: `${theme.status.migrating}25`,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${Math.min(pct, 100)}%`,
+          background: theme.status.migrating,
+          borderRadius: 2,
+          transition: 'width 0.5s ease',
+        }} />
+      </div>
+    </div>
   )
 }
 
@@ -321,7 +359,9 @@ export function StoragePage() {
                         )}
                       </td>
                       <td className="table-cell">
-                        {disk.status ? (
+                        {disk.dv_phase && disk.dv_phase !== 'Succeeded' ? (
+                          <DvProgress phase={disk.dv_phase} progress={disk.dv_progress ?? ''} />
+                        ) : disk.status ? (
                           <span
                             style={{
                               display: 'inline-flex',
