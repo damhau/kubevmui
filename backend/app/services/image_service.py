@@ -289,7 +289,9 @@ class ImageService:
             f"Set spec.uploadProxyURLOverride on CDIConfig in namespace '{settings.cdi_namespace}'."
         )
 
-    def upload_image_stream(self, namespace: str, name: str, file_stream) -> None:
+    def upload_image_stream(
+        self, namespace: str, name: str, file_stream, content_length: int = 0
+    ) -> None:
         """Stream file data to CDI upload proxy via direct HTTPS POST."""
         import httpx
 
@@ -315,15 +317,19 @@ class ImageService:
         proxy_url = self._get_upload_proxy_url()
         upload_url = f"{proxy_url.rstrip('/')}/v1beta1/upload"
 
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/octet-stream",
+        }
+        if content_length > 0:
+            headers["Content-Length"] = str(content_length)
+
         # POST file directly to CDI upload proxy
         with httpx.Client(verify=False, timeout=httpx.Timeout(600.0)) as client:
             response = client.post(
                 upload_url,
                 content=file_stream,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/octet-stream",
-                },
+                headers=headers,
             )
             if response.status_code >= 400:
                 raise RuntimeError(

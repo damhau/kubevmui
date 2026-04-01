@@ -49,9 +49,7 @@ Network:
 
 Tempalte:
 
-Convert VM to template" / "Create image from VM disk". Yes, it's absolutely doable with KubeVirt. The approach:                                                                                                                                                                                                                   
-                                                                                                                                                                                                                                                                                                                                        
-  1. Create image from VM disk — Clone the VM's root PVC into a new Image (DataVolume clone). This gives you a golden image of the.                                                                                                                                                                                                                       
-  2. Create template from VM — Extract the VM's spec (CPU, memory, disks, networks, cloud-init) into a Template CRD.        
+- when we create the template we should be able to edit the disk and the network, currently we cannot add/remove
+
 
   

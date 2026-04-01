@@ -105,7 +105,9 @@ async def upload_image(
 
     try:
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, svc.upload_image_stream, ns, name, progress_stream)
+        await loop.run_in_executor(
+            None, svc.upload_image_stream, ns, name, progress_stream, file.size or 0
+        )
         tracker.complete(upload_key)
     except Exception as e:
         logger.exception("Upload to CDI failed")
