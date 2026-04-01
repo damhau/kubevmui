@@ -12,6 +12,7 @@ from app.api.routes import (
     catalog,
     cluster_lists,
     dashboard,
+    datastores,
     events,
     images,
     kubevirt_info,
@@ -114,6 +115,7 @@ def create_app() -> FastAPI:
     application.include_router(networks_cluster_router)
     application.include_router(storage.router)
     application.include_router(storage_cluster_router)
+    application.include_router(datastores.router)
     application.include_router(templates.router)
     application.include_router(dashboard.router)
     application.include_router(namespaces.router)
