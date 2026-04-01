@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.api.deps import get_cluster_manager, get_current_user
@@ -6,11 +9,16 @@ from app.core.k8s_client import KubeVirtClient
 from app.models.auth import UserInfo
 from app.models.image import Image, ImageCreate, ImageList
 from app.services.image_service import ImageService
+from app.services.upload_tracker import ProgressStream, UploadTracker
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1/clusters/{cluster}/namespaces/{ns}",
     tags=["images"],
 )
+
+tracker = UploadTracker()
 
 
 def _get_service(cluster: str, cm: ClusterManager) -> ImageService:
@@ -91,16 +99,44 @@ async def upload_image(
     )
     image = svc.create_image(ns, image_create)
 
-    # Stream file to CDI in chunks (avoids loading entire file in memory)
-    import logging
+    upload_key = f"{ns}/{name}"
+    progress = tracker.start(upload_key, file.size or 0)
+    progress_stream = ProgressStream(file.file, progress)
 
     try:
-        svc.upload_image_stream(ns, name, file.file)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, svc.upload_image_stream, ns, name, progress_stream)
+        tracker.complete(upload_key)
     except Exception as e:
-        logging.getLogger(__name__).exception("Upload to CDI failed")
+        logger.exception("Upload to CDI failed")
+        tracker.fail(upload_key, str(e)[:500])
+        try:
+            svc.delete_image(ns, name)
+        except Exception:
+            logger.warning("Failed to clean up image '%s' after upload failure", name)
         raise HTTPException(status_code=502, detail=f"Upload to CDI failed: {str(e)[:500]}") from e
+    finally:
+        tracker.remove(upload_key)
 
     return image
+
+
+@router.get("/images/upload-progress/{name}")
+def get_upload_progress(
+    ns: str,
+    name: str,
+    _user: UserInfo = Depends(get_current_user),
+):
+    upload_key = f"{ns}/{name}"
+    progress = tracker.get(upload_key)
+    if progress is None:
+        raise HTTPException(status_code=404, detail="No active upload for this image")
+    return {
+        "phase": progress.phase,
+        "total_bytes": progress.total_bytes,
+        "uploaded_bytes": progress.uploaded_bytes,
+        "percent": progress.percent,
+    }
 
 
 @router.delete("/images/{name}", status_code=204)

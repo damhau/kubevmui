@@ -268,21 +268,37 @@ class ImageService:
         _merge_dv_status(img, self.kv)
         return img
 
+    def _get_upload_proxy_url(self) -> str:
+        """Discover CDI upload proxy URL from CDIConfig (same as virtctl)."""
+        from app.core.config import settings
+
+        cdi_config = self.kv.custom_api.get_cluster_custom_object(
+            group="cdi.kubevirt.io",
+            version="v1beta1",
+            plural="cdiconfigs",
+            name="config",
+        )
+        override = (cdi_config.get("spec", {}).get("uploadProxyURLOverride") or "").strip()
+        if override:
+            return override
+        status_url = (cdi_config.get("status", {}).get("uploadProxyURL") or "").strip()
+        if status_url:
+            return status_url
+        raise RuntimeError(
+            f"CDI upload proxy URL not configured. "
+            f"Set spec.uploadProxyURLOverride on CDIConfig in namespace '{settings.cdi_namespace}'."
+        )
+
     def upload_image_stream(self, namespace: str, name: str, file_stream) -> None:
-        """Stream file data to CDI upload proxy via kubectl port-forward."""
-        import subprocess
-        import time
-
-        import requests
-
-        dv_name = name
+        """Stream file data to CDI upload proxy via direct HTTPS POST."""
+        import httpx
 
         # Create upload token
         token_body = {
             "apiVersion": "upload.cdi.kubevirt.io/v1beta1",
             "kind": "UploadTokenRequest",
-            "metadata": {"name": dv_name, "namespace": namespace},
-            "spec": {"pvcName": dv_name},
+            "metadata": {"name": name, "namespace": namespace},
+            "spec": {"pvcName": name},
         }
         token_result = self.kv.custom_api.create_namespaced_custom_object(
             group="upload.cdi.kubevirt.io",
@@ -295,65 +311,34 @@ class ImageService:
         if not token:
             raise RuntimeError("Failed to get CDI upload token")
 
-        # Start port-forward to CDI upload proxy
-        from app.core.config import settings
+        # Discover upload proxy URL (like virtctl does)
+        proxy_url = self._get_upload_proxy_url()
+        upload_url = f"{proxy_url.rstrip('/')}/v1beta1/upload"
 
-        kubeconfig_args = []
-        if settings.kubeconfig_path:
-            kubeconfig_args = ["--kubeconfig", settings.kubeconfig_path]
-
-        port_forward = subprocess.Popen(
-            [
-                "kubectl",
-                *kubeconfig_args,
-                "port-forward",
-                "-n",
-                "cdi",
-                "svc/cdi-uploadproxy",
-                "0:443",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        # Wait for port-forward to be ready and parse the local port
-        local_port = None
-        for _ in range(30):
-            line = port_forward.stdout.readline().decode()
-            if "Forwarding from" in line:
-                # e.g. "Forwarding from 127.0.0.1:12345 -> 443"
-                local_port = line.split(":")[1].split(" ")[0]
-                break
-            time.sleep(0.2)
-
-        if not local_port:
-            port_forward.kill()
-            raise RuntimeError("Failed to start port-forward to CDI upload proxy")
-
-        try:
-            # Upload directly to CDI via port-forward (no K8s API proxy)
-            upload_url = f"https://127.0.0.1:{local_port}/v1beta1/upload"
-            response = requests.post(
+        # POST file directly to CDI upload proxy
+        with httpx.Client(verify=False, timeout=httpx.Timeout(600.0)) as client:
+            response = client.post(
                 upload_url,
-                data=file_stream,
+                content=file_stream,
                 headers={
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/octet-stream",
                 },
-                verify=False,
             )
             if response.status_code >= 400:
                 raise RuntimeError(
                     f"CDI upload failed ({response.status_code}): {response.text[:500]}"
                 )
-        finally:
-            port_forward.kill()
-            port_forward.wait()
 
     def delete_image(self, namespace: str, name: str) -> None:
         self.kv.delete_image(namespace, name)
         try:
             self.kv.delete_datavolume(namespace, name)
+        except ApiException as exc:
+            if exc.status != 404:
+                raise
+        try:
+            self.kv.delete_pvc(namespace, name)
         except ApiException as exc:
             if exc.status != 404:
                 raise

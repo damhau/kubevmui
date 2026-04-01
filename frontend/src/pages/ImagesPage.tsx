@@ -16,6 +16,13 @@ import { TableSkeleton } from '@/components/ui/Skeleton'
 import { Disc } from 'lucide-react'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 
+function formatUploadSize(bytes: number): string {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / 1024 ** i).toFixed(1)} ${units[i]}`
+}
+
 const osColor: Record<string, string> = {
   linux: theme.status.running,
   windows: theme.status.provisioning,
@@ -135,7 +142,7 @@ export function ImagesPage() {
     media_type: 'disk',
   }
   const [form, setForm] = useState<ImageForm>(defaultForm)
-  const { upload: uploadImage, progress: uploadProgress, isUploading, phase: uploadPhase } = useUploadImage()
+  const { upload: uploadImage, progress: uploadProgress, isUploading, phase: uploadPhase, progressDetail } = useUploadImage()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const inputStyle: React.CSSProperties = {
@@ -775,7 +782,11 @@ export function ImagesPage() {
             <div style={{ marginBottom: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 12, color: theme.text.secondary }}>
-                  {uploadPhase === 'writing' ? 'Writing to cluster storage...' : 'Uploading to server...'}
+                  {uploadPhase === 'writing'
+                    ? progressDetail && progressDetail.total > 0
+                      ? `Writing to cluster... ${formatUploadSize(progressDetail.uploaded)} / ${formatUploadSize(progressDetail.total)}`
+                      : 'Writing to cluster storage...'
+                    : 'Uploading to server...'}
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: theme.accent }}>{uploadProgress}%</span>
               </div>

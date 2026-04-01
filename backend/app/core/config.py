@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
     kubeconfig_path: str | None = None
     prometheus_url: str = "http://prometheus-prometheus.monitoring:9090"
+    cdi_namespace: str = "cdi"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

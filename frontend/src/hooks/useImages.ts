@@ -95,6 +95,7 @@ export function useUploadImage() {
   const ns = activeNamespace === '_all' ? 'default' : activeNamespace
   const [progress, setProgress] = useState(0)
   const [phase, setPhase] = useState<'idle' | 'uploading' | 'writing'>('idle')
+  const [progressDetail, setProgressDetail] = useState<{ uploaded: number; total: number } | null>(null)
   const isUploading = phase !== 'idle'
 
   const upload = async (file: File, metadata: {
@@ -109,6 +110,7 @@ export function useUploadImage() {
   }) => {
     setPhase('uploading')
     setProgress(0)
+    setProgressDetail(null)
 
     const formData = new FormData()
     formData.append('file', file)
@@ -121,6 +123,23 @@ export function useUploadImage() {
     formData.append('is_global', String(metadata.is_global || false))
     formData.append('media_type', metadata.media_type || 'disk')
 
+    // Poll server-side progress during 'writing' phase
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+    const startPolling = () => {
+      pollInterval = setInterval(async () => {
+        try {
+          const { data } = await apiClient.get(
+            `/clusters/${activeCluster}/namespaces/${ns}/images/upload-progress/${metadata.name}`
+          )
+          const serverPct = data.percent ?? 0
+          setProgress(50 + Math.round(serverPct / 2))
+          setProgressDetail({ uploaded: data.uploaded_bytes, total: data.total_bytes })
+        } catch {
+          // Progress endpoint may 404 if upload just finished
+        }
+      }, 2000)
+    }
+
     try {
       await apiClient.post(
         `/clusters/${activeCluster}/namespaces/${ns}/images/upload`,
@@ -131,9 +150,10 @@ export function useUploadImage() {
             if (e.total) {
               const pct = Math.round((e.loaded / e.total) * 50)
               setProgress(pct)
-              if (e.loaded >= e.total) {
+              if (e.loaded >= e.total && phase !== 'writing') {
                 setPhase('writing')
                 setProgress(50)
+                startPolling()
               }
             }
           },
@@ -142,9 +162,11 @@ export function useUploadImage() {
       setProgress(100)
       queryClient.invalidateQueries({ queryKey: ['images'] })
     } finally {
+      if (pollInterval) clearInterval(pollInterval)
       setPhase('idle')
+      setProgressDetail(null)
     }
   }
 
-  return { upload, progress, isUploading, phase }
+  return { upload, progress, isUploading, phase, progressDetail }
 }
