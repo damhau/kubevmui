@@ -53,10 +53,10 @@ function App() {
             <Route path="/vms/:namespace/:name/console" element={<ConsolePage />} />
             <Route path="/vms/:namespace/:name" element={<VMDetailPage />} />
             <Route path="/images" element={<ImagesPage />} />
-            <Route path="/images/:namespace/:name" element={<ImageDetailPage />} />
+            <Route path="/images/:name" element={<ImageDetailPage />} />
             <Route path="/catalog" element={<CatalogPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
-            <Route path="/templates/:namespace/:name" element={<TemplateDetailPage />} />
+            <Route path="/templates/:name" element={<TemplateDetailPage />} />
             <Route path="/networks" element={<NetworksPage />} />
             <Route path="/networks/network-crs/:name" element={<NetworkCRDetailPage />} />
             <Route path="/networks/interfaces/:name" element={<InterfaceDetailPage />} />

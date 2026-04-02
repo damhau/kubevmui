@@ -10,7 +10,7 @@ spec:
     singular: image
     shortNames:
       - img
-  scope: Namespaced
+  scope: Cluster
   versions:
     - name: v1
       served: true
@@ -31,10 +31,6 @@ spec:
                 description:
                   type: string
                   default: ""
-                global:
-                  type: boolean
-                  default: false
-                  description: When true, this image is available across all namespaces
                 osType:
                   type: string
                   enum: [linux, windows]
@@ -59,6 +55,10 @@ spec:
                 storage:
                   type: object
                   properties:
+                    namespace:
+                      type: string
+                      default: default
+                      description: Namespace where the backing DataVolume/PVC is stored
                     sizeGb:
                       type: integer
                       default: 20
@@ -83,9 +83,6 @@ spec:
           type: string
           jsonPath: .spec.source.url
           priority: 1
-        - name: Global
-          type: boolean
-          jsonPath: .spec.global
         - name: Age
           type: date
           jsonPath: .metadata.creationTimestamp

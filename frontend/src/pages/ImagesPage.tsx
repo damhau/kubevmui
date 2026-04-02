@@ -76,7 +76,6 @@ interface ImageForm {
   source_url: string
   size_gb: number
   storage_class: string
-  is_global: boolean
   media_type: string
 }
 
@@ -118,7 +117,7 @@ const SUGGESTIONS = [
 
 export function ImagesPage() {
   const navigate = useNavigate()
-  const { activeCluster, activeNamespace } = useUIStore()
+  const { activeCluster } = useUIStore()
   const { data, isLoading } = useImages()
   const createImage = useCreateImage()
   const deleteImage = useDeleteImage()
@@ -138,7 +137,6 @@ export function ImagesPage() {
     source_url: '',
     size_gb: 20,
     storage_class: '',
-    is_global: false,
     media_type: 'disk',
   }
   const [form, setForm] = useState<ImageForm>(defaultForm)
@@ -188,7 +186,6 @@ export function ImagesPage() {
       source_url: s.source_url,
       size_gb: 20,
       storage_class: '',
-      is_global: false,
       media_type: ('media_type' in s ? s.media_type : 'disk') as string,
     })
   }
@@ -216,7 +213,6 @@ export function ImagesPage() {
           os_type: form.os_type,
           size_gb: form.size_gb,
           storage_class: form.storage_class,
-          is_global: form.is_global,
           media_type: form.media_type,
         })
         resetAndClose()
@@ -262,7 +258,6 @@ export function ImagesPage() {
         source_url: img.source_url || '',
         size_gb: img.size_gb ?? 20,
         storage_class: img.storage_class || '',
-        is_global: (img as any).is_global ?? false,
         media_type: (img as any).media_type || 'disk',
       })
       setEditingName(img.name)
@@ -286,7 +281,6 @@ export function ImagesPage() {
               source_url: img.source_url?.trim(),
               size_gb: img.size_gb ?? 20,
               storage_class: img.storage_class,
-              is_global: (img as any).is_global ?? false,
             },
             {
               onSuccess: () => toast.success('Image duplicated'),
@@ -308,14 +302,13 @@ export function ImagesPage() {
               createImage.mutate(
                 {
                   name: img.name,
-                  display_name: img.display_name,
+                  display_name: img.display_name || img.name,
                   description: img.description,
                   os_type: img.os_type,
                   source_type: img.source_type,
                   source_url: img.source_url?.trim(),
                   size_gb: img.size_gb ?? 20,
                   storage_class: img.storage_class,
-                  is_global: (img as any).is_global ?? false,
                 },
                 {
                   onSuccess: () => toast.success('Re-import started'),
@@ -363,6 +356,7 @@ export function ImagesPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar
         title="Boot Source Images"
+        hideNamespace
         action={
           <button
             onClick={() => {
@@ -408,11 +402,6 @@ export function ImagesPage() {
                   <th className={`table-header-cell-sortable${sortConfig.column === 'name' ? ' active' : ''}`} onClick={() => requestSort('name')}>
                     Name{sortConfig.column === 'name' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
                   </th>
-                  {activeNamespace === '_all' && (
-                    <th className={`table-header-cell-sortable${sortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestSort('namespace')}>
-                      Namespace{sortConfig.column === 'namespace' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
-                    </th>
-                  )}
                   <th className={`table-header-cell-sortable${sortConfig.column === 'display_name' ? ' active' : ''}`} onClick={() => requestSort('display_name')}>
                     Display Name{sortConfig.column === 'display_name' ? (sortConfig.direction === 'asc' ? ' \u2191' : ' \u2193') : ''}
                   </th>
@@ -441,7 +430,7 @@ export function ImagesPage() {
                   <tr
                     key={img.name}
                     className="table-row-clickable"
-                    onClick={() => navigate(`/images/${(img as any).namespace || activeNamespace}/${img.name}`)}
+                    onClick={() => navigate(`/images/${img.name}`)}
                     style={i < 8 ? {
                       animation: `fadeInRow 0.3s ease-out both`,
                       animationDelay: `${0.05 + i * 0.04}s`,
@@ -456,16 +445,8 @@ export function ImagesPage() {
                         ...theme.typography.mono,
                       }}
                     >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {img.name}
-                        {(img as any).is_global && (
-                          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: `${theme.accent}15`, color: theme.accent, border: `1px solid ${theme.accent}40` }}>Global</span>
-                        )}
-                      </span>
+                      {img.name}
                     </td>
-                    {activeNamespace === '_all' && (
-                      <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>{(img as any).namespace}</td>
-                    )}
                     <td
                       className="table-cell"
                       style={{
@@ -842,21 +823,9 @@ export function ImagesPage() {
             </div>
           )}
 
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: theme.text.primary, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={form.is_global}
-                  onChange={(e) => setForm((f) => ({ ...f, is_global: e.target.checked }))}
-                  style={{ width: 16, height: 16, accentColor: theme.accent }}
-                />
-                Global image (available across all namespaces)
-              </label>
-            </div>
-
           {!editingName && (
             <YamlPreview
-              endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/images/preview`}
+              endpoint={`/clusters/${activeCluster}/namespaces/default/images/preview`}
               payload={{ ...form, source_url: form.source_url.trim() }}
             />
           )}

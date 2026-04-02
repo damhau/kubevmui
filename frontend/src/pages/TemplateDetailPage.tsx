@@ -18,8 +18,8 @@ const categoryColor: Record<string, string> = {
 type Tab = 'overview' | 'yaml'
 
 export function TemplateDetailPage() {
-  const { namespace, name } = useParams<{ namespace: string; name: string }>()
-  const { data, isLoading } = useTemplate(name!, namespace!)
+  const { name } = useParams<{ name: string }>()
+  const { data, isLoading } = useTemplate(name!)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const tabs: { id: Tab; label: string }[] = [
@@ -119,7 +119,6 @@ export function TemplateDetailPage() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: theme.text.heading, marginBottom: 12 }}>Basic Info</div>
                   <InfoRow label="Display Name" value={data.display_name} />
                   <InfoRow label="Name" value={data.name} mono />
-                  <InfoRow label="Namespace" value={data.namespace} mono />
                   <InfoRow
                     label="Category"
                     value={
@@ -179,7 +178,7 @@ export function TemplateDetailPage() {
                             <td className="table-cell">{disk.size_gb ?? '\u2014'}</td>
                             <td className="table-cell" style={{ fontFamily: theme.typography.mono.fontFamily, fontSize: 12 }}>
                               {disk.clone_source ? (
-                                <Link to={`/images/${data.namespace}/${disk.clone_source}`} style={{ color: theme.accent, textDecoration: 'none' }}>{disk.clone_source}</Link>
+                                <Link to={`/images/${disk.clone_source}`} style={{ color: theme.accent, textDecoration: 'none' }}>{disk.clone_source}</Link>
                               ) : disk.image || '\u2014'}
                             </td>
                           </tr>

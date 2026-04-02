@@ -28,7 +28,6 @@ const categoryColor: Record<string, string> = {
 
 interface Template {
   name: string
-  namespace: string
   display_name?: string
   category?: string
   os_type?: string
@@ -98,7 +97,6 @@ interface TemplateForm {
   cloud_init_user_data: string
   cloud_init_network_data: string
   autoattach_pod_interface: boolean
-  is_global: boolean
 }
 
 const emptyDisk = (): TemplateDisk => ({
@@ -129,7 +127,6 @@ const defaultForm = (): TemplateForm => ({
   cloud_init_user_data: '',
   cloud_init_network_data: '',
   autoattach_pod_interface: true,
-  is_global: false,
 })
 
 /* ── Styles ── */
@@ -201,12 +198,12 @@ const textareaStyle: React.CSSProperties = {
 
 export function TemplatesPage() {
   const navigate = useNavigate()
-  const { activeCluster, activeNamespace } = useUIStore()
+  const { activeCluster } = useUIStore()
   const { data, isLoading } = useTemplates()
   const { data: networkCRsData } = useNetworkCRs()
   const networkCRs: NetworkCR[] = networkCRsData?.items || []
   const { data: imagesData } = useImages()
-  const registeredImages: Array<{ name: string; namespace: string; display_name: string; source_type: string; source_url: string; size_gb: number }> =
+  const registeredImages: Array<{ name: string; display_name: string; source_type: string; source_url: string; size_gb: number; storage_namespace?: string }> =
     Array.isArray(imagesData?.items) ? imagesData.items : []
   const { data: storageClassData } = useStorageClasses()
   const storageClasses: Array<{ name: string; is_default: boolean }> =
@@ -217,7 +214,6 @@ export function TemplatesPage() {
   const { sorted: sortedTemplates, sortConfig, requestSort } = useSortable(templates, { column: 'display_name', direction: 'asc' })
   const [showCreate, setShowCreate] = useState(false)
   const [editingName, setEditingName] = useState<string | null>(null)
-  const [editingNamespace, setEditingNamespace] = useState<string>('default')
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<TemplateForm>(defaultForm)
 
@@ -254,10 +250,8 @@ export function TemplatesPage() {
         cloud_init_user_data: tpl.cloud_init_user_data || '',
         cloud_init_network_data: tpl.cloud_init_network_data || '',
         autoattach_pod_interface: tpl.autoattach_pod_interface ?? true,
-        is_global: tpl.is_global ?? false,
       })
       setEditingName(tpl.name)
-      setEditingNamespace(tpl.namespace)
       setError(null)
       setShowCreate(true)
       return
@@ -286,7 +280,7 @@ export function TemplatesPage() {
         message: `Delete template "${tpl.display_name || tpl.name}"? This action cannot be undone.`,
         danger: true,
         onConfirm: () => {
-          deleteTemplate.mutate({ name: tpl.name, namespace: tpl.namespace }, {
+          deleteTemplate.mutate(tpl.name, {
             onSuccess: () => toast.success('Template deleted'),
             onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete template')),
           })
@@ -361,11 +355,10 @@ export function TemplatesPage() {
       cloud_init_user_data: form.cloud_init_user_data || null,
       cloud_init_network_data: form.cloud_init_network_data || null,
       autoattach_pod_interface: form.autoattach_pod_interface,
-      is_global: form.is_global,
     }
     if (editingName) {
       // Edit: delete old, then create new
-      deleteTemplate.mutate({ name: editingName, namespace: editingNamespace }, {
+      deleteTemplate.mutate(editingName, {
         onSuccess: () => {
           createTemplate.mutate(payload, {
             onSuccess: () => {
@@ -450,11 +443,6 @@ export function TemplatesPage() {
                   <th className={`table-header-cell-sortable${sortConfig.column === 'display_name' ? ' active' : ''}`} onClick={() => requestSort('display_name')}>
                     Name{sortConfig.column === 'display_name' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                   </th>
-                  {activeNamespace === '_all' && (
-                    <th className={`table-header-cell-sortable${sortConfig.column === 'namespace' ? ' active' : ''}`} onClick={() => requestSort('namespace')}>
-                      Namespace{sortConfig.column === 'namespace' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
-                    </th>
-                  )}
                   <th className={`table-header-cell-sortable${sortConfig.column === 'category' ? ' active' : ''}`} onClick={() => requestSort('category')}>
                     Category{sortConfig.column === 'category' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                   </th>
@@ -480,7 +468,7 @@ export function TemplatesPage() {
                   <tr
                     key={tpl.name}
                     className="table-row-clickable"
-                    onClick={() => navigate(`/templates/${tpl.namespace}/${tpl.name}`)}
+                    onClick={() => navigate(`/templates/${tpl.name}`)}
                     style={i < 8 ? {
                       animation: `fadeInRow 0.3s ease-out both`,
                       animationDelay: `${0.05 + i * 0.04}s`,
@@ -495,16 +483,8 @@ export function TemplatesPage() {
                         fontFamily: theme.typography.mono.fontFamily,
                       }}
                     >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {tpl.display_name || tpl.name}
-                        {(tpl as any).is_global && (
-                          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: `${theme.accent}15`, color: theme.accent, border: `1px solid ${theme.accent}40` }}>Global</span>
-                        )}
-                      </span>
+                      {tpl.display_name || tpl.name}
                     </td>
-                    {activeNamespace === '_all' && (
-                      <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 12 }}>{(tpl as any).namespace}</td>
-                    )}
                     <td className="table-cell">
                       {tpl.category ? (
                         <Badge
@@ -772,7 +752,7 @@ export function TemplatesPage() {
                         const img = registeredImages.find((i) => i.name === e.target.value)
                         updateDisk(idx, {
                           clone_source: e.target.value,
-                          clone_namespace: img?.namespace || disk.clone_namespace,
+                          clone_namespace: img?.storage_namespace || disk.clone_namespace,
                           size_gb: img?.size_gb || disk.size_gb || 20,
                           name: disk.name || 'rootdisk',
                         })
@@ -930,28 +910,6 @@ export function TemplatesPage() {
             Attach default pod network interface
           </label>
 
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 13,
-              color: theme.text.primary,
-              cursor: 'pointer',
-              marginBottom: 14,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={form.is_global}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, is_global: e.target.checked }))
-              }
-              style={{ accentColor: theme.accent }}
-            />
-            Global template (available across all namespaces)
-          </label>
-
           {/* YAML PREVIEW */}
           {!editingName && (
             <YamlPreview
@@ -984,7 +942,6 @@ export function TemplatesPage() {
                 cloud_init_user_data: form.cloud_init_user_data || null,
                 cloud_init_network_data: form.cloud_init_network_data || null,
                 autoattach_pod_interface: form.autoattach_pod_interface,
-                is_global: form.is_global,
               }}
             />
           )}

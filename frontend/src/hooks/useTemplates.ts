@@ -3,27 +3,23 @@ import apiClient from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 
 export function useTemplates() {
-  const { activeCluster, activeNamespace } = useUIStore()
+  const { activeCluster } = useUIStore()
   return useQuery({
-    queryKey: ['templates', activeCluster, activeNamespace],
+    queryKey: ['templates', activeCluster],
     queryFn: async () => {
-      const url = activeNamespace === '_all'
-        ? `/clusters/${activeCluster}/all/templates`
-        : `/clusters/${activeCluster}/namespaces/${activeNamespace}/templates`
-      const { data } = await apiClient.get(url)
+      const { data } = await apiClient.get(`/clusters/${activeCluster}/templates`)
       return data
     },
   })
 }
 
-export function useTemplate(name: string, namespace?: string) {
-  const { activeCluster, activeNamespace } = useUIStore()
-  const ns = namespace || activeNamespace
+export function useTemplate(name: string) {
+  const { activeCluster } = useUIStore()
   return useQuery({
-    queryKey: ['template', activeCluster, ns, name],
+    queryKey: ['template', activeCluster, name],
     queryFn: async () => {
       const { data } = await apiClient.get(
-        `/clusters/${activeCluster}/namespaces/${ns}/templates/${name}`
+        `/clusters/${activeCluster}/templates/${name}`
       )
       return data
     },
@@ -37,7 +33,7 @@ export function useCreateTemplate() {
   return useMutation({
     mutationFn: async (template: any) => {
       const { data } = await apiClient.post(
-        `/clusters/${activeCluster}/namespaces/default/templates`,
+        `/clusters/${activeCluster}/templates`,
         template,
       )
       return data
@@ -52,8 +48,8 @@ export function useDeleteTemplate() {
   const queryClient = useQueryClient()
   const { activeCluster } = useUIStore()
   return useMutation({
-    mutationFn: async ({ name, namespace }: { name: string; namespace: string }) => {
-      await apiClient.delete(`/clusters/${activeCluster}/namespaces/${namespace}/templates/${name}`)
+    mutationFn: async (name: string) => {
+      await apiClient.delete(`/clusters/${activeCluster}/templates/${name}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] })

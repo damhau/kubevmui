@@ -33,7 +33,6 @@ def _image_from_raw(raw: dict) -> Image:
             created_at = datetime.now(tz=UTC)
     return Image(
         name=metadata.get("name", ""),
-        namespace=metadata.get("namespace", ""),
         display_name=spec.get("displayName", metadata.get("name", "")),
         description=spec.get("description", ""),
         os_type=spec.get("osType", ""),
@@ -42,7 +41,7 @@ def _image_from_raw(raw: dict) -> Image:
         source_url=source.get("url", ""),
         size_gb=int(storage.get("sizeGb", 20)),
         storage_class=storage.get("storageClass", ""),
-        is_global=spec.get("global", False),
+        storage_namespace=storage.get("namespace", "default"),
         created_at=created_at,
     )
 
@@ -52,7 +51,7 @@ def _merge_dv_status(image: Image, kv: KubeVirtClient) -> Image:
     if image.source_type == "container_disk":
         return image
 
-    dv = kv.get_datavolume(image.namespace, image.name)
+    dv = kv.get_datavolume(image.storage_namespace, image.name)
     if dv is None:
         return image
     status = dv.get("status", {})
@@ -65,34 +64,19 @@ class ImageService:
     def __init__(self, kv: KubeVirtClient):
         self.kv = kv
 
-    def list_images(self, namespace: str) -> list[Image]:
-        images = [_image_from_raw(i) for i in self.kv.list_images(namespace)]
-        # Merge global images from other namespaces
-        seen = {img.name for img in images}
-        for ns in self.kv.list_namespaces():
-            if ns == namespace:
-                continue
-            try:
-                for raw in self.kv.list_images(ns):
-                    spec = raw.get("spec", {})
-                    if spec.get("global", False):
-                        img = _image_from_raw(raw)
-                        if img.name not in seen:
-                            images.append(img)
-                            seen.add(img.name)
-            except Exception:
-                continue
+    def list_images(self) -> list[Image]:
+        images = [_image_from_raw(i) for i in self.kv.list_images()]
         for img in images:
             _merge_dv_status(img, self.kv)
         return images
 
-    def get_image(self, namespace: str, name: str) -> Image | None:
-        raw = self.kv.get_image(namespace, name)
+    def get_image(self, name: str) -> Image | None:
+        raw = self.kv.get_image(name)
         if raw is None:
             return None
         img = _image_from_raw(raw)
         img.raw_manifest = raw
-        dv = self.kv.get_datavolume(img.namespace, img.name)
+        dv = self.kv.get_datavolume(img.storage_namespace, img.name)
         if dv:
             status = dv.get("status", {})
             img.dv_phase = status.get("phase", "")
@@ -100,19 +84,23 @@ class ImageService:
             img.raw_dv_manifest = dv
         return img
 
-    def preview_image(self, namespace: str, request: ImageCreate) -> list[dict]:
+    def preview_image(self, request: ImageCreate) -> list[dict]:
+        storage_ns = request.storage_namespace
         body = {
             "apiVersion": "kubevmui.io/v1",
             "kind": "Image",
-            "metadata": {"name": request.name, "namespace": namespace},
+            "metadata": {"name": request.name},
             "spec": {
                 "displayName": request.display_name,
                 "description": request.description,
-                "global": request.is_global,
                 "osType": request.os_type,
                 "mediaType": request.media_type,
                 "source": {"type": request.source_type, "url": request.source_url},
-                "storage": {"sizeGb": request.size_gb, "storageClass": request.storage_class},
+                "storage": {
+                    "namespace": storage_ns,
+                    "sizeGb": request.size_gb,
+                    "storageClass": request.storage_class,
+                },
             },
         }
         manifests = [body]
@@ -134,7 +122,7 @@ class ImageService:
                 "kind": "DataVolume",
                 "metadata": {
                     "name": request.name,
-                    "namespace": namespace,
+                    "namespace": storage_ns,
                     "labels": {"kubevmui.io/type": "image"},
                 },
                 "spec": {"source": source_spec, "pvc": pvc_spec},
@@ -142,15 +130,15 @@ class ImageService:
             manifests.append(dv_manifest)
         return manifests
 
-    def create_image(self, namespace: str, request: ImageCreate) -> Image:
+    def create_image(self, request: ImageCreate) -> Image:
+        storage_ns = request.storage_namespace
         body = {
             "apiVersion": "kubevmui.io/v1",
             "kind": "Image",
-            "metadata": {"name": request.name, "namespace": namespace},
+            "metadata": {"name": request.name},
             "spec": {
                 "displayName": request.display_name,
                 "description": request.description,
-                "global": request.is_global,
                 "osType": request.os_type,
                 "mediaType": request.media_type,
                 "source": {
@@ -158,17 +146,16 @@ class ImageService:
                     "url": request.source_url,
                 },
                 "storage": {
+                    "namespace": storage_ns,
                     "sizeGb": request.size_gb,
                     "storageClass": request.storage_class,
                 },
             },
         }
-        raw = self.kv.create_image(namespace, body)
+        raw = self.kv.create_image(body)
 
         # Create backing storage for the image
         if request.source_type == "upload":
-            # Create DataVolume with upload source — CDI manages the upload
-            # pod lifecycle and cleans up automatically after upload completes.
             pvc_spec: dict = {
                 "accessModes": ["ReadWriteOnce"],
                 "resources": {"requests": {"storage": f"{request.size_gb}Gi"}},
@@ -181,7 +168,7 @@ class ImageService:
                 "kind": "DataVolume",
                 "metadata": {
                     "name": request.name,
-                    "namespace": namespace,
+                    "namespace": storage_ns,
                     "labels": {"kubevmui.io/type": "image"},
                 },
                 "spec": {
@@ -189,10 +176,9 @@ class ImageService:
                     "pvc": pvc_spec,
                 },
             }
-            self.kv.create_datavolume(namespace, dv_manifest)
+            self.kv.create_datavolume(storage_ns, dv_manifest)
 
         elif request.source_type in ("registry", "http"):
-            # Disk images: create DataVolume (CDI imports and converts)
             if request.source_type == "registry":
                 source_spec = {"registry": {"url": request.source_url}}
             else:
@@ -210,7 +196,7 @@ class ImageService:
                 "kind": "DataVolume",
                 "metadata": {
                     "name": request.name,
-                    "namespace": namespace,
+                    "namespace": storage_ns,
                     "labels": {"kubevmui.io/type": "image"},
                 },
                 "spec": {
@@ -218,10 +204,9 @@ class ImageService:
                     "pvc": pvc_spec,
                 },
             }
-            self.kv.create_datavolume(namespace, dv_manifest)
+            self.kv.create_datavolume(storage_ns, dv_manifest)
 
         elif request.source_type == "pvc_clone":
-            # Clone from an existing PVC via CDI DataVolume
             pvc_spec: dict = {
                 "accessModes": ["ReadWriteOnce"],
                 "resources": {"requests": {"storage": f"{request.size_gb}Gi"}},
@@ -234,20 +219,20 @@ class ImageService:
                 "kind": "DataVolume",
                 "metadata": {
                     "name": request.name,
-                    "namespace": namespace,
+                    "namespace": storage_ns,
                     "labels": {"kubevmui.io/type": "image"},
                 },
                 "spec": {
                     "source": {
                         "pvc": {
                             "name": request.source_pvc_name,
-                            "namespace": request.source_pvc_namespace or namespace,
+                            "namespace": request.source_pvc_namespace or storage_ns,
                         },
                     },
                     "pvc": pvc_spec,
                 },
             }
-            self.kv.create_datavolume(namespace, dv_manifest)
+            self.kv.create_datavolume(storage_ns, dv_manifest)
 
         img = _image_from_raw(raw)
         _merge_dv_status(img, self.kv)
@@ -275,28 +260,31 @@ class ImageService:
         )
 
     def upload_image_stream(
-        self, namespace: str, name: str, file_stream, content_length: int = 0
+        self, storage_namespace: str, name: str, file_stream, content_length: int = 0
     ) -> None:
         """Stream file data to CDI upload proxy via direct HTTPS POST."""
         import httpx
 
         logger.info(
-            "upload_image_stream: starting upload for %s/%s (size=%d)",
-            namespace, name, content_length,
+            "upload_image_stream: starting upload for %s (storage_ns=%s, size=%d)",
+            name, storage_namespace, content_length,
         )
 
         # Create upload token
         token_body = {
             "apiVersion": "upload.cdi.kubevirt.io/v1beta1",
             "kind": "UploadTokenRequest",
-            "metadata": {"name": name, "namespace": namespace},
+            "metadata": {"name": name, "namespace": storage_namespace},
             "spec": {"pvcName": name},
         }
-        logger.info("upload_image_stream: requesting upload token for PVC %s/%s", namespace, name)
+        logger.info(
+            "upload_image_stream: requesting upload token for PVC %s/%s",
+            storage_namespace, name,
+        )
         token_result = self.kv.custom_api.create_namespaced_custom_object(
             group="upload.cdi.kubevirt.io",
             version="v1beta1",
-            namespace=namespace,
+            namespace=storage_namespace,
             plural="uploadtokenrequests",
             body=token_body,
         )
@@ -307,10 +295,6 @@ class ImageService:
 
         # Discover upload proxy URL (like virtctl does)
         proxy_url = self._get_upload_proxy_url()
-        # Use the async endpoint so the connection closes as soon as data is
-        # transmitted.  The synchronous /upload endpoint keeps the connection
-        # open during conversion/resizing which causes timeout errors for
-        # large images (CDI "context deadline exceeded").
         upload_url = f"{proxy_url.rstrip('/')}/v1beta1/upload-async"
         logger.info("upload_image_stream: POST %s (content-length=%d)", upload_url, content_length)
 
@@ -321,15 +305,30 @@ class ImageService:
         if content_length > 0:
             headers["Content-Length"] = str(content_length)
 
-        # Large images (8 GB+) need generous timeouts for the data transfer
-        # itself; the async endpoint returns as soon as bytes are received.
+        import time
+
         timeout = httpx.Timeout(connect=30.0, read=3600.0, write=3600.0, pool=3600.0)
+        max_retries = 12  # up to ~60s waiting for upload pod
         with httpx.Client(verify=False, timeout=timeout) as client:
-            response = client.post(
-                upload_url,
-                content=file_stream,
-                headers=headers,
-            )
+            for attempt in range(max_retries):
+                response = client.post(
+                    upload_url,
+                    content=file_stream,
+                    headers=headers,
+                )
+                if response.status_code in (502, 503) and attempt < max_retries - 1:
+                    logger.warning(
+                        "upload_image_stream: attempt %d got %d (%s), retrying in 5s...",
+                        attempt + 1, response.status_code, response.text[:100],
+                    )
+                    time.sleep(5)
+                    # Reset stream position for retry
+                    if hasattr(file_stream, '_stream') and hasattr(file_stream._stream, 'seek'):
+                        file_stream._stream.seek(0)
+                        file_stream._progress.uploaded_bytes = 0
+                    continue
+                break
+
             logger.info(
                 "upload_image_stream: response status=%d (length=%d)",
                 response.status_code, len(response.text),
@@ -341,30 +340,27 @@ class ImageService:
                 raise RuntimeError(
                     f"CDI upload failed ({response.status_code}): {response.text[:500]}"
                 )
-        logger.info("upload_image_stream: upload completed successfully for %s/%s", namespace, name)
+        logger.info("upload_image_stream: upload completed successfully for %s", name)
 
-    def delete_image(self, namespace: str, name: str) -> None:
-        self.kv.delete_image(namespace, name)
+    def delete_image(self, name: str) -> None:
+        # Look up the image first to find its storage namespace
+        raw = self.kv.get_image(name)
+        storage_ns = "default"
+        if raw:
+            storage_ns = raw.get("spec", {}).get("storage", {}).get("namespace", "default")
+        self.kv.delete_image(name)
         try:
-            self.kv.delete_datavolume(namespace, name)
+            self.kv.delete_datavolume(storage_ns, name)
         except ApiException as exc:
             if exc.status != 404:
                 raise
         try:
-            self.kv.delete_pvc(namespace, name)
+            self.kv.delete_pvc(storage_ns, name)
         except ApiException as exc:
             if exc.status != 404:
                 raise
 
     # ── ISO PVC ensure / cleanup (mirrors network_cr_service.ensure_nad) ──
-
-    def _find_image(self, image_name: str) -> dict | None:
-        """Find an Image CR by name across all namespaces."""
-        for ns in self.kv.list_namespaces():
-            img = self.kv.get_image(ns, image_name)
-            if img:
-                return img
-        return None
 
     def ensure_iso_pvc(self, namespace: str, image_name: str) -> str | None:
         """Ensure an ISO PVC exists in the target namespace for the given Image.
@@ -373,7 +369,7 @@ class ImageService:
         If the source PVC is already in the target namespace, returns its name.
         Otherwise clones the PVC via CDI DataVolume and returns the clone name.
         """
-        raw = self._find_image(image_name)
+        raw = self.kv.get_image(image_name)
         if raw is None:
             raise ValueError(f"Image '{image_name}' not found")
 
@@ -382,7 +378,7 @@ class ImageService:
         if source_type == "container_disk":
             return None
 
-        source_ns = raw.get("metadata", {}).get("namespace", "")
+        source_ns = spec.get("storage", {}).get("namespace", "default")
 
         # Source PVC is already in target namespace — use directly
         if source_ns == namespace:

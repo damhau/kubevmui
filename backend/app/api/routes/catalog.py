@@ -67,9 +67,9 @@ def provision_catalog_entry(
 def get_catalog_status(
     cluster: str,
     name: str,
-    namespace: str,
+    storage_namespace: str = "default",
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    return svc.get_status(name, namespace)
+    return svc.get_status(name, storage_namespace)

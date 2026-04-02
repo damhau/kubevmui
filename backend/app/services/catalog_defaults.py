@@ -130,7 +130,7 @@ def _entry(
     templates: list[dict],
 ) -> dict:
     return {
-        "apiVersion": "catalog.kubevmui.io/v1",
+        "apiVersion": "kubevmui.io/v1",
         "kind": "CatalogEntry",
         "metadata": {"name": name},
         "spec": {

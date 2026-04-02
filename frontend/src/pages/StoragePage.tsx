@@ -46,6 +46,7 @@ const providerColor: Record<string, string> = {
 
 interface Disk {
   name: string
+  namespace: string
   size_gb?: number
   performance_tier?: string
   status?: string
@@ -326,7 +327,7 @@ export function StoragePage() {
                     <tr
                       key={disk.name}
                       className="table-row-clickable"
-                      onClick={() => navigate(`/storage/${activeNamespace}/${disk.name}`)}
+                      onClick={() => navigate(`/storage/${disk.namespace}/${disk.name}`)}
                       style={i < 8 ? {
                         animation: `fadeInRow 0.3s ease-out both`,
                         animationDelay: `${0.05 + i * 0.04}s`,

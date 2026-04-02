@@ -56,7 +56,7 @@ def preview_image(
     if api_client is None:
         raise HTTPException(status_code=404, detail=f"Cluster '{cluster}' not found")
     svc = ImageService(KubeVirtClient(api_client))
-    return _wrap(svc.preview_image(ns, body))
+    return _wrap(svc.preview_image(body))
 
 
 @router.post("/networks/preview")

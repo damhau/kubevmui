@@ -64,17 +64,17 @@ export function useCatalogEntry(name: string) {
   })
 }
 
-export function useCatalogStatus(name: string, namespace: string) {
+export function useCatalogStatus(name: string, storageNamespace: string = 'default') {
   const { activeCluster } = useUIStore()
   return useQuery({
-    queryKey: ['catalog-status', activeCluster, name, namespace],
+    queryKey: ['catalog-status', activeCluster, name, storageNamespace],
     queryFn: async () => {
       const { data } = await apiClient.get(
-        `/clusters/${activeCluster}/catalog/${name}/status?namespace=${namespace}`
+        `/clusters/${activeCluster}/catalog/${name}/status?storage_namespace=${storageNamespace}`
       )
       return data as CatalogStatus
     },
-    enabled: !!name && !!namespace && namespace !== '_all',
+    enabled: !!name,
     refetchInterval: 5000,
   })
 }
@@ -85,7 +85,7 @@ export function useProvisionCatalog() {
   return useMutation({
     mutationFn: async ({ name, body }: {
       name: string
-      body: { namespace: string; storage_class: string; templates: string[]; is_global?: boolean }
+      body: { storage_namespace: string; storage_class: string; templates: string[] }
     }) => {
       const { data } = await apiClient.post(
         `/clusters/${activeCluster}/catalog/${name}/provision`,

@@ -21,6 +21,8 @@ from app.services.template_service import TemplateService
 
 logger = logging.getLogger(__name__)
 
+CATALOG_LABEL = "kubevmui.io/catalog-entry"
+
 
 def _entry_from_raw(raw: dict) -> CatalogEntry:
     metadata = raw.get("metadata", {})
@@ -82,11 +84,11 @@ class CatalogService:
                     f"Available: {sorted(valid_variants)}"
                 )
 
-        namespace = request.namespace
-        label_selector = f"catalog.kubevmui.io/entry={name}"
+        storage_ns = request.storage_namespace
+        label_selector = f"{CATALOG_LABEL}={name}"
 
         # Create image if it doesn't exist already
-        existing_images = self.kv.list_images_by_label(namespace, label_selector)
+        existing_images = self.kv.list_images_by_label(label_selector)
         image_name = name
         if not existing_images:
             image_svc = ImageService(self.kv)
@@ -99,15 +101,15 @@ class CatalogService:
                 source_url=entry.image.source_url,
                 size_gb=entry.image.default_size_gb,
                 storage_class=request.storage_class,
-                is_global=request.is_global,
+                storage_namespace=storage_ns,
             )
-            image_svc.create_image(namespace, image_req)
+            image_svc.create_image(image_req)
             # Add the catalog label to the image
-            self._add_catalog_label(namespace, "images", image_name, name)
+            self._add_catalog_label("images", image_name, name)
 
         # Create templates for each requested variant
         template_svc = TemplateService(self.kv)
-        existing_templates = self.kv.list_templates_by_label(namespace, label_selector)
+        existing_templates = self.kv.list_templates_by_label(label_selector)
         existing_template_names = {
             t.get("metadata", {}).get("name", "") for t in existing_templates
         }
@@ -122,7 +124,6 @@ class CatalogService:
             disk_size = tpl_def.disk_size_gb or entry.image.default_size_gb
             tpl_req = TemplateCreate(
                 name=tpl_name,
-                namespace=namespace,
                 display_name=f"{entry.display_name} — {tpl_def.display_name}",
                 description=entry.description,
                 category=entry.category,
@@ -138,7 +139,7 @@ class CatalogService:
                         bus="virtio",
                         source_type="datavolume_clone",
                         clone_source=image_name,
-                        clone_namespace=namespace,
+                        clone_namespace=storage_ns,
                         storage_class=request.storage_class,
                     )
                 ],
@@ -146,29 +147,31 @@ class CatalogService:
                     VMNetworkRef(name="default", network_cr="pod-network"),
                 ],
                 cloud_init_user_data=entry.cloud_init_user_data,
-                is_global=request.is_global,
             )
             template_svc.create_template(tpl_req)
-            self._add_catalog_label(namespace, "templates", tpl_name, name)
+            self._add_catalog_label("templates", tpl_name, name)
             created_names.append(tpl_name)
 
         return ProvisionResponse(image_name=image_name, template_names=created_names)
 
-    def get_status(self, name: str, namespace: str) -> CatalogStatus:
+    def get_status(self, name: str, storage_namespace: str) -> CatalogStatus:
         entry = self.get_entry(name)
         if entry is None:
             return CatalogStatus(provisioned=False)
 
-        label_selector = f"catalog.kubevmui.io/entry={name}"
+        label_selector = f"{CATALOG_LABEL}={name}"
 
         # Check image
-        images = self.kv.list_images_by_label(namespace, label_selector)
+        images = self.kv.list_images_by_label(label_selector)
         image_info = None
         if images:
             img_raw = images[0]
             img_name = img_raw.get("metadata", {}).get("name", "")
+            img_storage_ns = (
+                img_raw.get("spec", {}).get("storage", {}).get("namespace", storage_namespace)
+            )
             # Check DataVolume status
-            dv = self.kv.get_datavolume(namespace, img_name)
+            dv = self.kv.get_datavolume(img_storage_ns, img_name)
             phase = ""
             progress = ""
             if dv:
@@ -178,7 +181,7 @@ class CatalogService:
             image_info = {"name": img_name, "phase": phase, "progress": progress}
 
         # Check templates
-        templates = self.kv.list_templates_by_label(namespace, label_selector)
+        templates = self.kv.list_templates_by_label(label_selector)
         existing_names = {t.get("metadata", {}).get("name", "") for t in templates}
         template_statuses = [
             TemplateStatus(
@@ -211,16 +214,15 @@ class CatalogService:
                     logger.warning("Failed to seed catalog entry: %s", entry_name, exc_info=True)
         return created
 
-    def _add_catalog_label(self, namespace: str, plural: str, name: str, entry_name: str) -> None:
-        """Patch a namespaced resource to add the catalog label."""
+    def _add_catalog_label(self, plural: str, name: str, entry_name: str) -> None:
+        """Patch a cluster-scoped resource to add the catalog label."""
         try:
-            self.kv.custom_api.patch_namespaced_custom_object(
+            self.kv.custom_api.patch_cluster_custom_object(
                 group=self.kv.KUBEVMUI_GROUP,
                 version=self.kv.KUBEVMUI_VERSION,
-                namespace=namespace,
                 plural=plural,
                 name=name,
-                body={"metadata": {"labels": {"catalog.kubevmui.io/entry": entry_name}}},
+                body={"metadata": {"labels": {CATALOG_LABEL: entry_name}}},
             )
         except ApiException:
             logger.warning("Failed to add catalog label to %s/%s", plural, name, exc_info=True)

@@ -20,9 +20,10 @@ const phaseBadge: Record<string, { bg: string; color: string; border: string }> 
 }
 
 export function ImageDetailPage() {
-  const { namespace, name } = useParams<{ namespace: string; name: string }>()
-  const { data, isLoading } = useImage(namespace!, name!)
-  const { data: events = [] } = useResourceEvents(namespace!, name!)
+  const { name } = useParams<{ name: string }>()
+  const { data, isLoading } = useImage(name!)
+  const storageNs = data?.storage_namespace || 'default'
+  const { data: events = [] } = useResourceEvents(storageNs, name!)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   const tabs: { id: Tab; label: string }[] = [
@@ -127,7 +128,7 @@ export function ImageDetailPage() {
                       Basic Info
                     </div>
                     <InfoRow label="Name" value={data.name} mono />
-                    <InfoRow label="Namespace" value={data.namespace} mono />
+                    <InfoRow label="Storage Namespace" value={data.storage_namespace || 'default'} mono />
                     <InfoRow label="Display Name" value={data.display_name} />
                     <InfoRow label="Description" value={data.description} />
                     <InfoRow

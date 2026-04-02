@@ -518,24 +518,22 @@ class KubeVirtClient:
 
     KUBEVMUI_GROUP = "kubevmui.io"
     KUBEVMUI_VERSION = "v1"
-    CATALOG_GROUP = "catalog.kubevmui.io"
-    CATALOG_VERSION = "v1"
 
-    def list_images(self, namespace: str) -> list[dict]:
-        result = self.custom_api.list_namespaced_custom_object(
+    # --- Images (kubevmui.io CRD, cluster-scoped) ---
+
+    def list_images(self) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="images",
         )
         return result.get("items", [])
 
-    def get_image(self, namespace: str, name: str) -> dict | None:
+    def get_image(self, name: str) -> dict | None:
         try:
-            return self.custom_api.get_namespaced_custom_object(
+            return self.custom_api.get_cluster_custom_object(
                 group=self.KUBEVMUI_GROUP,
                 version=self.KUBEVMUI_VERSION,
-                namespace=namespace,
                 plural="images",
                 name=name,
             )
@@ -544,41 +542,37 @@ class KubeVirtClient:
                 return None
             raise
 
-    def create_image(self, namespace: str, body: dict) -> dict:
-        return self.custom_api.create_namespaced_custom_object(
+    def create_image(self, body: dict) -> dict:
+        return self.custom_api.create_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="images",
             body=body,
         )
 
-    def delete_image(self, namespace: str, name: str) -> None:
-        self.custom_api.delete_namespaced_custom_object(
+    def delete_image(self, name: str) -> None:
+        self.custom_api.delete_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="images",
             name=name,
         )
 
-    # --- Templates (kubevmui.io CRD) ---
+    # --- Templates (kubevmui.io CRD, cluster-scoped) ---
 
-    def list_templates(self, namespace: str) -> list[dict]:
-        result = self.custom_api.list_namespaced_custom_object(
+    def list_templates(self) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="templates",
         )
         return result.get("items", [])
 
-    def get_template(self, namespace: str, name: str) -> dict | None:
+    def get_template(self, name: str) -> dict | None:
         try:
-            return self.custom_api.get_namespaced_custom_object(
+            return self.custom_api.get_cluster_custom_object(
                 group=self.KUBEVMUI_GROUP,
                 version=self.KUBEVMUI_VERSION,
-                namespace=namespace,
                 plural="templates",
                 name=name,
             )
@@ -587,20 +581,18 @@ class KubeVirtClient:
                 return None
             raise
 
-    def create_template(self, namespace: str, body: dict) -> dict:
-        return self.custom_api.create_namespaced_custom_object(
+    def create_template(self, body: dict) -> dict:
+        return self.custom_api.create_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="templates",
             body=body,
         )
 
-    def delete_template(self, namespace: str, name: str) -> None:
-        self.custom_api.delete_namespaced_custom_object(
+    def delete_template(self, name: str) -> None:
+        self.custom_api.delete_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="templates",
             name=name,
         )
@@ -617,8 +609,8 @@ class KubeVirtClient:
 
     def list_catalog_entries(self) -> list[dict]:
         result = self.custom_api.list_cluster_custom_object(
-            group=self.CATALOG_GROUP,
-            version=self.CATALOG_VERSION,
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
             plural="catalogentries",
         )
         return result.get("items", [])
@@ -626,8 +618,8 @@ class KubeVirtClient:
     def get_catalog_entry(self, name: str) -> dict | None:
         try:
             return self.custom_api.get_cluster_custom_object(
-                group=self.CATALOG_GROUP,
-                version=self.CATALOG_VERSION,
+                group=self.KUBEVMUI_GROUP,
+                version=self.KUBEVMUI_VERSION,
                 plural="catalogentries",
                 name=name,
             )
@@ -638,16 +630,16 @@ class KubeVirtClient:
 
     def create_catalog_entry(self, body: dict) -> dict:
         return self.custom_api.create_cluster_custom_object(
-            group=self.CATALOG_GROUP,
-            version=self.CATALOG_VERSION,
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
             plural="catalogentries",
             body=body,
         )
 
     def delete_catalog_entry(self, name: str) -> None:
         self.custom_api.delete_cluster_custom_object(
-            group=self.CATALOG_GROUP,
-            version=self.CATALOG_VERSION,
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
             plural="catalogentries",
             name=name,
         )
@@ -764,21 +756,19 @@ class KubeVirtClient:
 
     # ── Label-filtered queries ────────────────────────────────────
 
-    def list_images_by_label(self, namespace: str, label_selector: str) -> list[dict]:
-        result = self.custom_api.list_namespaced_custom_object(
+    def list_images_by_label(self, label_selector: str) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="images",
             label_selector=label_selector,
         )
         return result.get("items", [])
 
-    def list_templates_by_label(self, namespace: str, label_selector: str) -> list[dict]:
-        result = self.custom_api.list_namespaced_custom_object(
+    def list_templates_by_label(self, label_selector: str) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
             group=self.KUBEVMUI_GROUP,
             version=self.KUBEVMUI_VERSION,
-            namespace=namespace,
             plural="templates",
             label_selector=label_selector,
         )

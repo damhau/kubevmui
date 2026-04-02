@@ -1,10 +1,15 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
-from app.models.common import ResourceMeta
 from app.models.vm import VMCompute, VMDiskRef, VMNetworkRef
 
 
-class Template(ResourceMeta):
+class Template(BaseModel):
+    name: str
+    created_at: datetime | None = None
+    labels: dict[str, str] = {}
+    annotations: dict[str, str] = {}
     display_name: str
     description: str = ""
     category: str = "custom"
@@ -14,7 +19,6 @@ class Template(ResourceMeta):
     networks: list[VMNetworkRef] = []
     cloud_init_user_data: str | None = None
     cloud_init_network_data: str | None = None
-    is_global: bool = False
     status: str = "Ready"  # Ready, Importing, Pending, Failed
     status_message: str = ""
     raw_manifest: dict | None = None
@@ -22,7 +26,6 @@ class Template(ResourceMeta):
 
 class TemplateCreate(BaseModel):
     name: str
-    namespace: str = ""
     display_name: str
     description: str = ""
     category: str = "custom"
@@ -32,7 +35,6 @@ class TemplateCreate(BaseModel):
     networks: list[VMNetworkRef] = []
     cloud_init_user_data: str | None = None
     cloud_init_network_data: str | None = None
-    is_global: bool = False
 
 
 class TemplateList(BaseModel):

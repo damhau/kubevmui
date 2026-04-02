@@ -1,4 +1,4 @@
-apiVersion: catalog.kubevmui.io/v1
+apiVersion: kubevmui.io/v1
 kind: CatalogEntry
 metadata:
   name: fedora-41

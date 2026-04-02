@@ -71,7 +71,6 @@ def _cr_to_template(raw: dict) -> Template:
 
     return Template(
         name=metadata.get("name", ""),
-        namespace=metadata.get("namespace", ""),
         created_at=created_at,
         labels=metadata.get("labels", {}),
         annotations=metadata.get("annotations", {}),
@@ -84,7 +83,6 @@ def _cr_to_template(raw: dict) -> Template:
         networks=networks,
         cloud_init_user_data=cloud_init.get("userData"),
         cloud_init_network_data=cloud_init.get("networkData"),
-        is_global=spec.get("global", False),
     )
 
 
@@ -100,10 +98,15 @@ def _merge_disk_readiness(template: Template, kv: KubeVirtClient) -> Template:
     messages: list[str] = []
 
     for disk in clone_disks:
-        ns = disk.clone_namespace or template.namespace
+        # Look up the image to find its storage namespace
+        ns = disk.clone_namespace
+        if not ns:
+            img_raw = kv.get_image(disk.clone_source)
+            if img_raw:
+                ns = img_raw.get("spec", {}).get("storage", {}).get("namespace", "default")
+            else:
+                ns = "default"
         dv = kv.get_datavolume(ns, disk.clone_source)
-        if dv is None and ns != template.namespace:
-            dv = kv.get_datavolume(template.namespace, disk.clone_source)
         if dv is None:
             continue
 
@@ -132,8 +135,8 @@ class TemplateService:
     def __init__(self, kv: KubeVirtClient):
         self.kv = kv
 
-    def get_template(self, namespace: str, name: str) -> Template | None:
-        raw = self.kv.get_template(namespace, name)
+    def get_template(self, name: str) -> Template | None:
+        raw = self.kv.get_template(name)
         if raw is None:
             return None
         tpl = _cr_to_template(raw)
@@ -141,23 +144,8 @@ class TemplateService:
         _merge_disk_readiness(tpl, self.kv)
         return tpl
 
-    def list_templates(self, namespace: str) -> list[Template]:
-        templates = [_cr_to_template(item) for item in self.kv.list_templates(namespace)]
-        # Merge global templates from other namespaces
-        seen = {t.name for t in templates}
-        for ns in self.kv.list_namespaces():
-            if ns == namespace:
-                continue
-            try:
-                for raw in self.kv.list_templates(ns):
-                    spec = raw.get("spec", {})
-                    if spec.get("global", False):
-                        tpl = _cr_to_template(raw)
-                        if tpl.name not in seen:
-                            templates.append(tpl)
-                            seen.add(tpl.name)
-            except Exception:
-                continue
+    def list_templates(self) -> list[Template]:
+        templates = [_cr_to_template(item) for item in self.kv.list_templates()]
         for tpl in templates:
             _merge_disk_readiness(tpl, self.kv)
         return templates
@@ -169,7 +157,7 @@ class TemplateService:
         body = {
             "apiVersion": "kubevmui.io/v1",
             "kind": "Template",
-            "metadata": {"name": request.name, "namespace": request.namespace},
+            "metadata": {"name": request.name},
             "spec": {
                 "displayName": request.display_name,
                 "description": request.description,
@@ -204,7 +192,6 @@ class TemplateService:
                     "userData": request.cloud_init_user_data,
                     "networkData": request.cloud_init_network_data,
                 },
-                "global": request.is_global,
             },
         }
         return [body]
@@ -219,7 +206,6 @@ class TemplateService:
             "kind": "Template",
             "metadata": {
                 "name": request.name,
-                "namespace": request.namespace,
             },
             "spec": {
                 "displayName": request.display_name,
@@ -258,11 +244,10 @@ class TemplateService:
                     "userData": request.cloud_init_user_data,
                     "networkData": request.cloud_init_network_data,
                 },
-                "global": request.is_global,
             },
         }
-        raw = self.kv.create_template(request.namespace, body)
+        raw = self.kv.create_template(body)
         return _cr_to_template(raw)
 
-    def delete_template(self, namespace: str, name: str) -> None:
-        self.kv.delete_template(namespace, name)
+    def delete_template(self, name: str) -> None:
+        self.kv.delete_template(name)

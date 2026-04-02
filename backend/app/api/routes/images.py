@@ -14,7 +14,7 @@ from app.services.upload_tracker import ProgressStream, UploadTracker
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/api/v1/clusters/{cluster}/namespaces/{ns}",
+    prefix="/api/v1/clusters/{cluster}",
     tags=["images"],
 )
 
@@ -31,25 +31,23 @@ def _get_service(cluster: str, cm: ClusterManager) -> ImageService:
 @router.get("/images", response_model=ImageList)
 def list_images(
     cluster: str,
-    ns: str,
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    items = svc.list_images(ns)
+    items = svc.list_images()
     return ImageList(items=items, total=len(items))
 
 
 @router.get("/images/{name}", response_model=Image)
 def get_image(
     cluster: str,
-    ns: str,
     name: str,
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    img = svc.get_image(ns, name)
+    img = svc.get_image(name)
     if img is None:
         raise HTTPException(status_code=404, detail=f"Image '{name}' not found")
     return img
@@ -58,19 +56,17 @@ def get_image(
 @router.post("/images", response_model=Image, status_code=201)
 def create_image(
     cluster: str,
-    ns: str,
     body: ImageCreate,
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    return svc.create_image(ns, body)
+    return svc.create_image(body)
 
 
 @router.post("/images/upload", response_model=Image, status_code=201)
 async def upload_image(
     cluster: str,
-    ns: str,
     file: UploadFile = File(...),
     name: str = Form(...),
     display_name: str = Form(...),
@@ -78,7 +74,7 @@ async def upload_image(
     os_type: str = Form("linux"),
     size_gb: int = Form(20),
     storage_class: str = Form(""),
-    is_global: bool = Form(False),
+    storage_namespace: str = Form("default"),
     media_type: str = Form("disk"),
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
@@ -94,29 +90,29 @@ async def upload_image(
         source_url="",
         size_gb=size_gb,
         storage_class=storage_class,
-        is_global=is_global,
+        storage_namespace=storage_namespace,
         media_type=media_type,
     )
-    logger.info("upload_image: creating image CR %s/%s (source=upload, size=%dGB)", ns, name, size_gb)
-    image = svc.create_image(ns, image_create)
+    logger.info("upload_image: creating image CR %s (source=upload, size=%dGB)", name, size_gb)
+    image = svc.create_image(image_create)
     logger.info("upload_image: image CR created, starting stream to CDI (file_size=%d)", file.size or 0)
 
-    upload_key = f"{ns}/{name}"
+    upload_key = name
     progress = tracker.start(upload_key, file.size or 0)
     progress_stream = ProgressStream(file.file, progress)
 
     try:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
-            None, svc.upload_image_stream, ns, name, progress_stream, file.size or 0
+            None, svc.upload_image_stream, storage_namespace, name, progress_stream, file.size or 0
         )
-        logger.info("upload_image: stream completed for %s/%s", ns, name)
+        logger.info("upload_image: stream completed for %s", name)
         tracker.complete(upload_key)
     except Exception as e:
         logger.exception("Upload to CDI failed")
         tracker.fail(upload_key, str(e)[:500])
         try:
-            svc.delete_image(ns, name)
+            svc.delete_image(name)
         except Exception:
             logger.warning("Failed to clean up image '%s' after upload failure", name)
         raise HTTPException(status_code=502, detail=f"Upload to CDI failed: {str(e)[:500]}") from e
@@ -128,11 +124,10 @@ async def upload_image(
 
 @router.get("/images/upload-progress/{name}")
 def get_upload_progress(
-    ns: str,
     name: str,
     _user: UserInfo = Depends(get_current_user),
 ):
-    upload_key = f"{ns}/{name}"
+    upload_key = name
     progress = tracker.get(upload_key)
     if progress is None:
         raise HTTPException(status_code=404, detail="No active upload for this image")
@@ -147,10 +142,9 @@ def get_upload_progress(
 @router.delete("/images/{name}", status_code=204)
 def delete_image(
     cluster: str,
-    ns: str,
     name: str,
     _user: UserInfo = Depends(get_current_user),
     cm: ClusterManager = Depends(get_cluster_manager),
 ):
     svc = _get_service(cluster, cm)
-    svc.delete_image(ns, name)
+    svc.delete_image(name)

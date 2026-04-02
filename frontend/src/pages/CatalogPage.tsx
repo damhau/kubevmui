@@ -195,13 +195,12 @@ const TOTAL_STEPS = 4
 
 interface WizardState {
   step: number
-  namespace: string
+  storageNamespace: string
   storageClass: string
   imageSizeGb: number
   selectedTemplates: Record<string, boolean>
   templateOverrides: Record<string, { cpuCores: number; memoryMb: number; diskSizeGb: number }>
   cloudInitUserData: string
-  isGlobal: boolean
 }
 
 function ProvisionWizard({
@@ -227,13 +226,12 @@ function ProvisionWizard({
     }
     return {
       step: 1,
-      namespace: 'default',
+      storageNamespace: 'default',
       storageClass: '',
       imageSizeGb: entry.image.default_size_gb,
       selectedTemplates,
       templateOverrides,
       cloudInitUserData: entry.cloud_init_user_data || '',
-      isGlobal: false,
     }
   })
 
@@ -246,10 +244,9 @@ function ProvisionWizard({
       {
         name: entry.name,
         body: {
-          namespace: state.namespace,
+          storage_namespace: state.storageNamespace,
           storage_class: state.storageClass,
           templates: selectedVariants,
-          is_global: state.isGlobal,
         },
       },
       {
@@ -318,30 +315,6 @@ function ProvisionWizard({
                 style={inputStyle}
                 min={1}
               />
-            </div>
-            <div
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: theme.radius.md,
-                border: `1px solid ${theme.main.cardBorder}`,
-                cursor: 'pointer',
-              }}
-              onClick={() => setState((s) => ({ ...s, isGlobal: !s.isGlobal }))}
-            >
-              <input
-                type="checkbox"
-                checked={state.isGlobal}
-                readOnly
-                style={{ accentColor: theme.accent }}
-              />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: theme.text.primary }}>
-                  Global resources
-                </div>
-                <div style={{ fontSize: 11, color: theme.text.dim }}>
-                  Make image and templates available across all namespaces
-                </div>
-              </div>
             </div>
           </>
         )}
@@ -435,8 +408,8 @@ function ProvisionWizard({
                 <span style={{ fontWeight: 500 }}>{entry.display_name}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: theme.text.secondary }}>Namespace</span>
-                <span style={{ fontWeight: 500 }}>{state.namespace}</span>
+                <span style={{ color: theme.text.secondary }}>Storage Namespace</span>
+                <span style={{ fontWeight: 500 }}>{state.storageNamespace}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: theme.text.secondary }}>Storage Class</span>
@@ -445,10 +418,6 @@ function ProvisionWizard({
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: theme.text.secondary }}>Image Size</span>
                 <span style={{ fontWeight: 500 }}>{state.imageSizeGb} GB</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: theme.text.secondary }}>Global</span>
-                <span style={{ fontWeight: 500 }}>{state.isGlobal ? 'Yes' : 'No'}</span>
               </div>
               <div style={{ borderTop: `1px solid ${theme.main.cardBorder}`, paddingTop: 8, marginTop: 4 }}>
                 <div style={{ color: theme.text.secondary, marginBottom: 6 }}>Resources to create</div>

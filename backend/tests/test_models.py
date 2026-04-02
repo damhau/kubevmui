@@ -43,7 +43,7 @@ def test_network_profile_model():
 
 def test_template_model():
     tpl = Template(
-        name="ubuntu-2404", namespace="default",
+        name="ubuntu-2404",
         display_name="Ubuntu 24.04 LTS", category="linux", os_type="linux",
         compute=VMCompute(cpu_cores=2, memory_mb=4096),
     )

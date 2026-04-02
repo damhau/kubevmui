@@ -10,7 +10,7 @@ spec:
     singular: template
     shortNames:
       - tpl
-  scope: Namespaced
+  scope: Cluster
   versions:
     - name: v1
       served: true
@@ -30,10 +30,6 @@ spec:
                 description:
                   type: string
                   default: ""
-                global:
-                  type: boolean
-                  default: false
-                  description: When true, this template is available across all namespaces
                 category:
                   type: string
                   default: custom
@@ -116,9 +112,6 @@ spec:
         - name: Memory (MB)
           type: integer
           jsonPath: .spec.compute.memoryMb
-        - name: Global
-          type: boolean
-          jsonPath: .spec.global
         - name: Age
           type: date
           jsonPath: .metadata.creationTimestamp

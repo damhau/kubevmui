@@ -19,10 +19,9 @@ def _mock_cm():
     return cm
 
 
-def _make_template(name="test-tpl", namespace="default"):
+def _make_template(name="test-tpl"):
     return Template(
         name=name,
-        namespace=namespace,
         display_name="Test Template",
         compute=VMCompute(cpu_cores=2, memory_mb=2048),
     )
@@ -40,7 +39,7 @@ def test_list_templates_returns_200():
 
         try:
             with TestClient(app) as client:
-                resp = client.get("/api/v1/clusters/local/namespaces/default/templates")
+                resp = client.get("/api/v1/clusters/local/templates")
             assert resp.status_code == 200
             data = resp.json()
             assert "items" in data
@@ -52,7 +51,7 @@ def test_list_templates_returns_200():
 
 def test_list_templates_requires_auth():
     with TestClient(app) as client:
-        resp = client.get("/api/v1/clusters/local/namespaces/default/templates")
+        resp = client.get("/api/v1/clusters/local/templates")
     assert resp.status_code == 401
 
 
@@ -69,10 +68,9 @@ def test_create_template_returns_201():
         try:
             with TestClient(app) as client:
                 resp = client.post(
-                    "/api/v1/clusters/local/namespaces/default/templates",
+                    "/api/v1/clusters/local/templates",
                     json={
                         "name": "test-tpl",
-                        "namespace": "default",
                         "display_name": "Test Template",
                         "compute": {"cpu_cores": 2, "memory_mb": 2048},
                     },
@@ -93,7 +91,7 @@ def test_delete_template_returns_204():
         try:
             with TestClient(app) as client:
                 resp = client.delete(
-                    "/api/v1/clusters/local/namespaces/default/templates/test-tpl"
+                    "/api/v1/clusters/local/templates/test-tpl"
                 )
             assert resp.status_code == 204
         finally:

@@ -34,10 +34,9 @@ class CatalogEntryList(BaseModel):
 
 
 class ProvisionRequest(BaseModel):
-    namespace: str
+    storage_namespace: str = "default"  # namespace for backing DVs/PVCs
     storage_class: str = ""
     templates: list[str]  # variant names to provision, e.g. ["small", "medium"]
-    is_global: bool = False
 
 
 class ProvisionResponse(BaseModel):

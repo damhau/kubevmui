@@ -53,3 +53,21 @@ Tempalte:
 
 
   
+Test snapshot support:;
+
+  Option A: Check VolumeSnapshotClass existence                                                                                                                                                                                                   
+  The cleanest signal. If no VolumeSnapshotClass exists for the VM's storage class, snapshots won't work. The backend can query VolumeSnapshotClasses and match their driver against the provisioner of the VM's StorageClass. This is the most
+  reliable check.                                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                                
+  Option B: StorageClass annotations/features                                                                                                                                                                                                     
+  Some CSI drivers advertise snapshot support via the StorageClass or CSIDriver object. Less universal — not all drivers do this.
+                                                                                                                                                                                                                                                  
+  Option C: Try and fail
+  Just let the snapshot creation fail and show the error. Simplest but bad UX.                                                                                                                                                                    
+                                                                                                                                                                                                                                                  
+  I'd recommend Option A:                                                                                                                                                                                                                         
+  1. Backend adds an endpoint or enriches storage class data with a supports_snapshots: bool field (by checking if a matching VolumeSnapshotClass exists for that provisioner)                                                                    
+  2. Frontend uses this info to disable/hide the snapshot button on the VM detail page when the VM's disks use a storage class that doesn't support snapshots                                                                                     
+  3. Could also show a tooltip explaining why it's disabled                                                                                                  
+                                                                                                                                                                                                                                                  
+  The check is: for a given StorageClass, get its provisioner field, then check if any VolumeSnapshotClass has a matching driver field. If yes → snapshots supported.   

@@ -311,14 +311,12 @@ def _build_manifest(
                 )
             else:
                 dv_name = f"{request.name}-{disk_ref.name}-dv"
-                # Resolve clone namespace: use explicit value, or look up the image's namespace
+                # Resolve clone namespace: use explicit value, or look up the image's storage namespace
                 clone_ns = disk_ref.clone_namespace
                 if not clone_ns and disk_ref.clone_source and kv:
-                    for ns in kv.list_namespaces():
-                        img = kv.get_image(ns, disk_ref.clone_source)
-                        if img:
-                            clone_ns = ns
-                            break
+                    img = kv.get_image(disk_ref.clone_source)
+                    if img:
+                        clone_ns = img.get("spec", {}).get("storage", {}).get("namespace", "default")
                 clone_ns = clone_ns or request.namespace
                 dv_template = {
                     "metadata": {"name": dv_name},

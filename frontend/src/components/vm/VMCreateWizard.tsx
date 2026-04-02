@@ -201,7 +201,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
   const [quickCreate, setQuickCreate] = useState(!!initialTemplate)
   const { data: namespacesData } = useNamespaces()
   const { data: imagesData } = useImages()
-  const registeredImages: Array<{ name: string; display_name: string; source_url: string; os_type: string; source_type?: string }> =
+  const registeredImages: Array<{ name: string; display_name: string; source_url: string; os_type: string; source_type?: string; storage_namespace?: string }> =
     Array.isArray(imagesData?.items) ? imagesData.items : []
   const { data: templatesData } = useTemplates()
   const { data: storageClassData } = useStorageClasses()
@@ -1061,7 +1061,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                                 if (selectedImg?.source_type === 'container_disk') {
                                   updateDisk(i, { source_type: 'container_disk', image: selectedImg.source_url, clone_source: '', clone_namespace: '' })
                                 } else {
-                                  updateDisk(i, { source_type: 'datavolume_clone', clone_source: e.target.value, clone_namespace: selectedImg?.namespace || '', image: '' })
+                                  updateDisk(i, { source_type: 'datavolume_clone', clone_source: e.target.value, clone_namespace: selectedImg?.storage_namespace || 'default', image: '' })
                                 }
                               }}
                               style={inputStyle()}
