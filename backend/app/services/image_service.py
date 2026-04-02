@@ -52,20 +52,6 @@ def _merge_dv_status(image: Image, kv: KubeVirtClient) -> Image:
     if image.source_type == "container_disk":
         return image
 
-    # For upload images: check PVC status directly (no DataVolume)
-    if image.source_type == "upload":
-        try:
-            pvc = kv.core_api.read_namespaced_persistent_volume_claim(image.name, image.namespace)
-            phase = pvc.status.phase if pvc.status else "Pending"
-            if phase == "Bound":
-                image.dv_phase = "Succeeded"
-                image.dv_progress = "100%"
-            else:
-                image.dv_phase = phase
-        except Exception:
-            pass
-        return image
-
     dv = kv.get_datavolume(image.namespace, image.name)
     if dv is None:
         return image
@@ -181,30 +167,29 @@ class ImageService:
 
         # Create backing storage for the image
         if request.source_type == "upload":
-            # ISO/upload: create a plain PVC (like virtctl image-upload does)
-            # CDI upload proxy writes raw bytes directly — no conversion
-            from kubernetes import client as k8s_client
+            # Create DataVolume with upload source — CDI manages the upload
+            # pod lifecycle and cleans up automatically after upload completes.
+            pvc_spec: dict = {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {"requests": {"storage": f"{request.size_gb}Gi"}},
+            }
+            if request.storage_class:
+                pvc_spec["storageClassName"] = request.storage_class
 
-            pvc = k8s_client.V1PersistentVolumeClaim(
-                api_version="v1",
-                kind="PersistentVolumeClaim",
-                metadata=k8s_client.V1ObjectMeta(
-                    name=request.name,
-                    namespace=namespace,
-                    labels={"kubevmui.io/type": "image"},
-                    annotations={
-                        "cdi.kubevirt.io/storage.upload.target": "",
-                    },
-                ),
-                spec=k8s_client.V1PersistentVolumeClaimSpec(
-                    access_modes=["ReadWriteOnce"],
-                    storage_class_name=request.storage_class or None,
-                    resources=k8s_client.V1VolumeResourceRequirements(
-                        requests={"storage": f"{request.size_gb}Gi"},
-                    ),
-                ),
-            )
-            self.kv.core_api.create_namespaced_persistent_volume_claim(namespace, pvc)
+            dv_manifest = {
+                "apiVersion": "cdi.kubevirt.io/v1beta1",
+                "kind": "DataVolume",
+                "metadata": {
+                    "name": request.name,
+                    "namespace": namespace,
+                    "labels": {"kubevmui.io/type": "image"},
+                },
+                "spec": {
+                    "source": {"upload": {}},
+                    "pvc": pvc_spec,
+                },
+            }
+            self.kv.create_datavolume(namespace, dv_manifest)
 
         elif request.source_type in ("registry", "http"):
             # Disk images: create DataVolume (CDI imports and converts)
@@ -295,6 +280,11 @@ class ImageService:
         """Stream file data to CDI upload proxy via direct HTTPS POST."""
         import httpx
 
+        logger.info(
+            "upload_image_stream: starting upload for %s/%s (size=%d)",
+            namespace, name, content_length,
+        )
+
         # Create upload token
         token_body = {
             "apiVersion": "upload.cdi.kubevirt.io/v1beta1",
@@ -302,6 +292,7 @@ class ImageService:
             "metadata": {"name": name, "namespace": namespace},
             "spec": {"pvcName": name},
         }
+        logger.info("upload_image_stream: requesting upload token for PVC %s/%s", namespace, name)
         token_result = self.kv.custom_api.create_namespaced_custom_object(
             group="upload.cdi.kubevirt.io",
             version="v1beta1",
@@ -312,10 +303,16 @@ class ImageService:
         token = token_result.get("status", {}).get("token", "")
         if not token:
             raise RuntimeError("Failed to get CDI upload token")
+        logger.info("upload_image_stream: got upload token (length=%d)", len(token))
 
         # Discover upload proxy URL (like virtctl does)
         proxy_url = self._get_upload_proxy_url()
-        upload_url = f"{proxy_url.rstrip('/')}/v1beta1/upload"
+        # Use the async endpoint so the connection closes as soon as data is
+        # transmitted.  The synchronous /upload endpoint keeps the connection
+        # open during conversion/resizing which causes timeout errors for
+        # large images (CDI "context deadline exceeded").
+        upload_url = f"{proxy_url.rstrip('/')}/v1beta1/upload-async"
+        logger.info("upload_image_stream: POST %s (content-length=%d)", upload_url, content_length)
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -324,17 +321,27 @@ class ImageService:
         if content_length > 0:
             headers["Content-Length"] = str(content_length)
 
-        # POST file directly to CDI upload proxy
-        with httpx.Client(verify=False, timeout=httpx.Timeout(600.0)) as client:
+        # Large images (8 GB+) need generous timeouts for the data transfer
+        # itself; the async endpoint returns as soon as bytes are received.
+        timeout = httpx.Timeout(connect=30.0, read=3600.0, write=3600.0, pool=3600.0)
+        with httpx.Client(verify=False, timeout=timeout) as client:
             response = client.post(
                 upload_url,
                 content=file_stream,
                 headers=headers,
             )
+            logger.info(
+                "upload_image_stream: response status=%d (length=%d)",
+                response.status_code, len(response.text),
+            )
             if response.status_code >= 400:
+                logger.error(
+                    "upload_image_stream: CDI upload failed: %s", response.text[:500]
+                )
                 raise RuntimeError(
                     f"CDI upload failed ({response.status_code}): {response.text[:500]}"
                 )
+        logger.info("upload_image_stream: upload completed successfully for %s/%s", namespace, name)
 
     def delete_image(self, namespace: str, name: str) -> None:
         self.kv.delete_image(namespace, name)

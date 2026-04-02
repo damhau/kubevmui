@@ -441,7 +441,7 @@ export function ImagesPage() {
                   <tr
                     key={img.name}
                     className="table-row-clickable"
-                    onClick={() => navigate(`/images/${activeNamespace}/${img.name}`)}
+                    onClick={() => navigate(`/images/${(img as any).namespace || activeNamespace}/${img.name}`)}
                     style={i < 8 ? {
                       animation: `fadeInRow 0.3s ease-out both`,
                       animationDelay: `${0.05 + i * 0.04}s`,
@@ -786,12 +786,18 @@ export function ImagesPage() {
                     ? progressDetail && progressDetail.total > 0
                       ? `Writing to cluster... ${formatUploadSize(progressDetail.uploaded)} / ${formatUploadSize(progressDetail.total)}`
                       : 'Writing to cluster storage...'
-                    : 'Uploading to server...'}
+                    : 'Receiving file...'}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: theme.accent }}>{uploadProgress}%</span>
+                {uploadPhase === 'writing' && uploadProgress > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: theme.accent }}>{uploadProgress}%</span>
+                )}
               </div>
-              <div style={{ height: 6, background: theme.main.inputBg, borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${uploadProgress}%`, background: theme.accent, borderRadius: 3, transition: 'width 0.3s' }} />
+              <div style={{ height: 6, background: theme.main.inputBg, borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
+                {uploadPhase === 'uploading' ? (
+                  <div style={{ height: '100%', width: '40%', background: theme.accent, borderRadius: 3, opacity: 0.6, position: 'absolute', animation: 'indeterminate 1.5s ease-in-out infinite' }} />
+                ) : (
+                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: theme.accent, borderRadius: 3, transition: 'width 0.3s' }} />
+                )}
               </div>
             </div>
           )}

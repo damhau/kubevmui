@@ -15,6 +15,8 @@ class Template(ResourceMeta):
     cloud_init_user_data: str | None = None
     cloud_init_network_data: str | None = None
     is_global: bool = False
+    status: str = "Ready"  # Ready, Importing, Pending, Failed
+    status_message: str = ""
     raw_manifest: dict | None = None
 
 

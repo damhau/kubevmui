@@ -7,7 +7,6 @@ import {
 } from '@/hooks/useCatalog'
 import type { CatalogEntry } from '@/hooks/useCatalog'
 import { useStorageClasses } from '@/hooks/useImages'
-import { useUIStore } from '@/stores/ui-store'
 import { theme } from '@/lib/theme'
 import { Modal } from '@/components/ui/Modal'
 import { extractErrorMessage } from '@/lib/api-client'
@@ -75,13 +74,11 @@ function DistroIcon({ icon, size = 36 }: { icon: string; size?: number }) {
 
 /* ── Status badge ────────────────────────────────────────────── */
 
-function StatusBadge({ entryName, namespace }: { entryName: string; namespace: string }) {
-  const { data: status } = useCatalogStatus(entryName, namespace)
+function StatusBadge({ entryName }: { entryName: string }) {
+  const { data: status } = useCatalogStatus(entryName, 'default')
 
-  if (!status || namespace === '_all') {
-    return (
-      <span style={{ fontSize: 11, color: theme.text.secondary }}>Select a namespace</span>
-    )
+  if (!status) {
+    return null
   }
 
   if (!status.provisioned) {
@@ -209,11 +206,9 @@ interface WizardState {
 
 function ProvisionWizard({
   entry,
-  namespace,
   onClose,
 }: {
   entry: CatalogEntry
-  namespace: string
   onClose: () => void
 }) {
   const { data: storageClasses } = useStorageClasses()
@@ -232,7 +227,7 @@ function ProvisionWizard({
     }
     return {
       step: 1,
-      namespace,
+      namespace: 'default',
       storageClass: '',
       imageSizeGb: entry.image.default_size_gb,
       selectedTemplates,
@@ -300,15 +295,6 @@ function ProvisionWizard({
           <>
             <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
               Step 1: Image Configuration
-            </div>
-            <div>
-              <label style={labelStyle}>Target Namespace</label>
-              <input
-                type="text"
-                value={state.namespace}
-                onChange={(e) => setState((s) => ({ ...s, namespace: e.target.value }))}
-                style={inputStyle}
-              />
             </div>
             <div>
               <label style={labelStyle}>Storage Class</label>
@@ -535,7 +521,6 @@ function ProvisionWizard({
 /* ── Main page ───────────────────────────────────────────────── */
 
 export function CatalogPage() {
-  const { activeNamespace } = useUIStore()
   const { data, isLoading } = useCatalogEntries()
   const [search, setSearch] = useState('')
   const [wizardEntry, setWizardEntry] = useState<CatalogEntry | null>(null)
@@ -553,11 +538,9 @@ export function CatalogPage() {
     )
   }, [entries, search])
 
-  const ns = activeNamespace === '_all' ? '' : activeNamespace
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <TopBar title="Catalog">
+      <TopBar title="Catalog" hideNamespace>
         <input
           type="text"
           placeholder="Search distributions..."
@@ -643,7 +626,7 @@ export function CatalogPage() {
                   <span style={{ fontSize: 11, color: theme.text.dim }}>
                     {entry.templates.length} size{entry.templates.length !== 1 ? 's' : ''}
                   </span>
-                  <StatusBadge entryName={entry.name} namespace={ns} />
+                  <StatusBadge entryName={entry.name} />
                 </div>
               </div>
             ))}
@@ -655,7 +638,6 @@ export function CatalogPage() {
       {wizardEntry && (
         <ProvisionWizard
           entry={wizardEntry}
-          namespace={ns || 'default'}
           onClose={() => setWizardEntry(null)}
         />
       )}

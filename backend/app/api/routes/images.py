@@ -97,7 +97,9 @@ async def upload_image(
         is_global=is_global,
         media_type=media_type,
     )
+    logger.info("upload_image: creating image CR %s/%s (source=upload, size=%dGB)", ns, name, size_gb)
     image = svc.create_image(ns, image_create)
+    logger.info("upload_image: image CR created, starting stream to CDI (file_size=%d)", file.size or 0)
 
     upload_key = f"{ns}/{name}"
     progress = tracker.start(upload_key, file.size or 0)
@@ -108,6 +110,7 @@ async def upload_image(
         await loop.run_in_executor(
             None, svc.upload_image_stream, ns, name, progress_stream, file.size or 0
         )
+        logger.info("upload_image: stream completed for %s/%s", ns, name)
         tracker.complete(upload_key)
     except Exception as e:
         logger.exception("Upload to CDI failed")

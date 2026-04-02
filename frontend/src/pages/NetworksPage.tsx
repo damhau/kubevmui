@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { TopBar } from '@/components/layout/TopBar'
 import { useNetworkCRs, useCreateNetworkCR, useDeleteNetworkCR, type NetworkCR, type NetworkCRCreate } from '@/hooks/useNetworkCRs'
 import { useNNCPs, useCreateNNCP, useDeleteNNCP, useAvailableBridges, useNodeInterfaces } from '@/hooks/useNMState'
@@ -86,8 +86,10 @@ export function NetworksPage() {
   const navigate = useNavigate()
   const { activeCluster } = useUIStore()
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'interfaces' | 'networks'>('interfaces')
+  // Tab state — respect ?tab= query param for back-navigation from detail pages
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'networks' ? 'networks' : 'interfaces'
+  const [activeTab, setActiveTab] = useState<'interfaces' | 'networks'>(initialTab)
 
   // --- Interfaces ---
   const { data: nncpData, isLoading: nncpLoading } = useNNCPs()

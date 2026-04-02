@@ -33,12 +33,11 @@ export function useTemplate(name: string, namespace?: string) {
 
 export function useCreateTemplate() {
   const queryClient = useQueryClient()
-  const { activeCluster, activeNamespace } = useUIStore()
-  const ns = activeNamespace === '_all' ? 'default' : activeNamespace
+  const { activeCluster } = useUIStore()
   return useMutation({
     mutationFn: async (template: any) => {
       const { data } = await apiClient.post(
-        `/clusters/${activeCluster}/namespaces/${ns}/templates`,
+        `/clusters/${activeCluster}/namespaces/default/templates`,
         template,
       )
       return data
@@ -51,11 +50,10 @@ export function useCreateTemplate() {
 
 export function useDeleteTemplate() {
   const queryClient = useQueryClient()
-  const { activeCluster, activeNamespace } = useUIStore()
-  const ns = activeNamespace === '_all' ? 'default' : activeNamespace
+  const { activeCluster } = useUIStore()
   return useMutation({
-    mutationFn: async (name: string) => {
-      await apiClient.delete(`/clusters/${activeCluster}/namespaces/${ns}/templates/${name}`)
+    mutationFn: async ({ name, namespace }: { name: string; namespace: string }) => {
+      await apiClient.delete(`/clusters/${activeCluster}/namespaces/${namespace}/templates/${name}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] })

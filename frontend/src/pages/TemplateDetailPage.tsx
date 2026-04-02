@@ -58,6 +58,23 @@ export function TemplateDetailPage() {
         >
           {data?.display_name || data?.name || name}
         </h1>
+        {data?.status && data.status !== 'Ready' && (() => {
+          const statusStyles: Record<string, { bg: string; color: string; border: string }> = {
+            Importing: { bg: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' },
+            Pending:   { bg: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' },
+            Failed:    { bg: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' },
+          }
+          const s = statusStyles[data.status] ?? { bg: theme.main.bg, color: theme.text.secondary, border: `1px solid ${theme.main.cardBorder}` }
+          return (
+            <span
+              className="badge"
+              title={data.status_message}
+              style={{ background: s.bg, color: s.color, border: s.border }}
+            >
+              {data.status}
+            </span>
+          )
+        })()}
       </div>
 
       {/* Tabs */}

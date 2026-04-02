@@ -32,6 +32,8 @@ interface Template {
   display_name?: string
   category?: string
   os_type?: string
+  status?: string
+  status_message?: string
   compute?: { cpu_cores?: number; memory_mb?: number }
   disks?: unknown[]
   networks?: unknown[]
@@ -215,6 +217,7 @@ export function TemplatesPage() {
   const { sorted: sortedTemplates, sortConfig, requestSort } = useSortable(templates, { column: 'display_name', direction: 'asc' })
   const [showCreate, setShowCreate] = useState(false)
   const [editingName, setEditingName] = useState<string | null>(null)
+  const [editingNamespace, setEditingNamespace] = useState<string>('default')
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<TemplateForm>(defaultForm)
 
@@ -254,6 +257,7 @@ export function TemplatesPage() {
         is_global: tpl.is_global ?? false,
       })
       setEditingName(tpl.name)
+      setEditingNamespace(tpl.namespace)
       setError(null)
       setShowCreate(true)
       return
@@ -282,7 +286,7 @@ export function TemplatesPage() {
         message: `Delete template "${tpl.display_name || tpl.name}"? This action cannot be undone.`,
         danger: true,
         onConfirm: () => {
-          deleteTemplate.mutate(tpl.name, {
+          deleteTemplate.mutate({ name: tpl.name, namespace: tpl.namespace }, {
             onSuccess: () => toast.success('Template deleted'),
             onError: (err) => toast.error(extractErrorMessage(err, 'Failed to delete template')),
           })
@@ -361,7 +365,7 @@ export function TemplatesPage() {
     }
     if (editingName) {
       // Edit: delete old, then create new
-      deleteTemplate.mutate(editingName, {
+      deleteTemplate.mutate({ name: editingName, namespace: editingNamespace }, {
         onSuccess: () => {
           createTemplate.mutate(payload, {
             onSuccess: () => {
@@ -400,6 +404,7 @@ export function TemplatesPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <TopBar
         title="Templates"
+        hideNamespace
         action={
           <button
             onClick={() => {
@@ -456,6 +461,9 @@ export function TemplatesPage() {
                   <th className={`table-header-cell-sortable${sortConfig.column === 'os_type' ? ' active' : ''}`} onClick={() => requestSort('os_type')}>
                     OS Type{sortConfig.column === 'os_type' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                   </th>
+                  <th className={`table-header-cell-sortable${sortConfig.column === 'status' ? ' active' : ''}`} onClick={() => requestSort('status')}>
+                    Status{sortConfig.column === 'status' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
                   <th className={`table-header-cell-sortable${sortConfig.column === 'compute.cpu_cores' ? ' active' : ''}`} onClick={() => requestSort('compute.cpu_cores')}>
                     CPU{sortConfig.column === 'compute.cpu_cores' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                   </th>
@@ -509,6 +517,18 @@ export function TemplatesPage() {
                     </td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {tpl.os_type ?? '—'}
+                    </td>
+                    <td className="table-cell">
+                      {(() => {
+                        const s = tpl.status || 'Ready'
+                        if (s === 'Ready') return <Badge label="Ready" color={theme.status.running} />
+                        if (s === 'Failed') return <Badge label="Failed" color={theme.status.error} />
+                        return (
+                          <span title={tpl.status_message}>
+                            <Badge label="Importing" color={theme.status.provisioning} />
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13 }}>
                       {tpl.compute?.cpu_cores ? `${tpl.compute.cpu_cores} vCPU` : '—'}
@@ -935,7 +955,7 @@ export function TemplatesPage() {
           {/* YAML PREVIEW */}
           {!editingName && (
             <YamlPreview
-              endpoint={`/clusters/${activeCluster}/namespaces/${activeNamespace}/templates/preview`}
+              endpoint={`/clusters/${activeCluster}/namespaces/default/templates/preview`}
               payload={{
                 display_name: form.display_name,
                 name: form.name,

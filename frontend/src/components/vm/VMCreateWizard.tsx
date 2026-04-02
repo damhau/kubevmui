@@ -244,11 +244,23 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
 
   const updateForm = (patch: Partial<FormData>) => setForm((f) => ({ ...f, ...patch }))
 
+  const [templateWarning, setTemplateWarning] = useState('')
+
   const applyTemplate = (templateName: string) => {
     const tpl = templates.find((t: any) => t.name === templateName)
     if (!tpl) {
       updateForm({ template_name: '' })
+      setTemplateWarning('')
       return
+    }
+    if (tpl.status && tpl.status !== 'Ready') {
+      setTemplateWarning(
+        tpl.status === 'Failed'
+          ? `Template backing image has failed. VMs created from this template may not work.`
+          : `Template backing image is still importing. VMs created now may fail until the image is ready.`
+      )
+    } else {
+      setTemplateWarning('')
     }
     setForm((f) => ({
       ...f,
@@ -656,11 +668,24 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                 >
                   <option value="">No template — configure manually</option>
                   {templates.map((tpl: any) => (
-                    <option key={tpl.name} value={tpl.name}>
-                      {tpl.display_name || tpl.name} ({tpl.category})
+                    <option key={tpl.name} value={tpl.name} disabled={tpl.status === 'Failed'}>
+                      {tpl.display_name || tpl.name} ({tpl.category}){tpl.status && tpl.status !== 'Ready' ? ` — ${tpl.status}` : ''}
                     </option>
                   ))}
                 </select>
+                {templateWarning && (
+                  <div style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    fontSize: 12,
+                    borderRadius: theme.radius.sm,
+                    background: '#fef3c7',
+                    color: '#92400e',
+                    border: '1px solid #fde68a',
+                  }}>
+                    {templateWarning}
+                  </div>
+                )}
               </FieldGroup>
             </SectionCard>
           )}
@@ -1050,17 +1075,7 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                             </select>
                           </FieldGroup>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: disk.source_type === 'container_disk' ? '1fr' : '1fr 1fr', gap: 12, marginTop: 12 }}>
-                          {disk.source_type !== 'container_disk' && (
-                          <FieldGroup label="Storage Class">
-                            <select value={disk.storage_class} onChange={(e) => updateDisk(i, { storage_class: e.target.value })} style={inputStyle()}>
-                              <option value="">Default</option>
-                              {storageClasses.map((sc: any) => (
-                                <option key={sc.name} value={sc.name}>{sc.name}{sc.is_default ? ' (default)' : ''}</option>
-                              ))}
-                            </select>
-                          </FieldGroup>
-                          )}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 12 }}>
                           <FieldGroup label="Bus">
                             <select value={disk.bus} onChange={(e) => updateDisk(i, { bus: e.target.value as Disk['bus'] })} style={inputStyle()}>
                               <option value="sata">sata</option>
@@ -1217,8 +1232,8 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                           </div>
                         </div>
 
-                        {/* PVC form fields */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                        {/* PVC / Blank form fields */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                           <FieldGroup label="Name">
                             <input
                               type="text"
@@ -1235,6 +1250,16 @@ export function VMCreateWizard({ onClose, onSuccess, initialTemplate }: VMCreate
                               onChange={(e) => updateDisk(i, { size_gb: Number(e.target.value) })}
                               style={inputStyle()}
                             />
+                          </FieldGroup>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+                          <FieldGroup label="Storage Class">
+                            <select value={disk.storage_class} onChange={(e) => updateDisk(i, { storage_class: e.target.value })} style={inputStyle()}>
+                              <option value="">Default</option>
+                              {storageClasses.map((sc: any) => (
+                                <option key={sc.name} value={sc.name}>{sc.name}{sc.is_default ? ' (default)' : ''}</option>
+                              ))}
+                            </select>
                           </FieldGroup>
                           <FieldGroup label="Bus">
                             <select

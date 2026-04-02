@@ -874,11 +874,11 @@ export function VMDetailPage() {
 
             {/* Console */}
             {activeTab === 'console' && (
-              <div className="card" style={{ overflow: 'hidden' }}>
+              <div className="card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 400, height: 'calc(100vh - 260px)' }}>
                 {vm.status?.toLowerCase() !== 'running' ? (
                   <div className="empty-text">VM must be running to access the console.</div>
                 ) : (
-                  <div style={{ height: 600, background: '#000' }}>
+                  <div style={{ flex: 1, background: '#000' }}>
                     <VNCConsole
                       ref={vncRef}
                       cluster={activeCluster}

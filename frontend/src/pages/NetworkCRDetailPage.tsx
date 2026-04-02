@@ -110,7 +110,7 @@ export function NetworkCRDetailPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-          <Link to="/networks" className="back-link" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginBottom: 0 }}>
+          <Link to="/networks?tab=networks" className="back-link" style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginBottom: 0 }}>
             &larr; Networks
           </Link>
           <h1

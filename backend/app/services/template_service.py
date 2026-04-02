@@ -1,8 +1,11 @@
+import logging
 from datetime import UTC, datetime
 
 from app.core.k8s_client import KubeVirtClient
 from app.models.template import Template, TemplateCreate
 from app.models.vm import VMCompute
+
+logger = logging.getLogger(__name__)
 
 
 def _cr_to_template(raw: dict) -> Template:
@@ -85,6 +88,46 @@ def _cr_to_template(raw: dict) -> Template:
     )
 
 
+def _merge_disk_readiness(template: Template, kv: KubeVirtClient) -> Template:
+    """Check DataVolume status for clone-source disks and set template readiness."""
+    clone_disks = [
+        d for d in template.disks if d.source_type == "datavolume_clone" and d.clone_source
+    ]
+    if not clone_disks:
+        return template
+
+    worst_status = "Ready"
+    messages: list[str] = []
+
+    for disk in clone_disks:
+        ns = disk.clone_namespace or template.namespace
+        dv = kv.get_datavolume(ns, disk.clone_source)
+        if dv is None and ns != template.namespace:
+            dv = kv.get_datavolume(template.namespace, disk.clone_source)
+        if dv is None:
+            continue
+
+        status = dv.get("status", {})
+        phase = status.get("phase", "")
+        progress = status.get("progress", "")
+
+        if phase == "Failed":
+            worst_status = "Failed"
+            messages.append(f"Image {disk.clone_source} failed")
+        elif phase == "Succeeded":
+            pass  # Ready
+        elif phase:
+            if worst_status != "Failed":
+                worst_status = "Importing"
+            label = "Importing" if "InProgress" in phase else "Pending"
+            detail = f" ({progress})" if progress and progress != "N/A" else ""
+            messages.append(f"Image {disk.clone_source}: {label}{detail}")
+
+    template.status = worst_status
+    template.status_message = "; ".join(messages)
+    return template
+
+
 class TemplateService:
     def __init__(self, kv: KubeVirtClient):
         self.kv = kv
@@ -95,6 +138,7 @@ class TemplateService:
             return None
         tpl = _cr_to_template(raw)
         tpl.raw_manifest = raw
+        _merge_disk_readiness(tpl, self.kv)
         return tpl
 
     def list_templates(self, namespace: str) -> list[Template]:
@@ -114,6 +158,8 @@ class TemplateService:
                             seen.add(tpl.name)
             except Exception:
                 continue
+        for tpl in templates:
+            _merge_disk_readiness(tpl, self.kv)
         return templates
 
     def preview_template(self, request: TemplateCreate) -> list[dict]:

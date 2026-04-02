@@ -123,7 +123,11 @@ export function useUploadImage() {
     formData.append('is_global', String(metadata.is_global || false))
     formData.append('media_type', metadata.media_type || 'disk')
 
-    // Poll server-side progress during 'writing' phase
+    // Poll server-side progress once the backend starts writing to CDI.
+    // This is the real transfer (backend → K8s cluster).  The browser →
+    // backend part (onUploadProgress) is usually fast (localhost in dev)
+    // so we keep it as an indeterminate "receiving" state and let the
+    // server-side poll drive 0-100%.
     let pollInterval: ReturnType<typeof setInterval> | null = null
     const startPolling = () => {
       pollInterval = setInterval(async () => {
@@ -132,7 +136,7 @@ export function useUploadImage() {
             `/clusters/${activeCluster}/namespaces/${ns}/images/upload-progress/${metadata.name}`
           )
           const serverPct = data.percent ?? 0
-          setProgress(50 + Math.round(serverPct / 2))
+          setProgress(serverPct)
           setProgressDetail({ uploaded: data.uploaded_bytes, total: data.total_bytes })
         } catch {
           // Progress endpoint may 404 if upload just finished
@@ -141,20 +145,25 @@ export function useUploadImage() {
     }
 
     try {
+      // Start polling right away — the server creates the tracker before
+      // streaming to CDI, so it will pick up progress as it becomes
+      // available.  While the browser→backend transfer is ongoing the
+      // tracker may not yet exist (404) which the poll silently ignores.
+      startPolling()
+
       await apiClient.post(
         `/clusters/${activeCluster}/namespaces/${ns}/images/upload`,
         formData,
         {
           headers: { 'Content-Type': 'multipart/form-data' },
           onUploadProgress: (e) => {
-            if (e.total) {
-              const pct = Math.round((e.loaded / e.total) * 50)
-              setProgress(pct)
-              if (e.loaded >= e.total && phase !== 'writing') {
-                setPhase('writing')
-                setProgress(50)
-                startPolling()
-              }
+            if (e.total && e.loaded < e.total) {
+              // Browser → backend transfer in progress (often fast/localhost).
+              // Show as "uploading" phase without a percentage — the real
+              // progress comes from the server-side CDI transfer poll.
+              setPhase('uploading')
+            } else if (e.total && e.loaded >= e.total) {
+              setPhase('writing')
             }
           },
         },
