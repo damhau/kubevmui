@@ -1175,15 +1175,745 @@ See `kubernetes/crds/securitygroups.kubevmui.io.yaml` for the full CRD definitio
 
 See `kubernetes/crds/firewallpolicies.kubevmui.io.yaml` for the full CRD definition.
 
+
+## Firewall Logging & Flow Visibility
+
+### NSX-T Context
+
+VMware NSX-T provides integrated firewall logging: every DFW rule can be toggled to log matching traffic, with logs forwarded to syslog or vRealize Log Insight. Administrators expect to see which rules fired, what was allowed/denied, and source/destination details — all from within the management UI.
+
+KubeVM UI must provide equivalent visibility. The implementation varies significantly by CNI backend, so the abstraction layer needs to normalize the experience.
+
+### Logging Capabilities by Backend
+
+| Capability | Calico OSS | Calico Enterprise | Cilium / Hubble (OSS) | Cilium Enterprise | Vanilla K8s |
+|---|---|---|---|---|---|
+| **Per-rule logging** | Yes (`action: Log`) | Yes | Yes (Hubble observes all flows) | Yes | No |
+| **Source/Dest IP:port** | Yes (iptables log) | Yes | Yes | Yes | No |
+| **Pod name / namespace** | No (IP only) | Yes | Yes | Yes | No |
+| **Pod labels** | No | Yes | Yes | Yes | No |
+| **Policy name in verdict** | No (chain name only) | Yes | Limited (drop reason, not policy name) | Yes (full audit trail) | No |
+| **Allow / Deny verdict** | Implicit from chain | Yes | Yes (`FORWARDED` / `DROPPED`) | Yes | No |
+| **Bytes / packets** | No | Yes (aggregated) | Via Prometheus metrics | Yes | No |
+| **L7 (HTTP, DNS)** | No | No | Yes (with L7 proxy enabled) | Yes | No |
+| **TCP flags** | Yes (raw) | Yes | Yes | Yes | No |
+| **Real-time streaming** | syslog tail | Near-real-time | Yes (gRPC stream) | Yes | No |
+| **Historical query** | grep log files | Elasticsearch | No (in-memory ring buffer) | Yes (Timescape) | No |
+| **Programmatic API** | No | Proprietary REST | Yes (gRPC / protobuf) | Yes | No |
+| **Performance impact** | High (per-packet kernel log) | Moderate (aggregated, 30s windows) | Very low (<1% CPU, eBPF native) | Very low | N/A |
+
+### Backend: Calico OSS — `action: Log`
+
+Calico open-source supports per-rule logging via the `action: Log` iptables target. This is a **non-terminating action** — it logs the packet and continues evaluating subsequent rules.
+
+**How it works:**
+1. The reconciler inserts an `action: Log` entry before the actual `Allow` or `Deny` action
+2. Felix creates iptables LOG rules that emit kernel log messages
+3. Logs appear in syslog (`/var/log/syslog`, `/var/log/kern.log`, or journald)
+
+**Generated Calico policy with logging:**
+
+```yaml
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: kubevmui-three-tier-app-deny-web-to-db
+  labels:
+    app.kubernetes.io/managed-by: kubevmui
+    kubevmui.io/firewall-policy: three-tier-app
+    kubevmui.io/rule: deny-web-to-db
+spec:
+  tier: kubevmui
+  order: 100
+  selector: security.kubevmui.io/app == "database"
+  types:
+    - Ingress
+  ingress:
+    # Log action first (non-terminating, logs then continues)
+    - action: Log
+      protocol: TCP
+      source:
+        selector: security.kubevmui.io/app in { "web-frontend", "web-backend" }
+    # Then the actual deny
+    - action: Deny
+      protocol: TCP
+      source:
+        selector: security.kubevmui.io/app in { "web-frontend", "web-backend" }
+```
+
+**Log format (iptables LOG):**
+
+```
+calico-packet: IN=cali1a2b3c OUT= MAC=aa:bb:cc:dd:ee:ff
+  SRC=10.0.1.5 DST=10.0.2.3 LEN=60 TOS=0x00 PREC=0x00 TTL=64
+  ID=54321 DF PROTO=TCP SPT=45678 DPT=5432 WINDOW=29200
+  RES=0x00 SYN URGP=0
+```
+
+The prefix `calico-packet` is configurable via Felix's `iptablesLogPrefix` setting. The reconciler sets a **custom prefix** per rule for correlation:
+
+```yaml
+# Felix configuration for kubevmui-managed logging
+spec:
+  ingress:
+    - action: Log
+      metadata:
+        annotations:
+          # Custom log prefix for correlation
+          projectcalico.org/log-prefix: "kubevmui:deny-web-to-db"
+```
+
+**Calico OSS limitations:**
+- **IP addresses only** — no pod name, namespace, or label metadata in the log. The backend must correlate IPs to pods via the K8s API.
+- **Per-packet logging** — no aggregation. High-traffic rules will flood syslog. Use selectively.
+- **No structured format** — standard iptables LOG text. Must be parsed.
+- **No built-in query API** — must grep syslog or use an external log aggregator.
+
+**KubeVM UI approach for Calico OSS:**
+
+The backend collects logs via two mechanisms:
+1. **Primary:** If a log aggregator is configured (Loki/Elasticsearch URL in config), query it directly
+2. **Fallback:** Read syslog from node filesystem (via DaemonSet or hostPath mount) and parse iptables LOG entries with IP-to-pod correlation
+
+### Backend: Cilium — Hubble
+
+Hubble is Cilium's built-in observability layer. It is **fully open-source** and provides the richest flow visibility of any CNI.
+
+**Architecture:**
+- **Hubble Server** — embedded in the Cilium agent on each node. Hooks into eBPF data path with zero-copy flow capture.
+- **Hubble Relay** — separate Deployment that aggregates flow data from all nodes. Exposes a cluster-wide gRPC API on port 4245.
+- **Hubble UI** — optional web UI showing service dependency map and flow table.
+- **Hubble CLI** — command-line client for filtering and streaming flows.
+
+**Key advantage:** Hubble observes **all** flows automatically — no per-rule logging toggle needed. The `logging: true` field on a FirewallPolicy rule controls whether the KubeVM UI actively queries and displays logs for that rule, not whether Hubble captures them.
+
+**Hubble gRPC API:**
+
+```protobuf
+service Observer {
+  rpc GetFlows(GetFlowsRequest) returns (stream GetFlowsResponse);
+  rpc GetAgentEvents(GetAgentEventsRequest) returns (stream GetAgentEventsResponse);
+  rpc ServerStatus(ServerStatusRequest) returns (ServerStatusResponse);
+}
+```
+
+The API supports rich server-side filtering:
+- By namespace, pod name, label
+- By verdict (`FORWARDED`, `DROPPED`, `REDIRECTED`, `ERROR`, `AUDIT`)
+- By protocol, port, IP
+- By traffic direction (ingress/egress)
+- By HTTP method, URL, status code (L7)
+
+**Flow event JSON structure:**
+
+```json
+{
+  "time": "2026-04-02T10:30:00.123Z",
+  "verdict": "DROPPED",
+  "drop_reason": 133,
+  "drop_reason_desc": "POLICY_DENIED",
+  "IP": {
+    "source": "10.0.1.5",
+    "destination": "10.0.2.3",
+    "ipVersion": "IPv4"
+  },
+  "l4": {
+    "TCP": {
+      "source_port": 45678,
+      "destination_port": 5432,
+      "flags": { "SYN": true }
+    }
+  },
+  "source": {
+    "identity": 12345,
+    "namespace": "default",
+    "labels": ["k8s:security.kubevmui.io/app=web-frontend"],
+    "pod_name": "web-frontend-01"
+  },
+  "destination": {
+    "identity": 67890,
+    "namespace": "production",
+    "labels": ["k8s:security.kubevmui.io/app=database"],
+    "pod_name": "db-postgres-01"
+  },
+  "traffic_direction": "INGRESS",
+  "trace_observation_point": "TO_ENDPOINT",
+  "policy_match_type": 1
+}
+```
+
+**Hubble file export (for long-term storage):**
+
+Cilium can export Hubble flows to files, consumed by Fluent Bit/FluentD for forwarding to Loki, Elasticsearch, or Splunk:
+
+```yaml
+# Cilium Helm values
+hubble:
+  export:
+    static:
+      enabled: true
+      filePath: /var/run/cilium/hubble/events.log
+      fieldMask: [time, source, destination, verdict, l4, drop_reason_desc]
+      allowList:
+        - '{"verdict":["DROPPED"]}'   # only export denied flows
+```
+
+**Hubble Prometheus metrics (always recommended):**
+
+```yaml
+hubble:
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - icmp
+      - httpV2:exemplars=true;labelsContext=source_namespace,destination_namespace
+```
+
+These metrics power Grafana dashboards showing drop rates, flow counts, and HTTP golden signals per namespace/pod.
+
+**Cilium limitations:**
+- **In-memory ring buffer** — Hubble does not persist flow history by default (configurable size, default 4096 events per node). For historical queries, export to Loki/Elasticsearch is required.
+- **Policy name not in OSS verdicts** — Hubble OSS shows `POLICY_DENIED` as the drop reason but does not include the specific policy name. Cilium Enterprise adds full policy audit trails.
+
+### Backend: Vanilla Kubernetes
+
+**There is no native NetworkPolicy logging.** The Kubernetes NetworkPolicy API is declarative intent only — enforcement and visibility are entirely delegated to the CNI.
+
+If the detected backend is `kubernetes` and logging is requested on a rule, the backend sets a warning:
+
+```yaml
+status:
+  warnings:
+    - "Logging is not available with vanilla Kubernetes NetworkPolicy. Install Calico or Cilium for flow visibility."
+```
+
+### Log Aggregation Architecture
+
+KubeVM UI needs a unified log query layer that abstracts the CNI-specific mechanisms:
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   KubeVM UI                         │
+│              Flow Log Viewer Page                   │
+└──────────────────┬──────────────────────────────────┘
+                   │ REST API
+┌──────────────────▼──────────────────────────────────┐
+│              Backend: FlowLogService                │
+│     Unified query interface across backends         │
+└──────┬───────────┬───────────────┬──────────────────┘
+       │           │               │
+  ┌────▼────┐ ┌────▼─────┐  ┌─────▼──────┐
+  │ Calico  │ │ Cilium   │  │ External   │
+  │ Adapter │ │ Adapter  │  │ Log Store  │
+  │         │ │          │  │ Adapter    │
+  └────┬────┘ └────┬─────┘  └─────┬──────┘
+       │           │               │
+  syslog +    Hubble Relay    Loki / ES /
+  IP-to-pod   gRPC API       Splunk API
+  correlation
+```
+
+**Three adapter implementations:**
+
+1. **CiliumFlowAdapter** (recommended) — Connects to Hubble Relay gRPC API. Real-time streaming with rich filtering. Best experience.
+2. **CalicoFlowAdapter** — Parses syslog for `calico-packet` or custom kubevmui prefixes. Correlates IPs to pods via K8s API. Limited metadata.
+3. **ExternalLogStoreAdapter** — Queries Loki (LogQL), Elasticsearch (Lucene), or Splunk (SPL) for kubevmui-tagged log entries. Works with any CNI when a log aggregator is deployed.
+
+### Unified Flow Log Data Model
+
+Regardless of backend, the FlowLogService normalizes all flow events to a common model:
+
+```python
+class FlowLogEntry(BaseModel):
+    """Unified flow log entry across all CNI backends."""
+    timestamp: str                          # ISO 8601
+    verdict: str                            # "ALLOWED" | "DENIED" | "LOGGED"
+    direction: str                          # "ingress" | "egress"
+
+    # Source
+    source_ip: str
+    source_port: int | None = None
+    source_pod: str | None = None           # "namespace/pod-name"
+    source_namespace: str | None = None
+    source_labels: dict[str, str] | None = None
+    source_security_group: str | None = None  # resolved from labels
+
+    # Destination
+    dest_ip: str
+    dest_port: int | None = None
+    dest_pod: str | None = None
+    dest_namespace: str | None = None
+    dest_labels: dict[str, str] | None = None
+    dest_security_group: str | None = None
+
+    # Protocol
+    protocol: str                           # "TCP" | "UDP" | "ICMP"
+    tcp_flags: list[str] | None = None      # ["SYN", "ACK", ...]
+
+    # Policy correlation
+    firewall_policy: str | None = None      # kubevmui FirewallPolicy name
+    rule_name: str | None = None            # rule within the policy
+    cni_policy_name: str | None = None      # actual Calico/Cilium resource name
+
+    # L7 (Cilium only)
+    http_method: str | None = None
+    http_url: str | None = None
+    http_status: int | None = None
+    dns_query: str | None = None
+    dns_response: list[str] | None = None
+
+    # Metadata
+    node: str | None = None                 # node where the flow was observed
+    backend: str                            # "calico" | "cilium" | "external"
+
+
+class FlowLogQuery(BaseModel):
+    """Query parameters for flow log search."""
+    # Time range
+    start_time: str | None = None           # ISO 8601
+    end_time: str | None = None
+    last: str | None = None                 # "5m", "1h", "24h" shorthand
+
+    # Filters
+    verdict: str | None = None              # "ALLOWED" | "DENIED"
+    direction: str | None = None
+    source_security_group: str | None = None
+    dest_security_group: str | None = None
+    source_namespace: str | None = None
+    dest_namespace: str | None = None
+    source_pod: str | None = None
+    dest_pod: str | None = None
+    protocol: str | None = None
+    dest_port: int | None = None
+    firewall_policy: str | None = None
+    rule_name: str | None = None
+
+    # Pagination
+    limit: int = 100
+    offset: int = 0
+
+    # Mode
+    follow: bool = False                    # Real-time streaming (WebSocket)
+
+
+class FlowLogResponse(BaseModel):
+    """Paginated flow log response."""
+    entries: list[FlowLogEntry]
+    total: int | None = None                # None for streaming mode
+    backend: str                            # which adapter served this query
+    has_more: bool = False
+    warnings: list[str] = []                # e.g., "Pod names not available on Calico OSS"
+```
+
+### IP-to-Pod Correlation (Calico OSS)
+
+Since Calico OSS `action: Log` only provides IP addresses, the backend must resolve IPs to pods:
+
+```python
+class IPToPodResolver:
+    """Resolves IP addresses to pod metadata using the K8s API."""
+
+    def __init__(self, k8s_client: K8sClient):
+        self.k8s = k8s_client
+        self._cache: dict[str, PodInfo] = {}
+        self._cache_ttl = 30  # seconds
+
+    async def resolve(self, ip: str) -> PodInfo | None:
+        """Resolve an IP to pod name, namespace, and labels."""
+        if ip in self._cache and not self._cache[ip].expired:
+            return self._cache[ip]
+
+        # Search all pods for this IP
+        pods = await self.k8s.list_pods_all_namespaces(
+            field_selector=f"status.podIP={ip}"
+        )
+        if pods:
+            pod = pods[0]
+            info = PodInfo(
+                name=pod.metadata.name,
+                namespace=pod.metadata.namespace,
+                labels=pod.metadata.labels or {},
+                ip=ip,
+                expires_at=time.time() + self._cache_ttl,
+            )
+            self._cache[ip] = info
+            return info
+        return None
+
+    async def enrich_flow_entry(self, entry: FlowLogEntry) -> FlowLogEntry:
+        """Enrich a flow log entry with pod metadata."""
+        src = await self.resolve(entry.source_ip)
+        if src:
+            entry.source_pod = f"{src.namespace}/{src.name}"
+            entry.source_namespace = src.namespace
+            entry.source_labels = src.labels
+            entry.source_security_group = self._find_matching_group(src.labels)
+
+        dst = await self.resolve(entry.dest_ip)
+        if dst:
+            entry.dest_pod = f"{dst.namespace}/{dst.name}"
+            entry.dest_namespace = dst.namespace
+            entry.dest_labels = dst.labels
+            entry.dest_security_group = self._find_matching_group(dst.labels)
+
+        return entry
+```
+
+### Configuration
+
+New settings in the backend configuration:
+
+```python
+# config.py additions
+class Settings(BaseSettings):
+    # ... existing settings ...
+
+    # Flow log backend (auto-detected if not set)
+    kubevmui_flow_log_backend: str | None = None  # "cilium" | "calico" | "loki" | "elasticsearch"
+
+    # Cilium / Hubble
+    kubevmui_hubble_relay_address: str = "hubble-relay.kube-system.svc:4245"
+    kubevmui_hubble_tls_enabled: bool = False
+    kubevmui_hubble_tls_ca_cert: str | None = None
+
+    # Calico syslog
+    kubevmui_calico_log_prefix: str = "kubevmui"
+    kubevmui_calico_syslog_path: str = "/var/log/syslog"
+
+    # External log store
+    kubevmui_loki_url: str | None = None          # e.g., "http://loki.monitoring:3100"
+    kubevmui_elasticsearch_url: str | None = None  # e.g., "http://elasticsearch.logging:9200"
+    kubevmui_elasticsearch_index: str = "kubevmui-flows-*"
+```
+
+### API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/clusters/{cluster}/security/flow-logs` | Query flow logs with filters |
+| `WS` | `/ws/flow-logs/{cluster}` | Real-time flow log streaming via WebSocket |
+| `GET` | `/api/v1/clusters/{cluster}/security/flow-logs/summary` | Aggregated flow summary (top sources, destinations, denied count) |
+| `GET` | `/api/v1/clusters/{cluster}/security/flow-logs/stats` | Flow statistics per Security Group pair |
+| `GET` | `/api/v1/clusters/{cluster}/security/flow-log-config` | Get current flow log backend configuration and status |
+
+#### Query Parameters for `GET /flow-logs`
+
+```
+?verdict=DENIED
+&source_security_group=web-servers
+&dest_security_group=database-servers
+&protocol=TCP
+&dest_port=5432
+&last=1h
+&limit=100
+&offset=0
+&firewall_policy=three-tier-app
+```
+
+#### WebSocket Streaming `/ws/flow-logs/{cluster}`
+
+```json
+// Client sends filter on connect
+{"type": "subscribe", "filters": {
+  "verdict": "DENIED",
+  "dest_security_group": "database-servers",
+  "follow": true
+}}
+
+// Server streams matching flows
+{"type": "flow", "data": {
+  "timestamp": "2026-04-02T10:30:00.123Z",
+  "verdict": "DENIED",
+  "source_pod": "default/web-frontend-01",
+  "source_security_group": "web-servers",
+  "dest_pod": "production/db-postgres-01",
+  "dest_security_group": "database-servers",
+  "protocol": "TCP",
+  "dest_port": 5432,
+  "firewall_policy": "three-tier-app",
+  "rule_name": "deny-web-to-db"
+}}
+```
+
+#### Flow Summary Response
+
+```json
+{
+  "time_range": {"start": "2026-04-02T09:30:00Z", "end": "2026-04-02T10:30:00Z"},
+  "total_flows": 15420,
+  "allowed_flows": 14890,
+  "denied_flows": 530,
+  "top_denied_sources": [
+    {"security_group": "web-servers", "count": 312},
+    {"security_group": "untrusted-zone", "count": 198}
+  ],
+  "top_denied_destinations": [
+    {"security_group": "database-servers", "count": 425, "port": 5432},
+    {"security_group": "app-servers", "count": 105, "port": 8080}
+  ],
+  "top_denied_rules": [
+    {"policy": "three-tier-app", "rule": "deny-web-to-db", "count": 312},
+    {"policy": "perimeter", "rule": "deny-untrusted", "count": 198}
+  ],
+  "flows_by_security_group_pair": [
+    {"source": "web-servers", "destination": "app-servers", "allowed": 8500, "denied": 0},
+    {"source": "web-servers", "destination": "database-servers", "allowed": 0, "denied": 312},
+    {"source": "app-servers", "destination": "database-servers", "allowed": 6200, "denied": 0},
+    {"source": "monitoring-servers", "destination": "web-servers", "allowed": 190, "denied": 0}
+  ],
+  "backend": "cilium"
+}
+```
+
+### Backend Files
+
+| File | Purpose |
+|---|---|
+| `backend/app/services/flow_log_service.py` | Unified FlowLogService with adapter selection |
+| `backend/app/services/flow_adapters/base.py` | Abstract `FlowLogAdapter` base class |
+| `backend/app/services/flow_adapters/cilium_adapter.py` | Hubble Relay gRPC client, flow streaming and querying |
+| `backend/app/services/flow_adapters/calico_adapter.py` | Syslog parser, iptables LOG prefix matching, IP-to-pod resolution |
+| `backend/app/services/flow_adapters/loki_adapter.py` | Loki LogQL query adapter |
+| `backend/app/services/flow_adapters/elasticsearch_adapter.py` | Elasticsearch query adapter |
+| `backend/app/models/flow_log.py` | Pydantic models: `FlowLogEntry`, `FlowLogQuery`, `FlowLogResponse`, `FlowSummary` |
+| `backend/app/api/routes/flow_logs.py` | REST + WebSocket endpoints |
+| `backend/app/ws/flow_log_proxy.py` | WebSocket proxy for real-time flow streaming |
+
+## Flow Log Viewer — Frontend UI
+
+### New Page: Flow Logs (`/security/flow-logs`)
+
+This is the primary security monitoring interface — equivalent to NSX-T's "Flow Monitoring" view. It combines a real-time flow table, filter controls, and aggregated statistics.
+
+#### Page Layout
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  TopBar: "Flow Logs"                     [Backend: Cilium ✓]    │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─── Filter Bar ──────────────────────────────────────────────┐ │
+│  │ Verdict: [All ▾]  Source: [Any Group ▾]  Dest: [Any Group ▾]│ │
+│  │ Protocol: [All ▾] Port: [____]  Policy: [All ▾]             │ │
+│  │ Time: [Last 1h ▾]  [🔴 Live]  [Search]  [Clear]            │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌─── Stats Cards ────────────────────────────────────────────┐ │
+│  │ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐  │ │
+│  │ │ Total    │ │ Allowed  │ │ Denied   │ │ Denied Rate   │  │ │
+│  │ │ 15,420   │ │ 14,890   │ │ 530      │ │ 3.4%          │  │ │
+│  │ │ flows    │ │ ✓ green  │ │ ✗ red    │ │ ▲ 0.2%        │  │ │
+│  │ └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌─── Flow Table ─────────────────────────────────────────────┐ │
+│  │ Time       │ Verdict │ Source          │ Dest            │   │ │
+│  │            │         │ Pod / Group     │ Pod / Group     │   │ │
+│  │            │         │                 │ Port / Protocol │   │ │
+│  │────────────┼─────────┼─────────────────┼─────────────────┤   │ │
+│  │ 10:30:00   │ DENIED  │ web-frontend-01 │ db-postgres-01  │   │ │
+│  │            │   ✗     │ ○ web-servers   │ ○ db-servers    │   │ │
+│  │            │         │                 │ TCP/5432        │   │ │
+│  │────────────┼─────────┼─────────────────┼─────────────────┤   │ │
+│  │ 10:29:58   │ ALLOWED │ web-frontend-01 │ app-api-03      │   │ │
+│  │            │   ✓     │ ○ web-servers   │ ○ app-servers   │   │ │
+│  │            │         │                 │ TCP/8080        │   │ │
+│  │────────────┼─────────┼─────────────────┼─────────────────┤   │ │
+│  │ 10:29:55   │ DENIED  │ 203.0.113.50   │ web-frontend-01 │   │ │
+│  │            │   ✗     │ (external)      │ ○ web-servers   │   │ │
+│  │            │         │                 │ TCP/22          │   │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌─── Top Denied Pairs (mini chart) ─────────────────────────┐ │
+│  │ web-servers → database-servers  ████████████████  312      │ │
+│  │ untrusted   → web-servers       ██████████       198      │ │
+│  │ web-servers → app-servers        ████            105      │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### Filter Bar
+
+| Filter | Type | Options | Description |
+|---|---|---|---|
+| Verdict | Dropdown | All, Allowed, Denied | Filter by flow verdict |
+| Source | Dropdown | Any, (list of Security Groups) | Source Security Group |
+| Destination | Dropdown | Any, (list of Security Groups) | Destination Security Group |
+| Protocol | Dropdown | All, TCP, UDP, ICMP | Protocol filter |
+| Port | Text input | Number or range | Destination port |
+| Policy | Dropdown | All, (list of FirewallPolicies) | Filter by matching policy |
+| Time | Dropdown | Last 5m, 15m, 1h, 6h, 24h, Custom | Time range |
+| Live | Toggle button | On/Off | Enable real-time streaming via WebSocket |
+| Search | Button | — | Execute query |
+| Clear | Button | — | Reset all filters |
+
+When **Live mode** is enabled:
+- The flow table auto-updates as new flows arrive via WebSocket
+- New rows animate in at the top with a highlight flash
+- Stats cards update every 5 seconds
+- The "Live" button pulses red with a dot indicator
+- Maximum 500 rows kept in the table (older rows removed)
+
+#### Stats Cards
+
+Four summary cards at the top, updated every 10 seconds (or live):
+
+| Card | Value | Style |
+|---|---|---|
+| Total Flows | Count in time range | Neutral |
+| Allowed | Count of FORWARDED/ALLOWED | Green badge |
+| Denied | Count of DROPPED/DENIED | Red badge with attention if > 0 |
+| Denied Rate | (Denied / Total) percentage + trend arrow | Warning if > 5% |
+
+#### Flow Table
+
+Each row displays one flow event. Columns:
+
+| Column | Content | Notes |
+|---|---|---|
+| Time | `HH:MM:SS.ms` | Hover shows full ISO timestamp |
+| Verdict | `ALLOWED` (green checkmark) or `DENIED` (red X) | Bold colored badge |
+| Source | Pod name + Security Group chip | Pod as `namespace/name`, group as colored chip. External IPs show as IP with "(external)" label |
+| Destination | Pod name + Security Group chip + Port/Protocol | Same as source, plus `TCP/5432` badge |
+
+**Row click** expands to show full flow detail:
+
+```
+┌─── Flow Detail ────────────────────────────────────────────┐
+│ Timestamp:    2026-04-02T10:30:00.123Z                     │
+│ Verdict:      DENIED                                        │
+│ Direction:    Ingress                                       │
+│                                                             │
+│ Source:                                                     │
+│   Pod:        default/web-frontend-01                       │
+│   IP:         10.0.1.5:45678                                │
+│   Labels:     security.kubevmui.io/app=web-frontend         │
+│               security.kubevmui.io/env=production            │
+│   Group:      web-servers                                    │
+│                                                             │
+│ Destination:                                                │
+│   Pod:        production/db-postgres-01                     │
+│   IP:         10.0.2.3:5432                                 │
+│   Labels:     security.kubevmui.io/app=database             │
+│   Group:      database-servers                              │
+│                                                             │
+│ Protocol:     TCP (SYN)                                     │
+│ Node:         worker-02                                     │
+│                                                             │
+│ Matched Rule:                                               │
+│   Policy:     three-tier-app (priority 100)                 │
+│   Rule:       deny-web-to-db                                │
+│   Action:     Deny                                          │
+│                                                             │
+│ CNI Resource: kubevmui-three-tier-app-deny-web-to-db        │
+│ Backend:      cilium (Hubble)                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Top Denied Pairs Chart
+
+Horizontal bar chart showing the top 5 Security Group pairs with the most denied flows. Each bar is clickable — clicking filters the flow table to that pair. Shows:
+- Source Group → Destination Group label
+- Bar proportional to count
+- Count number
+
+#### Backend Availability Banner
+
+If the detected CNI doesn't support logging, or Hubble Relay is unreachable, a banner appears:
+
+```
+┌─── Warning ─────────────────────────────────────────────────┐
+│ ⚠ Flow logging is limited on Calico OSS. Pod names and     │
+│   labels are resolved from IP addresses and may be delayed. │
+│   For full visibility, upgrade to Cilium or Calico Enterprise│
+└─────────────────────────────────────────────────────────────┘
+```
+
+Or for vanilla K8s:
+
+```
+┌─── Warning ─────────────────────────────────────────────────┐
+│ ⚠ Flow logging is not available with vanilla Kubernetes     │
+│   NetworkPolicy. Install Calico or Cilium for flow          │
+│   visibility.                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Integration: Firewall Policy Detail Page
+
+Add a **"Logs" tab** to the Firewall Policy detail page showing flows matched by that specific policy:
+
+- Pre-filtered to `firewall_policy=<policy-name>`
+- Same flow table as the main flow log page but scoped
+- Per-rule breakdown: collapsible sections showing flow counts per rule
+- Sparkline chart showing denied flows over time for this policy
+
+### Integration: VM Detail Page — Security Tab
+
+Extend the existing Security tab on the VM detail page with a **"Recent Flows" section**:
+
+- Shows last 50 flows involving this VM (as source or destination)
+- Filter toggle: All / Denied Only
+- Compact table format (time, verdict, peer pod, port)
+- "View All" link navigates to Flow Logs page pre-filtered to this VM
+
+### Integration: Security Groups Detail Page
+
+Add **"Flow Activity" section** to the Security Group detail page:
+
+- Shows flow counts between this group and other groups (last 1h)
+- Mini bar chart: allowed vs denied per peer group
+- Clickable to navigate to Flow Logs filtered by this group
+
+### Navigation Update
+
+Add "Flow Logs" to the Security section in the sidebar:
+
+```
+Security
+  ├── Security Tags      (tag icon)
+  ├── Security Groups    (shield icon)
+  ├── Firewall Policies  (flame icon)
+  └── Flow Logs          (activity icon)
+```
+
+### New Frontend Files
+
+| File | Purpose |
+|---|---|
+| `frontend/src/pages/FlowLogsPage.tsx` | Main flow log viewer with filters, table, and stats |
+| `frontend/src/components/security/FlowTable.tsx` | Flow log table with expandable row detail |
+| `frontend/src/components/security/FlowDetailPanel.tsx` | Expanded flow detail view |
+| `frontend/src/components/security/FlowStatsCards.tsx` | Summary statistics cards |
+| `frontend/src/components/security/FlowFilterBar.tsx` | Filter controls bar |
+| `frontend/src/components/security/DeniedPairsChart.tsx` | Top denied pairs horizontal bar chart |
+| `frontend/src/components/security/BackendStatusBanner.tsx` | CNI capability warning banner |
+| `frontend/src/hooks/useFlowLogs.ts` | React Query hooks for flow log queries + WebSocket streaming |
+
+### New Hooks
+
+| Hook | Query Key | Description |
+|---|---|---|
+| `useFlowLogs(query)` | `["flow-logs", cluster, ...filters]` | Query flow logs with pagination |
+| `useFlowLogStream(filters)` | — | WebSocket hook for real-time flow streaming |
+| `useFlowLogSummary(timeRange)` | `["flow-log-summary", cluster, timeRange]` | Aggregated flow statistics (10s refetch) |
+| `useFlowLogStats()` | `["flow-log-stats", cluster]` | Per-Security Group pair flow counts |
+| `useFlowLogConfig()` | `["flow-log-config", cluster]` | Backend configuration and capabilities |
+
 ## Out of Scope (Future)
 
 - **L7 HTTP rules** — Cilium supports these natively; can extend `FirewallRule.l7Rules` field later
 - **DNS-based groups** — Cilium's `toFQDNs` for allow-by-domain. Requires new SecurityGroup criterion type.
 - **Time-based rules** — Schedule-aware policies (e.g., allow maintenance SSH only during change windows). No CNI supports this natively.
-- **Microsegmentation visualization** — Graph/topology view showing traffic flows between Security Groups. Requires flow log integration (Calico Flow Logs / Hubble).
+- **Microsegmentation visualization** — Graph/topology view showing traffic flows between Security Groups as a network map. Requires flow log data (now available via the Flow Log Viewer).
 - **Policy simulation** — "What if" analysis: given a proposed policy change, show which traffic would be affected. Possible with dry-run + diff.
 - **Import from NSX-T** — Parse NSX-T DFW export and generate equivalent KubeVM UI SecurityGroups + FirewallPolicies. Major migration accelerator for VMware refugees.
-- **Alerting on policy violations** — Integration with monitoring to alert when denied traffic is detected (requires Calico/Cilium flow logs).
+- **Alerting on policy violations** — Threshold-based alerts when denied flow counts exceed a configurable limit. Can leverage the FlowLogSummary data.
+- **Flow log retention policies** — Configurable TTL for flow data in external log stores (Loki/Elasticsearch).
+- **Grafana dashboard provisioning** — Auto-provisioned Grafana dashboards for Hubble Prometheus metrics or Loki flow queries.
 
 ## Migration Path from NSX-T
 
@@ -1193,21 +1923,32 @@ For vCenter administrators migrating from VMware:
 2. **Security Groups** → Map NSX-T groups to SecurityGroup CRDs (membership criteria are conceptually identical)
 3. **DFW Rules** → Map NSX-T DFW sections to FirewallPolicies, rules to rules. Priority ordering is preserved.
 4. **IP Sets** → Map to SecurityGroups with `type: cidr` criteria
+5. **Flow Monitoring** → NSX-T flow monitoring maps to the Flow Log Viewer. Cilium/Hubble provides equivalent or better visibility than NSX-T's IPFIX-based flow collection.
 
 The abstraction is intentionally close to NSX-T's model so that migration is mechanical rather than requiring a conceptual redesign.
 
 ## CNI Backend Capability Summary
 
-| Capability | Calico | Cilium | Vanilla K8s |
-|---|---|---|---|
-| Explicit Allow | Yes | Yes | Yes |
-| Explicit Deny | Yes | Yes | No (implicit) |
-| Policy Priority/Ordering | Yes (Tier + order) | No (additive) | No (additive) |
-| Cluster-scoped Policy | Yes (GlobalNetworkPolicy) | Yes (CiliumClusterwideNetworkPolicy) | No (per-namespace) |
-| Named IP Groups | Yes (GlobalNetworkSet) | Yes (CiliumCIDRGroup) | No (inline ipBlock) |
-| Logging | Yes (action: Log) | Yes (Hubble) | No |
-| L7 HTTP Rules | No | Yes | No |
-| DNS-based Rules | Limited | Yes (toFQDNs) | No |
-| Host Endpoint Policies | Yes | Yes | No |
+| Capability | Calico OSS | Calico Enterprise | Cilium / Hubble (OSS) | Cilium Enterprise | Vanilla K8s |
+|---|---|---|---|---|---|
+| Explicit Allow | Yes | Yes | Yes | Yes | Yes |
+| Explicit Deny | Yes | Yes | Yes | Yes | No (implicit) |
+| Policy Priority/Ordering | Yes (Tier + order) | Yes | No (additive) | No (additive) | No (additive) |
+| Cluster-scoped Policy | Yes (GlobalNetworkPolicy) | Yes | Yes (CiliumClusterwideNetworkPolicy) | Yes | No (per-namespace) |
+| Named IP Groups | Yes (GlobalNetworkSet) | Yes | Yes (CiliumCIDRGroup) | Yes | No (inline ipBlock) |
+| Per-rule Logging | Yes (`action: Log` → syslog) | Yes (aggregated flow logs) | Yes (Hubble captures all) | Yes | No |
+| Pod-aware Log Metadata | No (IP only) | Yes | Yes | Yes | No |
+| Policy Name in Verdict | No | Yes | Limited (drop reason) | Yes (full audit) | No |
+| Real-time Flow Streaming | syslog tail | Near-real-time | Yes (gRPC) | Yes | No |
+| Historical Flow Query | grep log files | Elasticsearch | No (ring buffer)* | Yes (Timescape) | No |
+| Flow Export to SIEM | DIY (syslog forward) | FluentD pipeline | File export + FluentD | Managed connectors | No |
+| Prometheus Flow Metrics | Basic Felix metrics | Yes | Yes (rich) | Yes | No |
+| L7 Visibility (HTTP/DNS) | No | No | Yes | Yes | No |
+| Performance Impact | High (per-packet) | Moderate | Very Low (<1% CPU) | Very Low | N/A |
+| L7 HTTP Rules | No | No | Yes | Yes | No |
+| DNS-based Rules | Limited | Limited | Yes (toFQDNs) | Yes | No |
+| Host Endpoint Policies | Yes | Yes | Yes | Yes | No |
 
-**Recommendation:** Use **Calico** for the most faithful NSX-T experience. Use **Cilium** if L7 rules or DNS-based policies are needed. Vanilla K8s is supported as a fallback but with significant limitations.
+*\*Cilium OSS Hubble uses an in-memory ring buffer. For historical queries, export to Loki/Elasticsearch via Hubble file exporter.*
+
+**Recommendation:** Use **Cilium** for the best combined policy + logging experience (eBPF native, Hubble built-in, very low overhead). Use **Calico** if policy ordering/tiers are critical and you can accept limited OSS logging (or invest in Calico Enterprise). Vanilla K8s is supported as a fallback but with no logging and limited deny support.
