@@ -30,6 +30,7 @@ The backend reconciles these abstractions into native network policies based on 
 - **Reconciliation, not real-time generation** — Policies are synced periodically and on CRD changes. Generated resources are labeled with `app.kubernetes.io/managed-by: kubevmui` so they can be safely garbage-collected.
 - **Deny semantics vary by backend** — Calico supports explicit Deny. Cilium supports `ingressDeny`/`egressDeny`. Vanilla K8s only supports implicit deny (absence of allow). The UI warns when Deny rules are used on vanilla K8s.
 - **Priority/ordering maps to Calico Tiers** — Calico is the only CNI with policy ordering. On Cilium and vanilla K8s, all policies are additive; priority is handled by the reconciler (higher-priority Deny suppresses lower-priority Allow).
+- **System namespaces are always protected** — The reconciler never applies policies to system namespaces (kube-system, kubevirt, cdi, CNI namespaces, etc.). On Calico, a dedicated `kubevmui-infrastructure` tier with explicit Allow rules for system traffic is created before the `kubevmui` application tier, guaranteeing system components are never blocked by user-defined firewall policies. DNS (port 53) and K8s API access (port 443/6443) are always allowed for all pods.
 
 ## Concept Mapping
 
@@ -927,6 +928,244 @@ def resolve_conflicts(rules: list[dict]) -> list[dict]:
 3. **Disabled policies** — Setting `enabled: false` removes all generated resources for that policy without deleting the CRD.
 4. **Orphan cleanup** — On policy deletion, all resources with that policy's label are deleted.
 5. **No modification of external policies** — Resources without the `managed-by` label are never touched.
+6. **System namespace protection** — See next section.
+
+### System Namespace Protection
+
+System namespaces are **always excluded** from firewall policy enforcement. This prevents misconfigured policies from breaking DNS, the Kubernetes API, KubeVirt controllers, CNI components, or the KubeVM UI itself.
+
+#### Protected Namespaces
+
+The reconciler maintains a hardcoded set of protected namespaces that are never affected by generated policies:
+
+```python
+SYSTEM_NAMESPACES = frozenset({
+    # Kubernetes core
+    "kube-system",
+    "kube-public",
+    "kube-node-lease",
+    # KubeVirt
+    "kubevirt",
+    "cdi",
+    # CNI
+    "calico-system",
+    "calico-apiserver",
+    "tigera-operator",
+    "cilium",
+    "kube-flannel",
+    "multus",
+    # Infrastructure
+    "metallb-system",
+    "ingress-nginx",
+    "cert-manager",
+    "local-path-storage",
+    "longhorn-system",
+    # KubeVM UI
+    "kubevmui-system",
+})
+```
+
+This set is also configurable via the backend config (`KUBEVMUI_SYSTEM_NAMESPACES` env var, comma-separated) to allow site-specific additions.
+
+#### Implementation per Backend
+
+**Calico — Selector exclusion + Infrastructure Tier:**
+
+Every generated `GlobalNetworkPolicy` selector includes a namespace exclusion:
+
+```yaml
+selector: >-
+  security.kubevmui.io/app == "database" &&
+  !projectcalico.org/namespace in {
+    "kube-system", "kubevirt", "cdi", "calico-system",
+    "cilium", "kubevmui-system"
+  }
+```
+
+Additionally, a dedicated `kubevmui-infrastructure` tier is created at startup with explicit Allow rules that take precedence over all user-defined policies:
+
+```yaml
+# Infrastructure tier — evaluates before the application tier
+apiVersion: projectcalico.org/v3
+kind: Tier
+metadata:
+  name: kubevmui-infrastructure
+  labels:
+    app.kubernetes.io/managed-by: kubevmui
+spec:
+  order: 100    # well before kubevmui tier (order 500)
+
+---
+# Allow ALL traffic to/from system namespaces (unconditional)
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: kubevmui-infra-allow-system-namespaces
+  labels:
+    app.kubernetes.io/managed-by: kubevmui
+spec:
+  tier: kubevmui-infrastructure
+  order: 1
+  selector: >-
+    projectcalico.org/namespace in {
+      "kube-system", "kubevirt", "cdi", "calico-system",
+      "calico-apiserver", "tigera-operator", "cilium",
+      "kubevmui-system", "metallb-system", "ingress-nginx",
+      "cert-manager", "multus", "longhorn-system",
+      "local-path-storage", "kube-flannel"
+    }
+  types: [Ingress, Egress]
+  ingress:
+    - action: Allow
+  egress:
+    - action: Allow
+
+---
+# Allow DNS for ALL pods (never block DNS resolution)
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: kubevmui-infra-allow-dns
+  labels:
+    app.kubernetes.io/managed-by: kubevmui
+spec:
+  tier: kubevmui-infrastructure
+  order: 2
+  selector: all()
+  types: [Egress]
+  egress:
+    - action: Allow
+      protocol: UDP
+      destination:
+        ports: [53]
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports: [53]
+
+---
+# Allow K8s API server access for all pods
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: kubevmui-infra-allow-k8s-api
+  labels:
+    app.kubernetes.io/managed-by: kubevmui
+spec:
+  tier: kubevmui-infrastructure
+  order: 3
+  selector: all()
+  types: [Egress]
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        ports: [443, 6443]
+```
+
+**Tier hierarchy:**
+
+```
+Tier: kubevmui-infrastructure (order 100)   ← ALWAYS ALLOW system traffic
+  └── Allow system namespace traffic (all)
+  └── Allow DNS (all pods, UDP+TCP/53)
+  └── Allow K8s API (all pods, TCP/443,6443)
+  └── Pass (everything else → next tier)
+
+Tier: kubevmui (order 500)                  ← User firewall policies
+  └── three-tier-app rules
+  └── perimeter rules
+  └── ...
+
+Tier: default (order 1000)                  ← Other non-kubevmui policies
+```
+
+**Cilium — endpointSelector exclusion:**
+
+Every generated `CiliumClusterwideNetworkPolicy` excludes system namespaces:
+
+```yaml
+spec:
+  endpointSelector:
+    matchLabels:
+      security.kubevmui.io/app: database
+    matchExpressions:
+      - key: k8s:io.kubernetes.pod.namespace
+        operator: NotIn
+        values:
+          - kube-system
+          - kubevirt
+          - cdi
+          - cilium
+          - kubevmui-system
+```
+
+Cilium doesn't have tiers, but the namespace exclusion in the selector is sufficient. Additionally, a global Allow policy is created for system namespaces:
+
+```yaml
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: kubevmui-allow-system-namespaces
+  labels:
+    app.kubernetes.io/managed-by: kubevmui
+spec:
+  endpointSelector:
+    matchExpressions:
+      - key: k8s:io.kubernetes.pod.namespace
+        operator: In
+        values:
+          - kube-system
+          - kubevirt
+          - cdi
+          - cilium
+          - kubevmui-system
+  ingress:
+    - fromEntities: [all]
+  egress:
+    - toEntities: [all]
+```
+
+**Vanilla Kubernetes — Namespace exclusion:**
+
+The reconciler simply never creates `NetworkPolicy` resources in any system namespace. Since vanilla `NetworkPolicy` is namespace-scoped, not creating one in `kube-system` means it remains fully open.
+
+#### Infrastructure Tier Seeding
+
+The infrastructure tier and its policies are created **at backend startup**, during the same lifecycle phase as catalog seeding and pod-network CR seeding:
+
+```python
+async def seed_infrastructure_policies(self):
+    """Create infrastructure tier and system-protection policies on startup."""
+    if self.backend == "calico":
+        await self._ensure_calico_infrastructure_tier()
+        await self._ensure_calico_system_namespace_allow()
+        await self._ensure_calico_dns_allow()
+        await self._ensure_calico_k8s_api_allow()
+    elif self.backend == "cilium":
+        await self._ensure_cilium_system_namespace_allow()
+```
+
+Each method is idempotent — it checks if the resource exists before creating it.
+
+#### UI Visibility
+
+The Firewall Policies page shows the infrastructure protections as a non-editable "System Protection" section at the top:
+
+```
+┌─── System Protection (automatic) ──────────────────────────┐
+│ ✓ System namespaces (kube-system, kubevirt, cdi, ...)     │
+│   always allowed — cannot be overridden by user policies   │
+│ ✓ DNS (UDP+TCP/53) allowed for all VMs                    │
+│ ✓ Kubernetes API (TCP/443,6443) allowed for all VMs       │
+│                                                            │
+│ Protected namespaces: kube-system, kubevirt, cdi,         │
+│   calico-system, cilium, kubevmui-system, ...             │
+│   [Configure]                                              │
+└────────────────────────────────────────────────────────────┘
+```
+
+The "[Configure]" link opens a modal where admins can add custom namespaces to the protected set (persisted in the backend config).
 
 ## API Endpoints
 
