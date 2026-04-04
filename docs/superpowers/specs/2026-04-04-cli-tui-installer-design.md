@@ -442,79 +442,375 @@ $ kubevmui platform upgrade
 ```
 
 
-## Non-Interactive Mode
+## CLI Installer Output (Non-Interactive)
 
-Every TUI screen has a CLI equivalent for automation/scripting:
+The primary install experience is a **streaming CLI output** — no interactive TUI needed. The admin prepares a config directory, runs a single command, and watches the install progress in their terminal. This is the VMware-admin-friendly experience: one command, watch it go.
 
-```bash
-# Generate a config file (answers all TUI questions)
-kubevmui init --config cluster.yaml
+### Full Install Flow
 
-# Install from config (no TUI)
-kubevmui install --config cluster.yaml --yes
+```
+$ kubevmui install --config cluster/prod-virt-01/
 
-# Add a node non-interactively
-kubevmui node add --ip 10.0.0.23 --role worker --name wk-03
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  KubeVM UI Platform Installer
+  Cluster: prod-virt-01 (3 nodes expected)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Upgrade all components
-kubevmui platform upgrade --yes
+Phase 1: Waiting for nodes to boot into Talos maintenance mode...
 
-# Backup etcd
-kubevmui cluster backup --destination s3://backups/production-01
+  Boot your servers from the Talos ISO now.
+  The installer will detect them automatically.
+
+  Expected nodes:
+    ○ node-01 (MAC: aa:bb:cc:dd:ee:01)
+    ○ node-02 (MAC: aa:bb:cc:dd:ee:02)
+    ○ node-03 (MAC: aa:bb:cc:dd:ee:03)
+
+  Scanning network 10.0.1.0/24 for Talos API (port 50000)...
+
+  10:00:12  ● node-01 discovered at 10.0.1.1 (matched by MAC)
+  10:00:12    → Applying Talos config... done ✓
+  10:00:12    → Node is installing to /dev/sda...
+
+  10:01:45  ● node-03 discovered at 10.0.1.3 (matched by MAC)
+  10:01:45    → Applying Talos config... done ✓
+  10:01:45    → Node is installing to /dev/sda...
+
+  Waiting for remaining nodes... (1 of 3 remaining)
+  ○ node-02 — not yet detected. Boot this server now.
+
+  10:03:20  ● node-02 discovered at 10.0.1.2 (matched by MAC)
+  10:03:20    → Applying Talos config... done ✓
+  10:03:20    → Node is installing to /dev/sda...
+
+  All 3 nodes discovered and configured ✓
+
+Phase 2: Waiting for nodes to reboot and become ready...
+
+  ● node-01  installing... rebooting... booted ✓  (3m 12s)
+  ● node-03  installing... rebooting... booted ✓  (3m 28s)
+  ● node-02  installing... rebooting... booted ✓  (3m 45s)
+
+Phase 3: Bootstrapping Kubernetes...
+
+  → Initializing etcd on node-01 ✓
+  → node-01 control plane ready ✓
+  → node-02 joined cluster ✓
+  → node-03 joined cluster ✓
+  → Cluster healthy (3/3 nodes Ready) ✓
+
+Phase 4: Installing virtualization stack...
+
+  [1/9]  Calico CNI ................ ✓  (45s)
+  [2/9]  MetalLB .................. ✓  (15s)
+  [3/9]  Longhorn Storage ......... ✓  (2m 10s)
+  [4/9]  KubeVirt ................. ✓  (1m 30s)
+  [5/9]  CDI ...................... ✓  (30s)
+  [6/9]  Multus + Bridge CNI ...... ✓  (20s)
+  [7/9]  NMState .................. ✓  (25s)
+  [8/9]  Prometheus ............... ✓  (1m 15s)
+  [9/9]  KubeVM UI ................ ✓  (45s)
+
+Phase 5: Post-install validation...
+
+  ✓ All nodes healthy
+  ✓ KubeVirt ready (virt-handler on all nodes)
+  ✓ Storage ready (Longhorn replicas: 3)
+  ✓ Networking ready (Calico + Multus)
+  ✓ Monitoring ready (Prometheus scraping)
+  ✓ KubeVM UI accessible at https://kubevmui.corp.local
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Installation complete! (Total: 14 minutes)
+
+  KubeVM UI:   https://kubevmui.corp.local
+  Admin user:  admin
+  Admin pass:  xK9m-2pQr-Fj7n-Lw4v  (change on first login)
+
+  Files saved:
+    cluster/prod-virt-01/kubeconfig
+    cluster/prod-virt-01/talosconfig
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-### Example Config File
+### Node Add (Day-2)
 
+```
+$ kubevmui node add --cluster prod-virt-01 --role worker
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Add Node to Cluster: prod-virt-01
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Scanning network 10.0.1.0/24 for new Talos nodes...
+
+  10:15:33  ● New node discovered at 10.0.1.4 (MAC: aa:bb:cc:dd:ee:04)
+            Hardware: 64C / 256 GB RAM / 4 TB NVMe
+            → Applying worker config... done ✓
+            → Installing to /dev/nvme0n1...
+            → Rebooting... booted ✓  (3m 05s)
+            → Joined Kubernetes cluster ✓
+            → Longhorn storage configured ✓
+            → Node schedulable ✓
+
+  Node "node-04" added successfully. (Total: 4m 12s)
+
+  Cluster now: 4 nodes | 192 cores | 768 GB RAM
+```
+
+### Cluster Status
+
+```
+$ kubevmui cluster status --cluster prod-virt-01
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Cluster: prod-virt-01          Uptime: 14d 6h 23m
+  Kubernetes: v1.31.2            Talos: v1.9.1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  NODES
+  NAME      ROLE     STATUS   CPU        MEMORY     VMs
+  node-01   CP       Ready     8% ░░░░   12% █░░░   —
+  node-02   CP       Ready     6% ░░░░   11% █░░░   —
+  node-03   Worker   Ready    62% █████  71% █████   12
+  node-04   Worker   Ready    45% ███░░  58% ████░    8
+
+  RESOURCES
+  CPU:      54/192 cores  (28%)   ████████░░░░░░░░░░░░░░░░░░
+  Memory:  412/768 GB     (54%)   ████████████████░░░░░░░░░░
+  Storage: 2.1/8.0 TB     (26%)  ████████░░░░░░░░░░░░░░░░░░
+  VMs:     20 running, 3 stopped
+
+  COMPONENTS
+  ✓ KubeVirt v1.4.0       ✓ Calico v3.28.0
+  ✓ CDI v1.60.0           ✓ Longhorn v1.7.0
+  ✓ Prometheus v2.54.0    ✓ KubeVM UI v1.0.0
+
+  ALERTS: None
+```
+
+### Platform Upgrade
+
+```
+$ kubevmui platform upgrade --cluster prod-virt-01
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Platform Upgrade: prod-virt-01
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Available upgrades:
+
+  COMPONENT        CURRENT     AVAILABLE    STATUS
+  Talos Linux      v1.9.1      v1.9.2       Update available
+  Kubernetes       v1.31.2     v1.31.3      Update available
+  KubeVirt         v1.4.0      v1.4.0       Up to date
+  Calico           v3.28.0     v3.28.2      Update available
+  Longhorn         v1.7.0      v1.7.1       Update available
+  KubeVM UI        v1.0.0      v1.1.0       Update available
+  Prometheus       v2.54.0     v2.54.0      Up to date
+
+  Upgrade strategy: Rolling (zero VM downtime)
+  Estimated duration: ~25 minutes for 4 nodes
+
+  Proceed? [y/N] y
+
+  Upgrading Talos Linux v1.9.1 → v1.9.2...
+    → node-01  upgrading... rebooted ✓  (2m 15s)
+    → node-02  upgrading... rebooted ✓  (2m 20s)
+    → node-03  upgrading... rebooted ✓  (2m 18s)  [VMs live-migrated]
+    → node-04  upgrading... rebooted ✓  (2m 22s)  [VMs live-migrated]
+
+  Upgrading Kubernetes v1.31.2 → v1.31.3...
+    → Control plane upgraded ✓  (1m 30s)
+    → Kubelets rolling restart ✓  (3m 10s)
+
+  Upgrading Helm charts...
+    [1/3]  Calico v3.28.0 → v3.28.2 ........ ✓  (30s)
+    [2/3]  Longhorn v1.7.0 → v1.7.1 ........ ✓  (45s)
+    [3/3]  KubeVM UI v1.0.0 → v1.1.0 ....... ✓  (20s)
+
+  Post-upgrade validation...
+    ✓ All nodes healthy (4/4 Ready)
+    ✓ All VMs running (20/20)
+    ✓ All components healthy
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Upgrade complete! (Total: 18 minutes, 0 VM downtime)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### Cluster Backup
+
+```
+$ kubevmui cluster backup --cluster prod-virt-01 --dest s3://backups/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Backup: prod-virt-01
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  → Snapshotting etcd ..................... ✓  (8s)
+  → Backing up Talos machine configs ...... ✓  (2s)
+  → Backing up Helm release state ......... ✓  (3s)
+  → Backing up platform CRDs .............. ✓  (5s)
+  → Uploading to s3://backups/ ............ ✓  (12s)
+
+  Backup saved: s3://backups/prod-virt-01/2026-04-04T10-30-00Z.tar.gz
+  Size: 48 MB | Includes: etcd + configs + CRDs + Helm state
+```
+
+### Error Handling Example
+
+```
+$ kubevmui install --config cluster/prod-virt-01/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  KubeVM UI Platform Installer
+  Cluster: prod-virt-01 (3 nodes expected)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Phase 1: Waiting for nodes to boot into Talos maintenance mode...
+
+  10:00:12  ● node-01 discovered at 10.0.1.1 (matched by MAC)
+  10:00:12    → Applying Talos config... done ✓
+
+  10:01:45  ● node-03 discovered at 10.0.1.3 (matched by MAC)
+  10:01:45    → Applying Talos config... done ✓
+
+  ⚠ node-02 not detected after 10 minutes.
+    MAC: aa:bb:cc:dd:ee:02
+
+    Troubleshooting:
+    • Verify the server is powered on and PXE booting
+    • Check that it's on the 10.0.1.0/24 network
+    • Verify MAC address in cluster/prod-virt-01/nodes.yaml
+
+    Options:
+    [w] Keep waiting    [s] Skip this node    [a] Abort install
+
+  > w
+
+  10:12:30  ● node-02 discovered at 10.0.1.2 (matched by MAC)
+  10:12:30    → Applying Talos config... done ✓
+
+  All 3 nodes discovered and configured ✓
+
+  ...
+```
+
+### Config Directory Structure
+
+The CLI uses a **directory-based config** (not a single YAML file) for clarity:
+
+```
+cluster/
+└── prod-virt-01/
+    ├── cluster.yaml          # Cluster-level settings
+    ├── nodes.yaml            # Node definitions (MAC, role, name)
+    ├── network.yaml          # Network configuration
+    ├── platform.yaml         # Platform components to install
+    ├── kubeconfig            # (generated after install)
+    └── talosconfig           # (generated after install)
+```
+
+**cluster.yaml:**
 ```yaml
 apiVersion: kubevmui.io/v1
 kind: ClusterConfig
 metadata:
-  name: production-01
+  name: prod-virt-01
 spec:
   kubernetes:
     version: v1.31.2
   talos:
     version: v1.9.1
-  network:
-    management:
-      subnet: 10.0.0.0/24
-      gateway: 10.0.0.1
-      dns: [10.0.0.1, 8.8.8.8]
-    vm:
-      vlan: 100
-      subnet: 192.168.100.0/24
-      dhcpRange: 192.168.100.100-192.168.100.200
-    storage:
+  controlPlaneEndpoint: 10.0.1.10  # VIP for HA control plane
+```
+
+**nodes.yaml:**
+```yaml
+apiVersion: kubevmui.io/v1
+kind: NodeList
+nodes:
+  - name: node-01
+    mac: aa:bb:cc:dd:ee:01
+    role: controlplane
+    installDisk: /dev/sda
+  - name: node-02
+    mac: aa:bb:cc:dd:ee:02
+    role: controlplane
+    installDisk: /dev/sda
+  - name: node-03
+    mac: aa:bb:cc:dd:ee:03
+    role: worker
+    installDisk: /dev/sda
+```
+
+**network.yaml:**
+```yaml
+apiVersion: kubevmui.io/v1
+kind: NetworkConfig
+spec:
+  management:
+    subnet: 10.0.1.0/24
+    gateway: 10.0.1.254
+    dns: [10.0.0.1, 8.8.8.8]
+    ntp: pool.ntp.org
+  vm:
+    vlan: 100
+    subnet: 192.168.100.0/24
+    dhcpRange: 192.168.100.100-192.168.100.200
+  pod:
+    cidr: 10.244.0.0/16
+  service:
+    cidr: 10.96.0.0/12
+```
+
+**platform.yaml:**
+```yaml
+apiVersion: kubevmui.io/v1
+kind: PlatformConfig
+spec:
+  cni: calico
+  storage:
+    provider: longhorn
+    replicas: 3
+  components:
+    kubevirt: true
+    cdi: true
+    multus: true
+    nmstate: true
+    metallb: true
+    prometheus: true
+    webUI:
       enabled: true
-      vlan: 200
-      subnet: 10.10.0.0/24
-  nodes:
-    - ip: 10.0.0.11
-      role: controlplane
-      name: cp-01
-    - ip: 10.0.0.12
-      role: controlplane
-      name: cp-02
-    - ip: 10.0.0.13
-      role: controlplane
-      name: cp-03
-    - ip: 10.0.0.21
-      role: worker
-      name: wk-01
-    - ip: 10.0.0.22
-      role: worker
-      name: wk-02
-  platform:
-    cni: calico
-    storage: longhorn
-    storageReplicas: 2
-    components:
-      kubevirt: true
-      monitoring: true
-      webUI: true
-      velero: false
-      certManager: false
-      harbor: false
+      hostname: kubevmui.corp.local
+      tls: true
+```
+
+---
+
+## CLI Commands Reference
+
+```bash
+# Initialize a new cluster config directory
+kubevmui init --name prod-virt-01
+
+# Install from config directory
+kubevmui install --config cluster/prod-virt-01/
+
+# Add a node (waits for discovery)
+kubevmui node add --cluster prod-virt-01 --role worker
+
+# Cluster health
+kubevmui cluster status --cluster prod-virt-01
+
+# Upgrade everything
+kubevmui platform upgrade --cluster prod-virt-01
+
+# Backup etcd + state
+kubevmui cluster backup --cluster prod-virt-01 --dest s3://backups/
 ```
 
 ## Discovery Protocol
