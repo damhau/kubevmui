@@ -1,0 +1,116 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: securitygroups.kubevmui.io
+spec:
+  group: kubevmui.io
+  names:
+    kind: SecurityGroup
+    plural: securitygroups
+    singular: securitygroup
+    shortNames:
+      - sg
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - displayName
+                - membershipCriteria
+              properties:
+                displayName:
+                  type: string
+                  description: Human-readable name for this security group
+                description:
+                  type: string
+                  default: ""
+                  description: Optional description
+                color:
+                  type: string
+                  description: Hex color for UI display (e.g., "#6366f1")
+                membershipCriteria:
+                  type: array
+                  minItems: 1
+                  description: Membership criteria (AND logic between entries)
+                  items:
+                    type: object
+                    required:
+                      - type
+                    properties:
+                      type:
+                        type: string
+                        enum: [tag, name, namespace, cidr]
+                        description: Criterion type
+                      key:
+                        type: string
+                        description: >
+                          Tag key without prefix (e.g., "app" for
+                          security.kubevmui.io/app). Required when type=tag.
+                      operator:
+                        type: string
+                        enum: [In, NotIn, Exists, DoesNotExist]
+                        default: In
+                        description: Match operator (for tag type)
+                      values:
+                        type: array
+                        items:
+                          type: string
+                        description: Values to match (required for In/NotIn operators)
+                      pattern:
+                        type: string
+                        description: Glob pattern for VM name matching (type=name)
+                      names:
+                        type: array
+                        items:
+                          type: string
+                        description: Namespace names to scope to (type=namespace)
+                      cidrs:
+                        type: array
+                        items:
+                          type: string
+                        description: CIDR ranges for external IP groups (type=cidr)
+            status:
+              type: object
+              properties:
+                memberCount:
+                  type: integer
+                  description: Number of VMs matching all criteria
+                members:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      namespace:
+                        type: string
+                      name:
+                        type: string
+                  description: Resolved VM members
+                lastEvaluated:
+                  type: string
+                  format: date-time
+                  description: Last time membership was evaluated
+                labelSelector:
+                  type: string
+                  description: Computed K8s label selector string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Display Name
+          type: string
+          jsonPath: .spec.displayName
+        - name: Members
+          type: integer
+          jsonPath: .status.memberCount
+        - name: Last Evaluated
+          type: date
+          jsonPath: .status.lastEvaluated
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

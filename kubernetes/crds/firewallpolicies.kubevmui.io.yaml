@@ -1,0 +1,225 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: firewallpolicies.kubevmui.io
+spec:
+  group: kubevmui.io
+  names:
+    kind: FirewallPolicy
+    plural: firewallpolicies
+    singular: firewallpolicy
+    shortNames:
+      - fwp
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - displayName
+                - priority
+                - appliedTo
+                - rules
+              properties:
+                displayName:
+                  type: string
+                  description: Human-readable policy name
+                description:
+                  type: string
+                  default: ""
+                  description: Optional description
+                priority:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                  description: >
+                    Policy evaluation order. Lower number = higher precedence.
+                    Maps to Calico Tier order. Used by reconciler for
+                    deny/allow conflict resolution on Cilium and vanilla K8s.
+                enabled:
+                  type: boolean
+                  default: true
+                  description: Enable or disable this policy without deleting it
+                backend:
+                  type: string
+                  enum: [auto, calico, cilium, kubernetes]
+                  default: auto
+                  description: >
+                    CNI backend for policy generation. "auto" detects the
+                    installed CNI by checking for CRDs.
+                appliedTo:
+                  type: object
+                  description: Which VMs this policy applies to
+                  properties:
+                    securityGroup:
+                      type: string
+                      description: SecurityGroup name (mutually exclusive with allVMs)
+                    allVMs:
+                      type: boolean
+                      description: Apply to all VMs in all namespaces
+                rules:
+                  type: array
+                  minItems: 1
+                  description: Ordered list of firewall rules
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - action
+                      - direction
+                      - source
+                      - destination
+                    properties:
+                      name:
+                        type: string
+                        description: Rule name (unique within policy)
+                      description:
+                        type: string
+                        description: Optional rule description
+                      action:
+                        type: string
+                        enum: [Allow, Deny]
+                        description: >
+                          Allow or Deny traffic. Calico and Cilium support
+                          explicit Deny. Vanilla K8s uses implicit deny
+                          (selecting policy activates default-deny).
+                      direction:
+                        type: string
+                        enum: [ingress, egress]
+                        description: Traffic direction from the perspective of the destination
+                      source:
+                        type: object
+                        description: Traffic source selector
+                        properties:
+                          securityGroup:
+                            type: string
+                            description: >
+                              SecurityGroup name, or "any" for all sources
+                          ipBlock:
+                            type: object
+                            description: Raw CIDR block (alternative to securityGroup)
+                            properties:
+                              cidr:
+                                type: string
+                                description: CIDR range (e.g., "10.0.0.0/8")
+                              except:
+                                type: array
+                                items:
+                                  type: string
+                                description: CIDRs to exclude from the block
+                      destination:
+                        type: object
+                        description: Traffic destination selector
+                        properties:
+                          securityGroup:
+                            type: string
+                            description: >
+                              SecurityGroup name, or "any" for all destinations
+                          ipBlock:
+                            type: object
+                            description: Raw CIDR block (alternative to securityGroup)
+                            properties:
+                              cidr:
+                                type: string
+                                description: CIDR range (e.g., "10.0.0.0/8")
+                              except:
+                                type: array
+                                items:
+                                  type: string
+                                description: CIDRs to exclude from the block
+                      services:
+                        type: array
+                        description: >
+                          Port/protocol specifications. Empty or omitted = all traffic.
+                        items:
+                          type: object
+                          required:
+                            - protocol
+                          properties:
+                            protocol:
+                              type: string
+                              enum: [TCP, UDP, ICMP, SCTP]
+                              description: Network protocol
+                            ports:
+                              type: array
+                              items:
+                                x-kubernetes-int-or-string: true
+                              description: >
+                                Port numbers or ranges (e.g., 80, 443,
+                                "8000-8999"). Omit for all ports.
+                      logging:
+                        type: boolean
+                        default: false
+                        description: >
+                          Enable logging for this rule. Supported on Calico
+                          (action: Log) and Cilium (Hubble). Ignored on
+                          vanilla Kubernetes.
+            status:
+              type: object
+              properties:
+                detectedBackend:
+                  type: string
+                  description: CNI backend in use (calico, cilium, kubernetes)
+                generatedResources:
+                  type: integer
+                  description: Number of network policy resources generated
+                lastSyncTime:
+                  type: string
+                  format: date-time
+                  description: Last successful reconciliation timestamp
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        description: Condition type (Synced, DenyLimited, Error)
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                warnings:
+                  type: array
+                  items:
+                    type: string
+                  description: >
+                    Warnings about backend limitations (e.g., Deny not
+                    supported on vanilla K8s)
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Display Name
+          type: string
+          jsonPath: .spec.displayName
+        - name: Priority
+          type: integer
+          jsonPath: .spec.priority
+        - name: Enabled
+          type: boolean
+          jsonPath: .spec.enabled
+        - name: Rules
+          type: integer
+          jsonPath: .spec.rules
+          priority: 1
+        - name: Backend
+          type: string
+          jsonPath: .status.detectedBackend
+        - name: Synced
+          type: string
+          jsonPath: .status.conditions[?(@.type=="Synced")].status
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
