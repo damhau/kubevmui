@@ -58,6 +58,7 @@ interface VM {
   compute?: { cpu_cores?: number; memory_mb?: number }
   node?: string
   created_at?: string
+  provision_progress?: string
 }
 
 const vmActions = [
@@ -526,6 +527,11 @@ export function VMListPage() {
                           <HealthBadge health={vm.health} size="dot" />
                         )}
                       </div>
+                      {vm.status === 'provisioning' && vm.provision_progress && (
+                        <div style={{ marginTop: 4, fontSize: 11, color: theme.text.secondary }}>
+                          {vm.provision_progress}
+                        </div>
+                      )}
                     </td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{vm.compute?.cpu_cores ?? '—'} vCPU</td>
                     <td className="table-cell" style={{ color: theme.text.secondary, fontSize: 13, fontFamily: theme.typography.mono.fontFamily }}>{formatMemoryMb(vm.compute?.memory_mb)}</td>

@@ -16,6 +16,8 @@ class VMDiskRef(BaseModel):
     storage_class: str = ""  # storage class for the cloned DV
     volume_name: str = ""  # actual PVC/DataVolume name backing this disk
     used_gb: float = 0  # used storage from guest agent
+    dv_phase: str = ""  # CloneScheduled, CloneInProgress, Succeeded, Failed, etc.
+    dv_progress: str = ""  # e.g. "55.40%"
 
 
 class VMNetworkRef(BaseModel):
@@ -69,6 +71,7 @@ class VM(ResourceMeta):
     template_name: str | None = None
     events: list[VMEvent] = []
     guest_agent_info: GuestAgentInfo | None = None
+    provision_progress: str = ""  # summary like "Cloning rootdisk (55.40%)"
     raw_manifest: dict | None = None
     raw_vmi_manifest: dict | None = None
 

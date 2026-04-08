@@ -516,7 +516,7 @@ export function AddDiskWizard({
                                 ...config,
                                 sourceType: 'clone',
                                 imageName: e.target.value,
-                                imageNamespace: img?.namespace || namespace,
+                                imageNamespace: img?.storage_namespace || 'default',
                                 containerDiskImage: '',
                               })
                             }
@@ -525,9 +525,8 @@ export function AddDiskWizard({
                         >
                           <option value="">{config.diskType === 'cdrom' ? 'Select an ISO image...' : 'Select an image...'}</option>
                           {filteredImages.map((img: any) => (
-                            <option key={`${img.namespace}/${img.name}`} value={img.source_type === 'container_disk' ? img.source_url : img.name}>
-                              {img.display_name || img.name}{' '}
-                              {img.namespace !== namespace ? `(${img.namespace})` : ''}
+                            <option key={img.name} value={img.source_type === 'container_disk' ? img.source_url : img.name}>
+                              {img.display_name || img.name}
                             </option>
                           ))}
                         </select>

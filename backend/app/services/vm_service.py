@@ -504,6 +504,38 @@ def _build_manifest(
     return manifest
 
 
+def _merge_dv_progress(vm: VM, namespace: str, kv: KubeVirtClient) -> None:
+    """Merge DataVolume clone/import progress into VM disks when provisioning."""
+    if vm.status != VMStatus.provisioning:
+        return
+
+    messages: list[str] = []
+    for disk in vm.disks:
+        if not disk.volume_name or disk.source_type == "container_disk":
+            continue
+        dv = kv.get_datavolume(namespace, disk.volume_name)
+        if dv is None:
+            continue
+        status = dv.get("status", {})
+        disk.dv_phase = status.get("phase", "")
+        disk.dv_progress = status.get("progress", "")
+
+        phase = disk.dv_phase
+        progress = disk.dv_progress
+        if phase and phase != "Succeeded":
+            if "Scheduled" in phase or phase == "Pending":
+                label = "Preparing"
+            elif "Clone" in phase:
+                label = "Cloning"
+            else:
+                label = "Importing"
+            detail = f" ({progress})" if progress and progress != "N/A" else ""
+            messages.append(f"{label} {disk.name}{detail}")
+
+    if messages:
+        vm.provision_progress = "; ".join(messages)
+
+
 class VMService:
     def __init__(self, kv: KubeVirtClient):
         self.kv = kv
@@ -520,10 +552,14 @@ class VMService:
         vmis_raw = self.kv.list_vmis(namespace)
         vmi_map = {v.get("metadata", {}).get("name", ""): v for v in vmis_raw}
         single_node = self._is_single_node()
-        return [
-            _vm_from_raw(vm, vmi_map.get(vm.get("metadata", {}).get("name", "")), single_node)
-            for vm in vms_raw
-        ]
+        result = []
+        for vm_raw in vms_raw:
+            vm = _vm_from_raw(
+                vm_raw, vmi_map.get(vm_raw.get("metadata", {}).get("name", "")), single_node
+            )
+            _merge_dv_progress(vm, namespace, self.kv)
+            result.append(vm)
+        return result
 
     def get_vm(self, namespace: str, name: str) -> VM | None:
         vm_raw = self.kv.get_vm(namespace, name)
@@ -546,6 +582,9 @@ class VMService:
                         )
                 except Exception:
                     pass
+
+        # Enrich DV clone/import progress for provisioning VMs
+        _merge_dv_progress(vm, namespace, self.kv)
 
         # Enrich disk usage from guest agent
         if vm.status.value == "running":
@@ -1346,10 +1385,12 @@ class VMService:
                         size_gb=disk.size_gb,
                         storage_class=disk.storage_class,
                     )
-                    image_service.create_image(namespace, img_request)
+                    image_service.create_image(img_request)
                     created_images.append(disk.image_name)
 
-                    # Template disk references the new Image via datavolume_clone
+                    # Template disk references the new Image via datavolume_clone.
+                    # Leave clone_namespace empty so VM creation resolves it
+                    # dynamically from the Image CRD's storage.namespace field.
                     template_disks.append(
                         VMDiskRef(
                             name=disk.name,
@@ -1357,7 +1398,6 @@ class VMService:
                             bus=disk.bus,
                             source_type="datavolume_clone",
                             clone_source=disk.image_name,
-                            clone_namespace=namespace,
                             storage_class=disk.storage_class,
                         )
                     )

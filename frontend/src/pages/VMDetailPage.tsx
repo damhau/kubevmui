@@ -29,6 +29,8 @@ import type { VNCConsoleRef, ConnectionStatus } from '@/components/console/VNCCo
 import { HealthBadge } from '@/components/vm/HealthBadge'
 import { AddDiskWizard } from '@/components/vm/AddDiskWizard'
 import { AddNetworkWizard } from '@/components/vm/AddNetworkWizard'
+import { EditDiskModal } from '@/components/vm/EditDiskModal'
+import { EditInterfaceModal } from '@/components/vm/EditInterfaceModal'
 import { DiagnosticsTab } from '@/components/vm/DiagnosticsTab'
 import { useNetworkCRs, type NetworkCR } from '@/hooks/useNetworkCRs'
 
@@ -206,6 +208,8 @@ export function VMDetailPage() {
   const networkCRMap = new Map(networkCRsData?.items?.map((cr: NetworkCR) => [cr.name, cr]) ?? [])
   const [showAddDisk, setShowAddDisk] = useState(false)
   const [showAddNic, setShowAddNic] = useState(false)
+  const [editingDisk, setEditingDisk] = useState<{ name: string; bus: string; boot_order: number | null; disk_type: string } | null>(null)
+  const [editingInterface, setEditingInterface] = useState<{ name: string; model: string | null; mac_address: string | null; network_profile: string; network_cr: string } | null>(null)
 
   const [snapshotName, setSnapshotName] = useState('')
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
@@ -318,6 +322,9 @@ export function VMDetailPage() {
           </h1>
           {vm?.status && (
             <StatusBadge status={vm.status} />
+          )}
+          {vm?.status === 'provisioning' && vm?.provision_progress && (
+            <span style={{ fontSize: 12, color: theme.text.secondary }}>{vm.provision_progress}</span>
           )}
           {vm?.health && vm.health !== 'unknown' && (
             <HealthBadge health={vm.health} />
@@ -1099,7 +1106,7 @@ export function VMDetailPage() {
                   <table className="table">
                     <thead>
                       <tr className="table-header">
-                        {['Name', 'Size', 'Bus', 'Actions'].map((col) => (
+                        {['Name', 'Size', 'Bus', 'Status', 'Actions'].map((col) => (
                           <th key={col} className="table-header-cell">
                             {col}
                           </th>
@@ -1127,12 +1134,43 @@ export function VMDetailPage() {
                           <td className="table-cell" style={{ color: theme.text.secondary }}>
                             {disk.bus ?? '—'}
                           </td>
+                          <td className="table-cell" style={{ minWidth: 140 }}>
+                            {(() => {
+                              const phase = disk.dv_phase
+                              const progress = disk.dv_progress && disk.dv_progress !== 'N/A' ? disk.dv_progress : null
+                              if (!phase || phase === 'Succeeded') return <span style={{ color: theme.status.running, fontSize: 12, fontWeight: 500 }}>Ready</span>
+                              if (phase === 'Failed') return <span style={{ color: theme.status.error, fontSize: 12, fontWeight: 500 }}>Failed</span>
+                              const pct = progress ? parseFloat(progress.replace('%', '')) : 0
+                              const isActive = ['CloneScheduled', 'CloneInProgress', 'ImportScheduled', 'ImportInProgress', 'Pending'].includes(phase)
+                              const label = phase.includes('Clone') ? 'Cloning' : phase.includes('Import') ? 'Importing' : 'Pending'
+                              return (
+                                <div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                                    <span style={{ fontSize: 11, color: theme.text.secondary }}>{label}</span>
+                                    {progress && <span style={{ fontSize: 11, fontWeight: 600, color: theme.status.provisioning }}>{progress}</span>}
+                                  </div>
+                                  <div style={{ height: 6, background: theme.main.inputBg, borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
+                                    {isActive && !progress ? (
+                                      <div style={{ height: '100%', width: '40%', background: theme.status.provisioning, borderRadius: 3, opacity: 0.6, position: 'absolute', animation: 'indeterminate 1.5s ease-in-out infinite' }} />
+                                    ) : (
+                                      <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: theme.status.provisioning, borderRadius: 3, transition: 'width 0.5s ease' }} />
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })()}
+                          </td>
                           <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
                             <DropdownMenu
                               actions={[
+                                ...(vm.status !== 'running' ? [{ label: 'Edit', action: 'edit' }] : []),
                                 { label: 'Remove', action: 'remove', danger: true },
                               ]}
                               onAction={(action) => {
+                                if (action === 'edit') {
+                                  setEditingDisk({ name: disk.name, bus: disk.bus || 'virtio', boot_order: disk.boot_order ?? null, disk_type: disk.disk_type || 'disk' })
+                                  return
+                                }
                                 if (action === 'remove' && namespace && name) {
                                   const isRunning = vm.status === 'running'
                                   setConfirmAction({
@@ -1256,9 +1294,14 @@ export function VMDetailPage() {
                           <td className="table-cell" style={{ position: 'relative', zIndex: 10 }}>
                             <DropdownMenu
                               actions={[
+                                ...(vm.status !== 'running' ? [{ label: 'Edit', action: 'edit' }] : []),
                                 { label: 'Remove', action: 'remove', danger: true },
                               ]}
                               onAction={(action) => {
+                                if (action === 'edit') {
+                                  setEditingInterface({ name: net.name, model: net.model ?? null, mac_address: net.mac_address ?? null, network_profile: net.network_profile || '', network_cr: net.network_cr || '' })
+                                  return
+                                }
                                 if (action === 'remove' && namespace && name) {
                                   const isRunning = vm.status === 'running'
                                   setConfirmAction({
@@ -1722,6 +1765,20 @@ export function VMDetailPage() {
         vmName={name!}
         vmStatus={vm?.status ?? ''}
         existingNicCount={vm?.networks?.length ?? 0}
+      />
+      <EditDiskModal
+        open={!!editingDisk}
+        onClose={() => setEditingDisk(null)}
+        namespace={namespace!}
+        vmName={name!}
+        disk={editingDisk}
+      />
+      <EditInterfaceModal
+        open={!!editingInterface}
+        onClose={() => setEditingInterface(null)}
+        namespace={namespace!}
+        vmName={name!}
+        iface={editingInterface}
       />
       <PromptModal
         open={!!promptAction}
