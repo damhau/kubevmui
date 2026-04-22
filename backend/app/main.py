@@ -16,6 +16,7 @@ from app.api.routes import (
     datastores,
     events,
     images,
+    import_vm,
     kubevirt_info,
     metrics,
     migrations,
@@ -78,6 +79,17 @@ async def lifespan(app: FastAPI):
         import logging
 
         logging.getLogger(__name__).warning("Failed to seed pod-network CR", exc_info=True)
+    # Resume any in-flight migration plans
+    try:
+        from app.services.import_service import ImportService
+
+        if api_client:
+            import_svc = ImportService(KubeVirtClient(api_client))
+            resumed = await import_svc.resume_pending_plans()
+            if resumed:
+                logging.getLogger(__name__).info("Resumed %d in-flight migration plans", resumed)
+    except Exception:
+        logging.getLogger(__name__).warning("Failed to resume migration plans", exc_info=True)
     yield
 
 
@@ -108,6 +120,7 @@ def create_app() -> FastAPI:
     application.include_router(audit.router)
     application.include_router(auth.router)
     application.include_router(images.router)
+    application.include_router(import_vm.router)
     application.include_router(snapshots.router)
     application.include_router(migrations.router)
     application.include_router(ssh_keys.router)

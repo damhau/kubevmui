@@ -644,6 +644,64 @@ class KubeVirtClient:
             name=name,
         )
 
+    # ── MigrationPlans (kubevmui.io CRD, cluster-scoped, with status subresource) ──
+
+    def list_migration_plans(self) -> list[dict]:
+        result = self.custom_api.list_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="migrationplans",
+        )
+        return result.get("items", [])
+
+    def get_migration_plan(self, name: str) -> dict | None:
+        try:
+            return self.custom_api.get_cluster_custom_object(
+                group=self.KUBEVMUI_GROUP,
+                version=self.KUBEVMUI_VERSION,
+                plural="migrationplans",
+                name=name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                return None
+            raise
+
+    def create_migration_plan(self, body: dict) -> dict:
+        return self.custom_api.create_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="migrationplans",
+            body=body,
+        )
+
+    def delete_migration_plan(self, name: str) -> None:
+        self.custom_api.delete_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="migrationplans",
+            name=name,
+        )
+
+    def patch_migration_plan(self, name: str, body: dict) -> dict:
+        return self.custom_api.patch_cluster_custom_object(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="migrationplans",
+            name=name,
+            body=body,
+        )
+
+    def patch_migration_plan_status(self, name: str, status: dict) -> dict:
+        """Patch the ``status`` subresource of a MigrationPlan."""
+        return self.custom_api.patch_cluster_custom_object_status(
+            group=self.KUBEVMUI_GROUP,
+            version=self.KUBEVMUI_VERSION,
+            plural="migrationplans",
+            name=name,
+            body={"status": status},
+        )
+
     # ── Network CRs (cluster-scoped) ─────────────────────────────
 
     def list_network_crs(self) -> list[dict]:

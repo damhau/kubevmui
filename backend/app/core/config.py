@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     kubeconfig_path: str | None = None
     prometheus_url: str = "http://prometheus-prometheus.monitoring:9090"
     cdi_namespace: str = "cdi"
+    # VM Import
+    kubevmui_import_max_concurrent: int = 2
+    kubevmui_import_max_ova_size_gb: int = 50
+    kubevmui_import_staging_dir: str = "/tmp/kubevmui-imports"  # noqa: S108
 
     @field_validator("cors_origins", mode="before")
     @classmethod

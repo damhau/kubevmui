@@ -17,6 +17,12 @@ FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
+# qemu-utils provides qemu-img, used by the VM Import pipeline to convert
+# VHD/VHDX/VMDK source disks to qcow2 before uploading to CDI.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends qemu-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy uv binary for runtime use
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/
 

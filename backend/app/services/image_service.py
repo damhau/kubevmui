@@ -6,6 +6,7 @@ from kubernetes.client import ApiException
 
 from app.core.k8s_client import KubeVirtClient
 from app.models.image import Image, ImageCreate
+from app.services import cdi_upload
 
 logger = logging.getLogger(__name__)
 
@@ -238,109 +239,18 @@ class ImageService:
         _merge_dv_status(img, self.kv)
         return img
 
-    def _get_upload_proxy_url(self) -> str:
-        """Discover CDI upload proxy URL from CDIConfig (same as virtctl)."""
-        from app.core.config import settings
-
-        cdi_config = self.kv.custom_api.get_cluster_custom_object(
-            group="cdi.kubevirt.io",
-            version="v1beta1",
-            plural="cdiconfigs",
-            name="config",
-        )
-        override = (cdi_config.get("spec", {}).get("uploadProxyURLOverride") or "").strip()
-        if override:
-            return override
-        status_url = (cdi_config.get("status", {}).get("uploadProxyURL") or "").strip()
-        if status_url:
-            return status_url
-        raise RuntimeError(
-            f"CDI upload proxy URL not configured. "
-            f"Set spec.uploadProxyURLOverride on CDIConfig in namespace '{settings.cdi_namespace}'."
-        )
-
     def upload_image_stream(
         self, storage_namespace: str, name: str, file_stream, content_length: int = 0
     ) -> None:
-        """Stream file data to CDI upload proxy via direct HTTPS POST."""
-        import httpx
-
+        """Stream file data to CDI upload proxy via the shared helper."""
         logger.info(
             "upload_image_stream: starting upload for %s (storage_ns=%s, size=%d)",
-            name, storage_namespace, content_length,
+            name,
+            storage_namespace,
+            content_length,
         )
-
-        # Create upload token
-        token_body = {
-            "apiVersion": "upload.cdi.kubevirt.io/v1beta1",
-            "kind": "UploadTokenRequest",
-            "metadata": {"name": name, "namespace": storage_namespace},
-            "spec": {"pvcName": name},
-        }
-        logger.info(
-            "upload_image_stream: requesting upload token for PVC %s/%s",
-            storage_namespace, name,
-        )
-        token_result = self.kv.custom_api.create_namespaced_custom_object(
-            group="upload.cdi.kubevirt.io",
-            version="v1beta1",
-            namespace=storage_namespace,
-            plural="uploadtokenrequests",
-            body=token_body,
-        )
-        token = token_result.get("status", {}).get("token", "")
-        if not token:
-            raise RuntimeError("Failed to get CDI upload token")
-        logger.info("upload_image_stream: got upload token (length=%d)", len(token))
-
-        # Discover upload proxy URL (like virtctl does)
-        proxy_url = self._get_upload_proxy_url()
-        upload_url = f"{proxy_url.rstrip('/')}/v1beta1/upload-async"
-        logger.info("upload_image_stream: POST %s (content-length=%d)", upload_url, content_length)
-
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/octet-stream",
-        }
-        if content_length > 0:
-            headers["Content-Length"] = str(content_length)
-
-        import time
-
-        timeout = httpx.Timeout(connect=30.0, read=3600.0, write=3600.0, pool=3600.0)
-        max_retries = 12  # up to ~60s waiting for upload pod
-        with httpx.Client(verify=False, timeout=timeout) as client:
-            for attempt in range(max_retries):
-                response = client.post(
-                    upload_url,
-                    content=file_stream,
-                    headers=headers,
-                )
-                if response.status_code in (502, 503) and attempt < max_retries - 1:
-                    logger.warning(
-                        "upload_image_stream: attempt %d got %d (%s), retrying in 5s...",
-                        attempt + 1, response.status_code, response.text[:100],
-                    )
-                    time.sleep(5)
-                    # Reset stream position for retry
-                    if hasattr(file_stream, '_stream') and hasattr(file_stream._stream, 'seek'):
-                        file_stream._stream.seek(0)
-                        file_stream._progress.uploaded_bytes = 0
-                    continue
-                break
-
-            logger.info(
-                "upload_image_stream: response status=%d (length=%d)",
-                response.status_code, len(response.text),
-            )
-            if response.status_code >= 400:
-                logger.error(
-                    "upload_image_stream: CDI upload failed: %s", response.text[:500]
-                )
-                raise RuntimeError(
-                    f"CDI upload failed ({response.status_code}): {response.text[:500]}"
-                )
-        logger.info("upload_image_stream: upload completed successfully for %s", name)
+        cdi_upload.upload_stream(self.kv, storage_namespace, name, file_stream, content_length)
+        logger.info("upload_image_stream: upload completed for %s", name)
 
     def delete_image(self, name: str) -> None:
         # Look up the image first to find its storage namespace

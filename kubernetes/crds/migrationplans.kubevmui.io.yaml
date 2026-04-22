@@ -1,0 +1,191 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: migrationplans.kubevmui.io
+spec:
+  group: kubevmui.io
+  names:
+    kind: MigrationPlan
+    plural: migrationplans
+    singular: migrationplan
+    shortNames:
+      - mp
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - displayName
+                - source
+                - targetNamespace
+              properties:
+                displayName:
+                  type: string
+                description:
+                  type: string
+                  default: ""
+                source:
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    type:
+                      type: string
+                      enum: [hyperv, vcenter, esxi, ova]
+                    endpoint:
+                      type: string
+                      description: Hypervisor hostname or IP (hyperv/vcenter/esxi)
+                    credentialsRef:
+                      type: string
+                      description: Name of a K8s Secret holding username/password
+                    ovaUploadId:
+                      type: string
+                      description: Upload ID returned by /import/upload-ova (ova only)
+                    insecureSkipVerify:
+                      type: boolean
+                      default: false
+                    winrmPort:
+                      type: integer
+                      description: WinRM port (Hyper-V only). Default 5986 for HTTPS, 5985 for HTTP.
+                    winrmTransport:
+                      type: string
+                      enum: [https, http]
+                      description: WinRM transport (Hyper-V only)
+                targetNamespace:
+                  type: string
+                networkMappings:
+                  type: array
+                  default: []
+                  items:
+                    type: object
+                    required: [source, target]
+                    properties:
+                      source:
+                        type: string
+                      target:
+                        type: string
+                storageMappings:
+                  type: array
+                  default: []
+                  items:
+                    type: object
+                    required: [source, target]
+                    properties:
+                      source:
+                        type: string
+                      target:
+                        type: string
+                vms:
+                  type: array
+                  items:
+                    type: object
+                    required: [sourceVMId, sourceName]
+                    properties:
+                      sourceVMId:
+                        type: string
+                      sourceName:
+                        type: string
+                      targetName:
+                        type: string
+                      cpuCores:
+                        type: integer
+                      memoryMb:
+                        type: integer
+                      firmware:
+                        type: string
+                        enum: [bios, uefi]
+                      startAfterMigration:
+                        type: boolean
+                        default: false
+                      installGuestAgent:
+                        type: boolean
+                        default: true
+                      captureAsImage:
+                        type: boolean
+                        default: false
+                        description: Also create an Image CR referencing the bound PVC so the disk is reusable from the catalog.
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Validating
+                    - InProgress
+                    - Completed
+                    - Failed
+                    - PartiallyCompleted
+                startTime:
+                  type: string
+                  format: date-time
+                completionTime:
+                  type: string
+                  format: date-time
+                message:
+                  type: string
+                vmStatuses:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      phase:
+                        type: string
+                        enum:
+                          - Pending
+                          - ExportingDisk
+                          - ConvertingDisk
+                          - ImportingDisk
+                          - CreatingVM
+                          - Completed
+                          - Failed
+                      progress:
+                        type: integer
+                      error:
+                        type: string
+                      startTime:
+                        type: string
+                        format: date-time
+                      completionTime:
+                        type: string
+                        format: date-time
+                      diskStatuses:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            sizeMb:
+                              type: integer
+                            phase:
+                              type: string
+                            progress:
+                              type: integer
+      additionalPrinterColumns:
+        - name: Display Name
+          type: string
+          jsonPath: .spec.displayName
+        - name: Source
+          type: string
+          jsonPath: .spec.source.type
+        - name: Target NS
+          type: string
+          jsonPath: .spec.targetNamespace
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
