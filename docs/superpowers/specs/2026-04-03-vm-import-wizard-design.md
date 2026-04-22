@@ -1,29 +1,57 @@
 # VM Import Wizard — Design Spec
 
 **Date:** 2026-04-03
+**Updated:** 2026-04-08
 **Status:** Draft
+
+## Priorities
+
+| Priority | Source Hypervisor | Rationale |
+|---|---|---|
+| **P1** | **Microsoft Hyper-V** | Many organizations run Hyper-V on-prem (included with Windows Server). VHD/VHDX → qcow2 conversion is well-supported by qemu-img. WinRM-based discovery is straightforward. |
+| **P2** | **VMware vCenter / ESXi** | Large VMware install base. More complex API surface (pyvmomi/SOAP) but well-documented. |
+| — | **OVA/OVF file upload** | Hypervisor-agnostic fallback, supported from day one for both priorities. |
 
 ## Problem
 
-The primary audience for KubeVM UI is VMware vCenter administrators migrating to KubeVirt. The biggest barrier to adoption is the migration itself — converting VMware VMs (VMDKs, OVAs, OVFs) to KubeVirt-compatible formats and recreating networking/storage/configuration. Today this requires manual VMDK-to-qcow2 conversion, kubectl YAML authoring, and deep KubeVirt knowledge.
+The primary audience for KubeVM UI is administrators migrating traditional VMs (Hyper-V, VMware) to KubeVirt. The biggest barrier to adoption is the migration itself — converting disk images (VHD/VHDX, VMDK) to KubeVirt-compatible formats and recreating networking/storage/configuration. Today this requires manual disk conversion, kubectl YAML authoring, and deep KubeVirt knowledge.
 
 Red Hat offers MTV (Migration Toolkit for Virtualization) but it requires OpenShift. No standalone open-source tool exists for vanilla Kubernetes.
 
 ## Solution
 
-A guided **VM Import Wizard** that connects to a VMware vCenter or ESXi host, discovers VMs, maps their resources to KubeVirt equivalents, and orchestrates the migration — all from the KubeVM UI.
+A guided **VM Import Wizard** that connects to a source hypervisor (Hyper-V host or VMware vCenter/ESXi), discovers VMs, maps their resources to KubeVirt equivalents, and orchestrates the migration — all from the KubeVM UI.
 
 ## Key Decisions
 
-- **vCenter API integration** — Use VMware's REST API (vSphere Automation SDK) or SOAP API (pyvmomi) to discover VMs. Read-only access is sufficient for discovery; disk export requires limited privileges.
-- **Disk conversion** — VMDKs are converted to qcow2 and imported via CDI (Containerized Data Importer) DataVolumes. Conversion happens server-side (backend pod or a dedicated migration worker).
+- **Multi-hypervisor connectors** — Pluggable connector architecture. P1: Hyper-V via WinRM/PowerShell. P2: VMware via pyvmomi SOAP API.
+- **Hyper-V integration (P1)** — Connect to a Windows Server Hyper-V host via WinRM. Discover VMs using PowerShell remoting (`Get-VM`, `Get-VHD`). Export VHD/VHDX disks via SMB share or WinRM file transfer. Read-only WinRM access is sufficient for discovery; disk export requires Hyper-V Administrator privileges.
+- **vCenter API integration (P2)** — Use VMware's SOAP API (pyvmomi) to discover VMs. Read-only access is sufficient for discovery; disk export requires limited privileges.
+- **Disk conversion** — VHD/VHDX (Hyper-V) and VMDKs (VMware) are converted to qcow2 and imported via CDI (Containerized Data Importer) DataVolumes. Conversion happens server-side (backend pod or a dedicated migration worker). `qemu-img` supports all source formats natively.
 - **No agent required on source VMs** — Migration is agentless. Source VMs can be powered on (warm migration) or off (cold migration).
-- **Cold migration first** — Phase 1 supports powered-off VMs only. Warm migration (with change block tracking) is a future enhancement.
-- **OVA/OVF file import as alternative** — Users can upload OVA/OVF files directly if they don't want to connect to vCenter.
+- **Cold migration first** — Phase 1 supports powered-off VMs only. Warm migration is a future enhancement.
+- **OVA/OVF file import as alternative** — Users can upload OVA/OVF files directly if they don't want to connect to a hypervisor.
 - **Batch migration** — Select multiple VMs and migrate them as a group with progress tracking per VM.
 - **Migration plan persistence** — Migration plans are stored as a CRD (`migrationplans.kubevmui.io`) so they survive backend restarts and can be audited.
 
-## Concept Mapping: VMware → KubeVirt
+## Concept Mapping: Hyper-V → KubeVirt (P1)
+
+| Hyper-V Concept | KubeVM UI Mapping | KubeVirt Resource |
+|---|---|---|
+| Virtual Machine | VM in target namespace | `VirtualMachine` |
+| VHD/VHDX (disk) | Disk converted to qcow2 | `DataVolume` (CDI import) |
+| Virtual Switch | Network CR mapping | `Network` CR → NAD |
+| VM Storage Path | StorageClass mapping | `StorageClass` → PVC |
+| Generation 1 / 2 | Firmware selection (BIOS/UEFI) | VM spec `firmware` |
+| Integration Services | qemu-guest-agent (cloud-init) | cloud-init `runcmd` |
+| CPU/Memory | Compute resources | VM spec `cpu`/`memory` |
+| Checkpoints | Not migrated (recreate post-migration) | `VirtualMachineSnapshot` |
+| ISO media | Not migrated | — |
+| Fibre Channel adapters | Not migrated | — |
+| RemoteFX / GPU-P | Not migrated (manual post-migration) | — |
+| Pass-through disks | Not migrated (manual post-migration) | — |
+
+## Concept Mapping: VMware → KubeVirt (P2)
 
 | VMware Concept | KubeVM UI Mapping | KubeVirt Resource |
 |---|---|---|
@@ -53,14 +81,19 @@ A guided **VM Import Wizard** that connects to a VMware vCenter or ESXi host, di
 │                   Backend: ImportService                     │
 │                                                              │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │ vCenter      │  │ OVA/OVF      │  │ Migration Plan    │  │
-│  │ Connector    │  │ Parser       │  │ Controller        │  │
-│  │ (pyvmomi)    │  │              │  │ (orchestration)   │  │
+│  │ Hyper-V      │  │ vCenter      │  │ Migration Plan    │  │
+│  │ Connector    │  │ Connector    │  │ Controller        │  │
+│  │ (WinRM) [P1] │  │ (pyvmomi)[P2]│  │ (orchestration)   │  │
 │  └──────┬───────┘  └──────┬───────┘  └─────────┬─────────┘  │
+│         │                 │                     │            │
+│         │          ┌──────┴───────┐              │            │
+│         │          │ OVA/OVF      │              │            │
+│         │          │ Parser       │              │            │
+│         │          └──────┬───────┘              │            │
 │         │                 │                     │            │
 │  ┌──────▼─────────────────▼─────────────────────▼─────────┐  │
 │  │                  Disk Converter                         │  │
-│  │   VMDK → qcow2 (qemu-img) → CDI DataVolume import     │  │
+│  │  VHD/VHDX|VMDK → qcow2 (qemu-img) → CDI DV import    │  │
 │  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -86,10 +119,12 @@ A guided **VM Import Wizard** that connects to a VMware vCenter or ESXi host, di
 | `displayName` | string | yes | Human-readable plan name |
 | `description` | string | no | Optional description |
 | `source` | object | yes | Source environment connection details |
-| `source.type` | enum | yes | `vcenter`, `esxi`, or `ova` |
-| `source.endpoint` | string | conditional | vCenter/ESXi hostname or IP (not for OVA) |
+| `source.type` | enum | yes | `hyperv`, `vcenter`, `esxi`, or `ova` |
+| `source.endpoint` | string | conditional | Hyper-V/vCenter/ESXi hostname or IP (not for OVA) |
 | `source.credentials` | string | conditional | K8s Secret name containing username/password |
 | `source.insecureSkipVerify` | boolean | no | Skip TLS verification (default: false) |
+| `source.winrmPort` | integer | no | WinRM port (default: 5986 for HTTPS, 5985 for HTTP). Hyper-V only. |
+| `source.winrmTransport` | enum | no | `https` (default) or `http`. Hyper-V only. |
 | `targetNamespace` | string | yes | Namespace where VMs will be created |
 | `networkMappings` | array | yes | VMware network → Network CR mappings |
 | `networkMappings[].source` | string | yes | VMware network name (e.g., "VM Network") |
@@ -123,7 +158,61 @@ A guided **VM Import Wizard** that connects to a VMware vCenter or ESXi host, di
 | `vmStatuses[].startTime` | string | Per-VM start time |
 | `vmStatuses[].completionTime` | string | Per-VM completion time |
 
-### Example
+### Example: Hyper-V Migration (P1)
+
+```yaml
+apiVersion: kubevmui.io/v1
+kind: MigrationPlan
+metadata:
+  name: migrate-hyperv-web
+  namespace: production
+spec:
+  displayName: "Migrate Web VMs from Hyper-V"
+  source:
+    type: hyperv
+    endpoint: hyperv-host01.corp.local
+    credentials: hyperv-credentials
+    winrmTransport: https
+    insecureSkipVerify: true
+  targetNamespace: production
+  networkMappings:
+    - source: "Default Switch"
+      target: pod-network
+    - source: "Production VLAN"
+      target: prod-vlan100
+  storageMappings:
+    - source: "C:\\Hyper-V\\Virtual Hard Disks"
+      target: longhorn
+  vms:
+    - sourceVMId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      sourceName: "web-frontend-01"
+      targetName: "web-frontend-01"
+      firmware: uefi    # Hyper-V Gen2
+      startAfterMigration: false
+      installGuestAgent: true
+    - sourceVMId: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+      sourceName: "web-frontend-02"
+      targetName: "web-frontend-02"
+      firmware: bios    # Hyper-V Gen1
+      startAfterMigration: false
+status:
+  phase: InProgress
+  startTime: "2026-04-08T10:00:00Z"
+  vmStatuses:
+    - name: web-frontend-01
+      phase: ImportingDisk
+      progress: 65
+      diskStatuses:
+        - name: "web-frontend-01.vhdx"
+          sizeMb: 40960
+          phase: Importing
+          progress: 65
+    - name: web-frontend-02
+      phase: Pending
+      progress: 0
+```
+
+### Example: VMware Migration (P2)
 
 ```yaml
 apiVersion: kubevmui.io/v1
@@ -181,23 +270,40 @@ status:
 ### Step 1: Source Selection
 
 **Options:**
-- **VMware vCenter** — Enter hostname, username, password. "Test Connection" button validates credentials and API access.
-- **VMware ESXi** — Direct ESXi host connection (for smaller environments without vCenter).
-- **OVA/OVF File** — Upload an OVA file or provide a URL to an OVF descriptor. No VMware connection needed.
+- **Hyper-V (P1)** — Enter Windows Server hostname, username, password. Connects via WinRM (HTTPS by default). "Test Connection" validates WinRM access and Hyper-V role.
+- **VMware vCenter (P2)** — Enter hostname, username, password. "Test Connection" button validates credentials and API access.
+- **VMware ESXi (P2)** — Direct ESXi host connection (for smaller environments without vCenter).
+- **OVA/OVF File** — Upload an OVA file or provide a URL to an OVF descriptor. No hypervisor connection needed.
+
+For Hyper-V:
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Source Type:  ● Hyper-V  ○ vCenter  ○ ESXi  ○ OVA/OVF     │
+│                                                              │
+│ Hostname:    [hyperv-host01.corp.local     ]                │
+│ Username:    [CORP\admin                   ]                │
+│ Password:    [••••••••••••••               ]                │
+│ Transport:   [HTTPS ▾]  Port: [5986]                        │
+│ Skip TLS:    ☑ (self-signed cert)                           │
+│                                                              │
+│              [Test Connection]  ✓ Connected                  │
+│              Hyper-V 10.0.20348 │ Found: 12 VMs             │
+└──────────────────────────────────────────────────────────────┘
+```
 
 For vCenter/ESXi:
 ```
-┌─────────────────────────────────────────────────┐
-│ Source Type:  ● vCenter  ○ ESXi  ○ OVA/OVF     │
-│                                                  │
-│ Hostname:    [vcenter.corp.local        ]       │
-│ Username:    [administrator@vsphere.local]       │
-│ Password:    [••••••••••••••            ]       │
-│ Skip TLS:    ☑ (self-signed cert)               │
-│                                                  │
-│              [Test Connection]  ✓ Connected      │
-│              Found: 3 datacenters, 47 VMs       │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ Source Type:  ○ Hyper-V  ● vCenter  ○ ESXi  ○ OVA/OVF     │
+│                                                              │
+│ Hostname:    [vcenter.corp.local           ]                │
+│ Username:    [administrator@vsphere.local  ]                │
+│ Password:    [••••••••••••••               ]                │
+│ Skip TLS:    ☑ (self-signed cert)                           │
+│                                                              │
+│              [Test Connection]  ✓ Connected                  │
+│              Found: 3 datacenters, 47 VMs                   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 Credentials are stored as a K8s Secret (never persisted in the CRD spec itself).
@@ -354,12 +460,14 @@ Progress updates via polling (5s interval). Each VM shows:
 ## Migration Pipeline (per VM)
 
 ```
-1. Export Disk(s) from VMware
-   └── vCenter API: download VMDK via HTTP/NFC
+1. Export Disk(s) from Source Hypervisor
+   ├── Hyper-V: copy VHD/VHDX via SMB share or WinRM file transfer
+   └── VMware: download VMDK via vCenter HTTP/NFC API
    └── Stream to temporary PVC or local storage
 
 2. Convert Disk(s)
-   └── qemu-img convert -f vmdk -O qcow2 input.vmdk output.qcow2
+   ├── Hyper-V:  qemu-img convert -f vpc -O qcow2 input.vhdx output.qcow2
+   └── VMware:   qemu-img convert -f vmdk -O qcow2 input.vmdk output.qcow2
    └── Runs in a migration worker pod (or backend pod)
 
 3. Import Disk(s) via CDI
@@ -369,6 +477,7 @@ Progress updates via polling (5s interval). Each VM shows:
 
 4. Create VM Manifest
    └── Map CPU, memory, firmware from source VM config
+   ├── Hyper-V Gen1 → BIOS, Gen2 → UEFI
    └── Attach imported DataVolumes as disks
    └── Attach mapped Network CRs as interfaces
    └── Inject cloud-init (guest agent install)
@@ -391,9 +500,10 @@ Progress updates via polling (5s interval). Each VM shows:
 |---|---|
 | `backend/app/models/import_vm.py` | Pydantic models for migration plan, VM source, progress tracking |
 | `backend/app/services/import_service.py` | Migration orchestration, plan lifecycle management |
-| `backend/app/services/vcenter_connector.py` | VMware vCenter/ESXi API client (pyvmomi wrapper) |
+| `backend/app/services/hyperv_connector.py` | **(P1)** Hyper-V host discovery and disk export via WinRM/PowerShell |
+| `backend/app/services/vcenter_connector.py` | **(P2)** VMware vCenter/ESXi API client (pyvmomi wrapper) |
 | `backend/app/services/ova_parser.py` | OVA/OVF file parsing and disk extraction |
-| `backend/app/services/disk_converter.py` | VMDK-to-qcow2 conversion (qemu-img subprocess) |
+| `backend/app/services/disk_converter.py` | VHD/VHDX/VMDK-to-qcow2 conversion (qemu-img subprocess) |
 | `backend/app/api/routes/import_vm.py` | REST endpoints for migration plans |
 | `kubernetes/crds/migrationplans.kubevmui.io.yaml` | MigrationPlan CRD definition |
 
@@ -403,11 +513,12 @@ Progress updates via polling (5s interval). Each VM shows:
 # pyproject.toml additions
 dependencies = [
     # ... existing ...
-    "pyvmomi>=8.0",        # VMware vSphere API client
+    "pywinrm>=0.4",        # P1: WinRM client for Hyper-V
+    "pyvmomi>=8.0",        # P2: VMware vSphere API client
 ]
 ```
 
-`qemu-img` must be available in the backend container image (install via `apt-get install qemu-utils` in Dockerfile).
+`qemu-img` must be available in the backend container image (install via `apt-get install qemu-utils` in Dockerfile). It natively supports VHD/VHDX (Hyper-V) and VMDK (VMware) as source formats.
 
 ### API Endpoints
 
@@ -454,18 +565,20 @@ Main
 
 ## Security Considerations
 
-- **vCenter credentials** stored as K8s Secrets with `type: Opaque`, referenced by Secret name in the MigrationPlan spec. Never stored in CRD directly.
+- **Hypervisor credentials** stored as K8s Secrets with `type: Opaque`, referenced by Secret name in the MigrationPlan spec. Never stored in CRD directly.
 - **RBAC** — import operations require cluster-admin or a dedicated `kubevmui-import` ClusterRole with permissions to create DataVolumes, VMs, and Secrets.
-- **Network isolation** — the backend must be able to reach the vCenter/ESXi endpoint. In air-gapped environments, use OVA file upload instead.
-- **Disk data in transit** — VMDK download over HTTPS (vCenter NFC). qcow2 upload to CDI over HTTPS.
+- **Network isolation** — the backend must be able to reach the Hyper-V host (WinRM port 5985/5986) or vCenter/ESXi endpoint. In air-gapped environments, use OVA file upload instead.
+- **Disk data in transit** — VHD/VHDX transfer via WinRM HTTPS or SMB (Hyper-V). VMDK download over HTTPS (vCenter NFC). qcow2 upload to CDI over HTTPS.
+- **WinRM security** — Prefer HTTPS transport (port 5986) with certificate validation. HTTP (5985) should only be used in lab/dev environments with `insecureSkipVerify: true`.
 
 ## Out of Scope (Future)
 
-- **Warm migration** — Migrate running VMs using VMware CBT (Changed Block Tracking) for near-zero downtime. Requires iterative disk sync.
+- **Warm migration** — Migrate running VMs with near-zero downtime (VMware CBT, Hyper-V Replica). Requires iterative disk sync.
+- **SCVMM integration** — Connect to System Center Virtual Machine Manager for centralized Hyper-V discovery across multiple hosts.
 - **Bulk migration scheduling** — Schedule migrations for maintenance windows.
 - **Automatic source VM shutdown** — Optionally power off source VM after successful migration.
-- **Source VM deletion** — Delete source VM from vCenter after migration. Dangerous, requires explicit confirmation.
-- **Migration from other hypervisors** — Hyper-V, KVM/libvirt, Proxmox. Each needs its own connector.
+- **Source VM deletion** — Delete source VM from hypervisor after migration. Dangerous, requires explicit confirmation.
+- **Migration from other hypervisors** — KVM/libvirt, Proxmox. Each needs its own connector.
 - **P2V (Physical to Virtual)** — Convert physical servers to VMs. Out of scope.
 - **Windows Sysprep integration** — Generalize Windows VMs during migration.
-- **Network mapping auto-detection** — Suggest KubeVirt network mappings based on VLAN IDs matching VMware port groups.
+- **Network mapping auto-detection** — Suggest KubeVirt network mappings based on VLAN IDs matching source hypervisor virtual switches.

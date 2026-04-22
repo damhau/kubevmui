@@ -4,6 +4,40 @@
 
 KubeVM UI — a full-stack web application for managing KubeVirt virtual machines on Kubernetes. Monorepo with a Python FastAPI backend and a React TypeScript frontend.
 
+
+## GitHub Issues Workflow
+
+Repository: `damhau/kubevmui`
+
+### Session start
+At the beginning of each conversation, run `gh issue list --repo damhau/kubevmui --limit 20` to be aware of open issues. If the user's request relates to an open issue, reference it and ask if they want to work on it.
+
+### Bug discovery
+When you discover a bug or broken behavior during work that is NOT the current task, ask the user: "I found [describe bug]. Want me to create a GitHub issue for this?" If yes, create it with the `type:bug` label, appropriate `comp:` label, and `status:needs-triage`.
+
+### Plan to issues
+When entering plan mode for a non-trivial feature or refactor, after the plan is approved, offer to create one GitHub issue per major task in the plan. Link related issues with "Related: #N" in the body. Apply appropriate type/component/priority labels.
+
+### Working on issues
+- When starting work on an existing issue, mention "Working on #N" at the start.
+- ALWAYS read the content of the issue before starting to work
+- Add a comment to the issue with the planned approach: `gh issue comment N --repo damhau/triaj --body "approach summary"`.
+- If you hit a blocker or change approach, comment on the issue to keep a record.
+- In commit messages, use `Fixes #N` (for bugs) or `Refs #N` (for partial progress) to link commits to issues.
+- When work is complete, close the issue with a summary comment: `gh issue close N --repo damhau/triaj --comment "what was done"`.
+- Update labels as needed (e.g. add `status:blocked` if blocked, remove when unblocked).
+
+### Creating issues
+- Before creating, check for duplicates: `gh issue list --search "keywords" --repo damhau/triaj`.
+- Always apply: one `type:` label, one or more `comp:` labels, one `priority:` label.
+- Use the matching template structure (bug/feature/chore fields).
+
+### Labels reference
+- **Type**: `type:bug`, `type:feature`, `type:enhancement`, `type:chore`
+- **Priority**: `priority:high`, `priority:medium`, `priority:low`
+- **Status**: `status:blocked`
+
+
 ## Repository Structure
 
 ```
